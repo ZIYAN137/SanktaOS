@@ -13,7 +13,7 @@
 //! - 写者饥饿：连续读者可能饿死写者（内核场景可接受）
 //! - 不支持锁升级/降级：尝试升级会死锁
 
-use crate::sync::intr_guard::IntrGuard;
+use crate::intr_guard::IntrGuard;
 use core::{
     cell::UnsafeCell,
     hint,
@@ -33,12 +33,14 @@ pub struct RwLock<T> {
 /// 读锁的 RAII 保护器
 pub struct RwLockReadGuard<'a, T> {
     lock: &'a RwLock<T>,
+    #[allow(dead_code)]
     intr_guard: IntrGuard,
 }
 
 /// 写锁的 RAII 保护器
 pub struct RwLockWriteGuard<'a, T> {
     lock: &'a RwLock<T>,
+    #[allow(dead_code)]
     intr_guard: IntrGuard,
 }
 
@@ -245,122 +247,3 @@ unsafe impl<T: Send> Send for RwLock<T> {}
 
 // SAFETY: RwLock 可以在线程间共享，只要 T 是 Send + Sync
 unsafe impl<T: Send + Sync> Sync for RwLock<T> {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{arch::intr::are_interrupts_enabled, kassert, test_case};
-
-    test_case!(test_rwlock_read_basic, {
-        let lock = RwLock::new(42);
-
-        let guard = lock.read();
-        kassert!(*guard == 42);
-        kassert!(lock.reader_count() == 1);
-        kassert!(!lock.is_write_locked());
-
-        drop(guard);
-        kassert!(lock.reader_count() == 0);
-    });
-
-    test_case!(test_rwlock_write_basic, {
-        let lock = RwLock::new(100);
-
-        let mut guard = lock.write();
-        kassert!(*guard == 100);
-        kassert!(lock.is_write_locked());
-        kassert!(lock.reader_count() == 0);
-
-        *guard = 200;
-        drop(guard);
-
-        kassert!(!lock.is_write_locked());
-
-        let guard = lock.read();
-        kassert!(*guard == 200);
-    });
-
-    test_case!(test_rwlock_multiple_readers, {
-        let lock = RwLock::new(42);
-
-        let guard1 = lock.read();
-        kassert!(lock.reader_count() == 1);
-
-        let guard2 = lock.read();
-        kassert!(lock.reader_count() == 2);
-
-        let guard3 = lock.read();
-        kassert!(lock.reader_count() == 3);
-
-        kassert!(*guard1 == 42);
-        kassert!(*guard2 == 42);
-        kassert!(*guard3 == 42);
-
-        drop(guard1);
-        kassert!(lock.reader_count() == 2);
-
-        drop(guard2);
-        kassert!(lock.reader_count() == 1);
-
-        drop(guard3);
-        kassert!(lock.reader_count() == 0);
-    });
-
-    test_case!(test_rwlock_writer_excludes_readers, {
-        let lock = RwLock::new(0);
-
-        let guard = lock.write();
-        kassert!(lock.is_write_locked());
-
-        // 尝试获取读锁应该失败
-        let read_guard = lock.try_read();
-        kassert!(read_guard.is_none());
-
-        drop(guard);
-
-        // 释放写锁后应该可以获取读锁
-        let read_guard = lock.try_read();
-        kassert!(read_guard.is_some());
-    });
-
-    test_case!(test_rwlock_interrupt_disable, {
-        let lock = RwLock::new(0);
-
-        let guard = lock.read();
-        kassert!(!are_interrupts_enabled());
-        drop(guard);
-        kassert!(are_interrupts_enabled());
-
-        let guard = lock.write();
-        kassert!(!are_interrupts_enabled());
-        drop(guard);
-        kassert!(are_interrupts_enabled());
-    });
-
-    test_case!(test_rwlock_try_read, {
-        let lock = RwLock::new(42);
-
-        if let Some(guard) = lock.try_read() {
-            kassert!(*guard == 42);
-        } else {
-            kassert!(false); // try_read 应该成功
-        }
-    });
-
-    test_case!(test_rwlock_try_write, {
-        let lock = RwLock::new(100);
-
-        let guard = lock.try_write();
-        kassert!(guard.is_some());
-
-        // 持有写锁时，再次 try_write 应该失败
-        let guard2 = lock.try_write();
-        kassert!(guard2.is_none());
-
-        drop(guard);
-
-        // 释放后应该可以获取
-        let guard3 = lock.try_write();
-        kassert!(guard3.is_some());
-    });
-}

@@ -8,14 +8,14 @@ build-std-features = ["compiler-builtins-mem"]
 
 [target.riscv64gc-unknown-none-elf]
 rustflags = [
-    "-Clink-arg=-Tsrc/linker.ld", "-Cforce-frame-pointers=yes"
+    "-Clink-arg=-Tos/src/linker.ld", "-Cforce-frame-pointers=yes"
 ]
 
 runner = "./qemu-run.sh"
 
 [target.loongarch64-unknown-none]
 rustflags = [
-    "-Clink-arg=-Tsrc/loongarch_linker.ld", "-Cforce-frame-pointers=yes"
+    "-Clink-arg=-Tos/src/loongarch_linker.ld", "-Cforce-frame-pointers=yes"
 ]
 
 runner = "./qemu-loongarch-run.sh"

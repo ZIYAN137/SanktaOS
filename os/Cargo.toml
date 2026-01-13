@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+uapi = { path = "../crates/uapi" }
+sync = { path = "../crates/sync" }
 talc = { version = "4" }
 lock_api = "0.4"
 bitflags = { version = "2.10.0" }

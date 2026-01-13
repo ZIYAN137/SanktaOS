@@ -141,7 +141,7 @@ unsafe impl<T: Send> Sync for PerCpu<T> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sync::PreemptGuard;
+    use sync::PreemptGuard;
     use crate::{kassert, test_case};
     use core::sync::atomic::{AtomicUsize, Ordering};
 

@@ -2,9 +2,8 @@
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::kernel::{WaitQueue, current_cpu, current_task, yield_task};
-use crate::sync::SpinLock;
-use crate::sync::{raw_spin_lock::RawSpinLock, raw_spin_lock::RawSpinLockGuard};
+use crate::kernel::{WaitQueue, current_task, yield_task};
+use sync::{RawSpinLock, RawSpinLockGuard, SpinLock};
 
 /// 互斥锁
 pub struct Mutex<T> {

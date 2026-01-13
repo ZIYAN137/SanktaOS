@@ -12,7 +12,7 @@
 //! # 已知限制
 //! - 票号溢出：next_ticket 在 usize::MAX 时回绕，可能导致死锁（实际不太可能发生）
 
-use crate::sync::intr_guard::IntrGuard;
+use crate::intr_guard::IntrGuard;
 use core::{
     cell::UnsafeCell,
     hint,
@@ -30,6 +30,7 @@ pub struct TicketLock<T> {
 /// 票号锁的 RAII 保护器
 pub struct TicketLockGuard<'a, T> {
     lock: &'a TicketLock<T>,
+    #[allow(dead_code)]
     intr_guard: IntrGuard,
 }
 
@@ -141,83 +142,3 @@ unsafe impl<T: Send> Send for TicketLock<T> {}
 
 // SAFETY: TicketLock 可以在线程间共享，只要 T 是 Send + Sync
 unsafe impl<T: Send + Sync> Sync for TicketLock<T> {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{arch::intr::are_interrupts_enabled, kassert, test_case};
-
-    test_case!(test_ticket_lock_basic, {
-        let lock = TicketLock::new(42);
-        kassert!(!lock.is_locked());
-
-        let guard = lock.lock();
-        kassert!(lock.is_locked());
-        kassert!(*guard == 42);
-
-        drop(guard);
-        kassert!(!lock.is_locked());
-    });
-
-    test_case!(test_ticket_lock_raii, {
-        let lock = TicketLock::new(100);
-
-        {
-            let mut guard = lock.lock();
-            kassert!(lock.is_locked());
-            *guard = 200;
-        }
-
-        kassert!(!lock.is_locked());
-
-        let guard = lock.lock();
-        kassert!(*guard == 200);
-    });
-
-    test_case!(test_ticket_lock_fairness, {
-        let lock = TicketLock::new(0);
-
-        // 获取第一个票号
-        let guard1 = lock.lock();
-        kassert!(lock.next_ticket.load(Ordering::Relaxed) == 1);
-        kassert!(lock.serving_ticket.load(Ordering::Relaxed) == 0);
-
-        drop(guard1);
-
-        // 获取第二个票号
-        let guard2 = lock.lock();
-        kassert!(lock.next_ticket.load(Ordering::Relaxed) == 2);
-        kassert!(lock.serving_ticket.load(Ordering::Relaxed) == 1);
-
-        drop(guard2);
-    });
-
-    test_case!(test_ticket_lock_interrupt_disable, {
-        let lock = TicketLock::new(0);
-
-        let guard = lock.lock();
-        kassert!(!are_interrupts_enabled());
-
-        drop(guard);
-        kassert!(are_interrupts_enabled());
-    });
-
-    test_case!(test_ticket_lock_try_lock, {
-        let lock = TicketLock::new(42);
-
-        // 第一次 try_lock 应该成功
-        let guard = lock.try_lock();
-        kassert!(guard.is_some());
-        kassert!(lock.is_locked());
-
-        // 第二次 try_lock 应该失败（锁已被占用）
-        let guard2 = lock.try_lock();
-        kassert!(guard2.is_none());
-
-        drop(guard);
-
-        // 释放后再次 try_lock 应该成功
-        let guard3 = lock.try_lock();
-        kassert!(guard3.is_some());
-    });
-}

@@ -10,14 +10,14 @@ LOG ?=
 # 根据架构设置变量
 ifeq ($(ARCH),loongarch)
     TARGET := loongarch64-unknown-none
-    TARGET_DIR := target/loongarch64-unknown-none/debug
+    TARGET_DIR := ../target/loongarch64-unknown-none/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-loongarch-run.sh
     GDB_BIN := loongarch64-unknown-elf-gdb
     GDB_ARCH_SETUP :=
 else
     TARGET := riscv64gc-unknown-none-elf
-    TARGET_DIR := target/riscv64gc-unknown-none-elf/debug
+    TARGET_DIR := ../target/riscv64gc-unknown-none-elf/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-run.sh
     GDB_BIN := riscv64-unknown-elf-gdb

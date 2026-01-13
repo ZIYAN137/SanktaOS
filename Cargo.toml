@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = ["os", "crates/uapi", "crates/sync"]
+exclude = ["user"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+bitflags = "2.10.0"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+private_intra_doc_links = "deny"
+
+[workspace.lints.rust]
+missing_docs = "deny"
+single_use_lifetimes = "warn"
+
+[workspace.lints.clippy]
+todo = "warn"
+needless_borrow = "deny"
+redundant_clone = "deny"
+
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 1

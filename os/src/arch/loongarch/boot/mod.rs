@@ -272,6 +272,9 @@ pub fn main(hartid: usize) {
     // instructions very early during startup.
     loongArch64::register::euen::set_fpe(true);
 
+    // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
+    unsafe { crate::arch::init_sync_arch_ops() };
+
     run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");

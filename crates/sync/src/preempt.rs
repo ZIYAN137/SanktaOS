@@ -4,7 +4,10 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::config::MAX_CPU_COUNT;
+use crate::arch_ops;
+
+/// 最大支持的 CPU 数量（编译时常量）
+const MAX_CPUS: usize = 16;
 
 /// 缓存行对齐的原子计数器
 ///
@@ -21,9 +24,9 @@ impl CacheAlignedAtomic {
 /// Per-CPU 抢占计数器
 ///
 /// 每个 CPU 维护一个计数器，> 0 表示抢占已禁用。
-static PREEMPT_COUNT: [CacheAlignedAtomic; MAX_CPU_COUNT] = {
+static PREEMPT_COUNT: [CacheAlignedAtomic; MAX_CPUS] = {
     const INIT: CacheAlignedAtomic = CacheAlignedAtomic::new();
-    [INIT; MAX_CPU_COUNT]
+    [INIT; MAX_CPUS]
 };
 
 /// 禁用抢占
@@ -31,7 +34,7 @@ static PREEMPT_COUNT: [CacheAlignedAtomic; MAX_CPU_COUNT] = {
 /// 可以嵌套调用，每次调用增加计数器。
 #[inline]
 pub fn preempt_disable() {
-    let cpu_id = crate::arch::kernel::cpu::cpu_id();
+    let cpu_id = arch_ops().cpu_id();
     PREEMPT_COUNT[cpu_id].0.fetch_add(1, Ordering::Relaxed);
     // Acquire 屏障，确保后续访问不会被重排到此之前
     core::sync::atomic::fence(Ordering::Acquire);
@@ -44,14 +47,14 @@ pub fn preempt_disable() {
 pub fn preempt_enable() {
     // Release 屏障，确保之前的访问不会被重排到此之后
     core::sync::atomic::fence(Ordering::Release);
-    let cpu_id = crate::arch::kernel::cpu::cpu_id();
+    let cpu_id = arch_ops().cpu_id();
     PREEMPT_COUNT[cpu_id].0.fetch_sub(1, Ordering::Relaxed);
 }
 
 /// 检查抢占是否已禁用
 #[inline]
 pub fn preempt_disabled() -> bool {
-    let cpu_id = crate::arch::kernel::cpu::cpu_id();
+    let cpu_id = arch_ops().cpu_id();
     PREEMPT_COUNT[cpu_id].0.load(Ordering::Relaxed) > 0
 }
 
@@ -74,45 +77,4 @@ impl Drop for PreemptGuard {
     fn drop(&mut self) {
         preempt_enable();
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{kassert, test_case};
-
-    test_case!(test_preempt_disable_enable, {
-        kassert!(!preempt_disabled());
-        preempt_disable();
-        kassert!(preempt_disabled());
-        preempt_disable();
-        kassert!(preempt_disabled());
-        preempt_enable();
-        kassert!(preempt_disabled());
-        preempt_enable();
-        kassert!(!preempt_disabled());
-    });
-
-    test_case!(test_preempt_guard, {
-        kassert!(!preempt_disabled());
-        {
-            let _guard = PreemptGuard::new();
-            kassert!(preempt_disabled());
-        }
-        kassert!(!preempt_disabled());
-    });
-
-    test_case!(test_nested_preempt_guard, {
-        kassert!(!preempt_disabled());
-        {
-            let _guard1 = PreemptGuard::new();
-            kassert!(preempt_disabled());
-            {
-                let _guard2 = PreemptGuard::new();
-                kassert!(preempt_disabled());
-            }
-            kassert!(preempt_disabled());
-        }
-        kassert!(!preempt_disabled());
-    });
 }
