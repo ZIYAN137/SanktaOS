@@ -20,7 +20,7 @@ use crate::{
     },
     vfs::{
         DENTRY_CACHE, Dentry, FileMode, FsError, InodeType, OpenFlags, RegFile, SeekWhence, Stat,
-        Statx, split_path, vfs_lookup,
+        StatExt, Statx, StatxExt, split_path, vfs_lookup,
     },
 };
 
@@ -813,7 +813,7 @@ pub fn utimensat(dirfd: i32, pathname: *const c_char, times: *const TimeSpec, fl
     // 解析时间参数
     let (atime_opt, mtime_opt) = if times.is_null() {
         // NULL 表示将两个时间都设置为当前时间
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         (Some(now), Some(now))
     } else {
         unsafe {
@@ -832,7 +832,7 @@ pub fn utimensat(dirfd: i32, pathname: *const c_char, times: *const TimeSpec, fl
             let atime_opt = if user_times[0].is_omit() {
                 None // 不修改
             } else if user_times[0].is_now() {
-                Some(TimeSpec::now())
+                Some(crate::time_ext::timespec_now())
             } else {
                 Some(user_times[0])
             };
@@ -841,7 +841,7 @@ pub fn utimensat(dirfd: i32, pathname: *const c_char, times: *const TimeSpec, fl
             let mtime_opt = if user_times[1].is_omit() {
                 None
             } else if user_times[1].is_now() {
-                Some(TimeSpec::now())
+                Some(crate::time_ext::timespec_now())
             } else {
                 Some(user_times[1])
             };
@@ -866,7 +866,7 @@ pub fn renameat2(
     newpath: *const c_char,
     flags: u32,
 ) -> isize {
-    use crate::uapi::{
+    use uapi::{
         errno::{EEXIST, ENOTDIR},
         fs::RenameFlags,
     };
@@ -1476,7 +1476,7 @@ pub fn fdatasync(fd: usize) -> isize {
 /// # 在单 root 用户系统中的行为
 /// 所有调用都会成功并更新 inode 的 uid/gid 字段，不进行权限检查
 pub fn fchownat(dirfd: i32, pathname: *const c_char, owner: u32, group: u32, flags: u32) -> isize {
-    use crate::uapi::fs::AtFlags;
+    use uapi::fs::AtFlags;
 
     // 解析路径字符串
     let _guard = SumGuard::new();
@@ -1545,7 +1545,7 @@ pub fn fchownat(dirfd: i32, pathname: *const c_char, owner: u32, group: u32, fla
 /// # 在单 root 用户系统中的行为
 /// 所有调用都会成功并更新 inode 的 mode 字段，不进行权限检查
 pub fn fchmodat(dirfd: i32, pathname: *const c_char, mode: u32, flags: u32) -> isize {
-    use crate::uapi::fs::AtFlags;
+    use uapi::fs::AtFlags;
 
     // 解析路径字符串
     let _guard = SumGuard::new();

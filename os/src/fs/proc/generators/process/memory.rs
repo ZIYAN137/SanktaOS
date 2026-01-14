@@ -1,4 +1,5 @@
-use crate::{config::PAGE_SIZE, mm::memory_space::MemorySpace};
+use crate::config::PAGE_SIZE;
+use crate::mm::memory_space::MemorySpace;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProcMemStats {

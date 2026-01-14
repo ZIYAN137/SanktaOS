@@ -85,7 +85,7 @@
 
 use core::any::Any;
 
-use crate::uapi::time::TimeSpec;
+use uapi::time::TimeSpec;
 use crate::vfs::{Dentry, FsError};
 use alloc::string::String;
 use alloc::sync::Arc;

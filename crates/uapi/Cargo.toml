@@ -1,10 +1,10 @@
 [package]
 name = "uapi"
-version.workspace = true
-edition.workspace = true
+version = "0.1.0"
+edition = "2024"
 
 [dependencies]
-bitflags = { workspace = true }
+bitflags = "2.10.0"
 
 # uapi 暂时放宽文档要求，后续逐步补齐
 [lints.rust]

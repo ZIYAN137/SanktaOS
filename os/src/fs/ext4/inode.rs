@@ -7,7 +7,7 @@
 //! - 需要路径时动态从 Dentry.full_path() 获取
 
 use crate::sync::{Mutex, SpinLock};
-use crate::uapi::time::TimeSpec;
+use uapi::time::TimeSpec;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
@@ -674,7 +674,7 @@ impl Inode for Ext4Inode {
             inode.i_mtime_extra = ((mt.tv_nsec as u32) << 2) & 0xFFFFFFFC;
 
             // 修改时间改变时，也更新 ctime
-            let now = TimeSpec::now();
+            let now = crate::time_ext::timespec_now();
             inode.ctime = now.tv_sec as u32;
             inode.i_ctime_extra = ((now.tv_nsec as u32) << 2) & 0xFFFFFFFC;
         }
@@ -703,7 +703,7 @@ impl Inode for Ext4Inode {
         }
 
         // 更新 ctime（状态改变时间）
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         inode.ctime = now.tv_sec as u32;
         inode.i_ctime_extra = ((now.tv_nsec as u32) << 2) & 0xFFFFFFFC;
 
@@ -726,7 +726,7 @@ impl Inode for Ext4Inode {
         inode.mode = file_type | permission_bits;
 
         // 更新 ctime（状态改变时间）
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         inode.ctime = now.tv_sec as u32;
         inode.i_ctime_extra = ((now.tv_nsec as u32) << 2) & 0xFFFFFFFC;
 

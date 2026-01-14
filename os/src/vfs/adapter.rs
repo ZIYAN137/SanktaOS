@@ -3,12 +3,16 @@
 //! 用于处理数据结构之间的转换
 
 use super::{InodeMetadata, InodeType};
-use crate::uapi::fs::{LinuxDirent64, STATX_BASIC_STATS, Stat, Statx, StatxTimestamp};
+use uapi::fs::{LinuxDirent64, STATX_BASIC_STATS, Stat, Statx, StatxTimestamp};
 
-/// Stat 结构适配方法
-impl Stat {
+/// Stat 结构扩展 trait
+pub trait StatExt {
     /// 从InodeMetadata创建Stat结构
-    pub fn from_metadata(meta: &InodeMetadata) -> Self {
+    fn from_metadata(meta: &InodeMetadata) -> Self;
+}
+
+impl StatExt for Stat {
+    fn from_metadata(meta: &InodeMetadata) -> Self {
         Self {
             st_dev: 0, // TODO: 需要从文件系统获取设备号
             st_ino: meta.inode_no as u64,
@@ -33,11 +37,15 @@ impl Stat {
     }
 }
 
-/// Statx 结构适配方法
-impl Statx {
+/// Statx 结构扩展 trait
+pub trait StatxExt {
     /// 从 InodeMetadata 创建 Statx 结构
-    pub fn from_metadata(meta: &InodeMetadata) -> Self {
-        let ts = |t: crate::uapi::time::TimeSpec| StatxTimestamp {
+    fn from_metadata(meta: &InodeMetadata) -> Self;
+}
+
+impl StatxExt for Statx {
+    fn from_metadata(meta: &InodeMetadata) -> Self {
+        let ts = |t: uapi::time::TimeSpec| StatxTimestamp {
             tv_sec: t.tv_sec as i64,
             tv_nsec: t.tv_nsec as u32,
             __reserved: 0,

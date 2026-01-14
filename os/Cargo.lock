@@ -182,6 +182,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "klog"
+version = "0.1.0"
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,6 +248,7 @@ dependencies = [
  "ext4_rs",
  "fdt",
  "hashbrown",
+ "klog",
  "lazy_static",
  "lock_api",
  "loongArch64",
@@ -252,7 +257,9 @@ dependencies = [
  "riscv",
  "sbi-rt",
  "smoltcp",
+ "sync",
  "talc",
+ "uapi",
  "uart_16550",
  "virtio-drivers",
  "xmas-elf",
@@ -426,6 +433,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "talc"
 version = "4.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -452,6 +466,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "uapi"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.10.0",
 ]
 
 [[package]]

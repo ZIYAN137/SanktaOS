@@ -1,6 +1,6 @@
 use crate::device::Driver;
 use crate::sync::SpinLock;
-use crate::uapi::ioctl::Termios;
+use uapi::ioctl::Termios;
 use crate::vfs::dev::{major, minor};
 use crate::vfs::devno::{chrdev_major, get_chrdev_driver, misc_minor};
 use crate::vfs::{Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence};
@@ -63,7 +63,7 @@ pub struct CharDeviceFile {
     termios: SpinLock<Termios>,
 
     /// 终端窗口大小（用于 TTY 设备）
-    winsize: SpinLock<crate::uapi::ioctl::WinSize>,
+    winsize: SpinLock<uapi::ioctl::WinSize>,
 }
 
 impl CharDeviceFile {
@@ -100,7 +100,7 @@ impl CharDeviceFile {
             flags,
             offset: SpinLock::new(0),
             termios: SpinLock::new(Termios::default()),
-            winsize: SpinLock::new(crate::uapi::ioctl::WinSize {
+            winsize: SpinLock::new(uapi::ioctl::WinSize {
                 ws_row: 24,
                 ws_col: 80,
                 ws_xpixel: 0,
@@ -310,8 +310,8 @@ impl File for CharDeviceFile {
 
     fn ioctl(&self, request: u32, arg: usize) -> Result<isize, FsError> {
         use crate::arch::trap::SumGuard;
-        use crate::uapi::errno::{EINVAL, ENOTTY};
-        use crate::uapi::ioctl::*;
+        use uapi::errno::{EINVAL, ENOTTY};
+        use uapi::ioctl::*;
 
         let maj = major(self.dev);
 
@@ -337,8 +337,8 @@ impl CharDeviceFile {
     /// 控制台设备 ioctl 处理
     fn console_ioctl(&self, request: u32, arg: usize) -> Result<isize, FsError> {
         use crate::arch::trap::SumGuard;
-        use crate::uapi::errno::{EINVAL, ENOTTY};
-        use crate::uapi::ioctl::*;
+        use uapi::errno::{EINVAL, ENOTTY};
+        use uapi::ioctl::*;
 
         match request {
             TCGETS => {
@@ -395,7 +395,7 @@ impl CharDeviceFile {
 
                 unsafe {
                     let _guard = SumGuard::new();
-                    let winsize_ptr = arg as *mut crate::uapi::ioctl::WinSize;
+                    let winsize_ptr = arg as *mut uapi::ioctl::WinSize;
                     if winsize_ptr.is_null() {
                         return Ok(-EINVAL as isize);
                     }
@@ -404,7 +404,7 @@ impl CharDeviceFile {
                     core::ptr::write_bytes(
                         winsize_ptr as *mut u8,
                         0,
-                        core::mem::size_of::<crate::uapi::ioctl::WinSize>(),
+                        core::mem::size_of::<uapi::ioctl::WinSize>(),
                     );
 
                     // 返回保存的窗口大小
@@ -421,7 +421,7 @@ impl CharDeviceFile {
 
                 {
                     let _guard = SumGuard::new();
-                    let winsize_ptr = arg as *const crate::uapi::ioctl::WinSize;
+                    let winsize_ptr = arg as *const uapi::ioctl::WinSize;
                     if winsize_ptr.is_null() {
                         return Ok(-EINVAL as isize);
                     }
@@ -443,8 +443,8 @@ impl CharDeviceFile {
     /// MISC 设备 ioctl 处理
     fn misc_ioctl(&self, request: u32, arg: usize) -> Result<isize, FsError> {
         use crate::arch::trap::SumGuard;
-        use crate::uapi::errno::EINVAL;
-        use crate::uapi::ioctl::*;
+        use uapi::errno::EINVAL;
+        use uapi::ioctl::*;
         use crate::vfs::dev::minor;
 
         let min = minor(self.dev);

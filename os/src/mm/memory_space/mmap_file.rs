@@ -1,6 +1,6 @@
 //! mmap 文件映射信息
 
-use crate::uapi::mm::{MapFlags, ProtFlags};
+use uapi::mm::{MapFlags, ProtFlags};
 use crate::vfs::File;
 use alloc::sync::Arc;
 

@@ -67,7 +67,9 @@ impl TaskQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, kernel::task::TaskStruct, test_case};
+    use crate::kassert;
+    use crate::kernel::task::TaskStruct;
+    use crate::test_case;
     use alloc::sync::Arc;
 
     fn mk_task(tid: u32) -> SharedTask {

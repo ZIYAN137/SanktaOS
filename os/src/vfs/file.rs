@@ -82,7 +82,7 @@
 //! println!("文件大小: {}", metadata.size);
 //! ```
 
-use crate::uapi::fcntl::{OpenFlags, SeekWhence};
+use uapi::fcntl::{OpenFlags, SeekWhence};
 use crate::vfs::{Dentry, FsError, Inode, InodeMetadata};
 use alloc::sync::Arc;
 

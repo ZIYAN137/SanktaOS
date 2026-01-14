@@ -117,8 +117,8 @@ lazy_static! {
         SpinLock::new(alloc::vec::Vec::new());
 }
 
-use crate::uapi::fcntl::OpenFlags;
-use crate::uapi::socket::SocketOptions;
+use uapi::fcntl::OpenFlags;
+use uapi::socket::SocketOptions;
 
 const UDP_RXQ_CAP: usize = 64;
 const UDP_DGRAM_MAX: usize = 2048;

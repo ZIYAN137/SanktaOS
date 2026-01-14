@@ -474,7 +474,7 @@ pub fn accept(sockfd: i32, addr: *mut u8, addrlen: *mut u32) -> isize {
     // Check if socket is non-blocking
     let is_nonblock = socket_file
         .flags()
-        .contains(crate::uapi::fcntl::OpenFlags::O_NONBLOCK);
+        .contains(uapi::fcntl::OpenFlags::O_NONBLOCK);
     let backlog = socket_file.listen_backlog().max(1).min(128);
 
     loop {
@@ -547,7 +547,7 @@ pub fn accept(sockfd: i32, addr: *mut u8, addrlen: *mut u32) -> isize {
         }
         crate::kernel::yield_task();
         if crate::ipc::signal_interrupts_syscall(&task) {
-            return -(crate::uapi::errno::EINTR as isize);
+            return -(uapi::errno::EINTR as isize);
         }
     }
 }
@@ -626,7 +626,7 @@ pub fn connect(sockfd: i32, addr: *const u8, addrlen: u32) -> isize {
 
     let is_nonblock = file
         .flags()
-        .contains(crate::uapi::fcntl::OpenFlags::O_NONBLOCK);
+        .contains(uapi::fcntl::OpenFlags::O_NONBLOCK);
 
     match handle {
         SocketHandle::Tcp(h) => {
@@ -724,7 +724,7 @@ pub fn connect(sockfd: i32, addr: *const u8, addrlen: u32) -> isize {
 
                     crate::kernel::yield_task();
                     if crate::ipc::signal_interrupts_syscall(&task) {
-                        return -(crate::uapi::errno::EINTR as isize);
+                        return -(uapi::errno::EINTR as isize);
                     }
                 }
             }
@@ -841,7 +841,7 @@ pub fn send(sockfd: i32, buf: *const u8, len: usize, _flags: i32) -> isize {
                             crate::net::socket::poll_network_and_dispatch();
                             crate::kernel::yield_task();
                             if crate::ipc::signal_interrupts_syscall(&task) {
-                                return -(crate::uapi::errno::EINTR as isize);
+                                return -(uapi::errno::EINTR as isize);
                             }
                             continue;
                         }
@@ -890,7 +890,7 @@ pub fn recv(sockfd: i32, buf: *mut u8, len: usize, _flags: i32) -> isize {
                             crate::net::socket::poll_network_and_dispatch();
                             crate::kernel::yield_task();
                             if crate::ipc::signal_interrupts_syscall(&task) {
-                                return -(crate::uapi::errno::EINTR as isize);
+                                return -(uapi::errno::EINTR as isize);
                             }
                             continue;
                         }
@@ -940,7 +940,7 @@ unsafe fn get_c_str_safe(ptr: *const c_char) -> Option<&'static str> {
 /// - 失败返回负的错误码
 fn get_interface_stats(ifname: *const c_char, stats: *mut u8, size: usize) -> isize {
     use crate::arch::trap::SumGuard;
-    use crate::uapi::errno::{EFAULT, EINVAL, ENODEV};
+    use uapi::errno::{EFAULT, EINVAL, ENODEV};
 
     if ifname.is_null() || stats.is_null() {
         return -(EFAULT as isize);
@@ -1016,7 +1016,7 @@ pub fn init_network_syscalls() {
 /// 包括：ifaddrs 链表、sockaddr 结构、接口名称字符串等
 pub fn getifaddrs(ifap: *mut *mut u8) -> isize {
     use crate::arch::trap::SumGuard;
-    use crate::uapi::errno::{EFAULT, ENOMEM};
+    use uapi::errno::{EFAULT, ENOMEM};
 
     if ifap.is_null() {
         return -(EFAULT as isize);
@@ -1072,7 +1072,7 @@ pub fn getifaddrs(ifap: *mut *mut u8) -> isize {
     let (user_mem_start, map_len) = {
         use crate::config::PAGE_SIZE;
         use crate::kernel::syscall::mm::mmap;
-        use crate::uapi::mm::{MapFlags, ProtFlags};
+        use uapi::mm::{MapFlags, ProtFlags};
 
         // 额外预留一段 header，用于 freeifaddrs 释放整块映射（Linux ABI 语义）
         let map_len = {
@@ -1307,7 +1307,7 @@ unsafe fn fill_sockaddr_broadcast(addr: *mut SockAddrIn, ip_cidr: &smoltcp::wire
 pub fn freeifaddrs(ifa: *mut u8) -> isize {
     use crate::arch::trap::SumGuard;
     use crate::kernel::syscall::mm::munmap;
-    use crate::uapi::errno::EINVAL;
+    use uapi::errno::EINVAL;
 
     if ifa.is_null() {
         return 0; // NULL 指针，直接返回
@@ -1349,8 +1349,8 @@ pub fn freeifaddrs(ifa: *mut u8) -> isize {
 pub fn setsockopt(sockfd: i32, level: i32, optname: i32, optval: *const u8, optlen: u32) -> isize {
     use crate::arch::trap::SumGuard;
     use crate::kernel::current_cpu;
-    use crate::uapi::errno::{EBADF, EINVAL, ENOPROTOOPT, ENOTSOCK};
-    use crate::uapi::socket::*;
+    use uapi::errno::{EBADF, EINVAL, ENOPROTOOPT, ENOTSOCK};
+    use uapi::socket::*;
 
     if sockfd < 0 || optval.is_null() {
         return -(EINVAL as isize);
@@ -1421,8 +1421,8 @@ pub fn getsockopt(
     optlen: *mut u32,
 ) -> isize {
     use crate::arch::trap::SumGuard;
-    use crate::uapi::errno::{EBADF, EINVAL, ENOPROTOOPT, ENOTSOCK};
-    use crate::uapi::socket::*;
+    use uapi::errno::{EBADF, EINVAL, ENOPROTOOPT, ENOTSOCK};
+    use uapi::socket::*;
 
     if sockfd < 0 || optval.is_null() || optlen.is_null() {
         return -(EINVAL as isize);
@@ -1664,13 +1664,13 @@ pub fn recvfrom(
                     if let Some(socket_file) = file.as_any().downcast_ref::<SocketFile>() {
                         if !socket_file
                             .flags()
-                            .contains(crate::uapi::fcntl::OpenFlags::O_NONBLOCK)
+                            .contains(uapi::fcntl::OpenFlags::O_NONBLOCK)
                         {
                             drop(file);
                             crate::net::socket::poll_network_and_dispatch();
                             crate::kernel::yield_task();
                             if crate::ipc::signal_interrupts_syscall(&task) {
-                                return -(crate::uapi::errno::EINTR as isize);
+                                return -(uapi::errno::EINTR as isize);
                             }
                             continue;
                         }

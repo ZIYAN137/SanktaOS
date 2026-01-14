@@ -4,8 +4,8 @@
 
 use crate::arch::trap::SumGuard;
 use crate::kernel::current_task;
-use crate::uapi::errno::{EBADF, EINVAL, ENOTTY, EOPNOTSUPP};
-use crate::uapi::ioctl::*;
+use uapi::errno::{EBADF, EINVAL, ENOTTY, EOPNOTSUPP};
+use uapi::ioctl::*;
 use crate::vfs::FsError;
 use crate::{pr_debug, pr_err, pr_warn};
 
@@ -159,9 +159,9 @@ fn handle_fionbio(file: &alloc::sync::Arc<dyn crate::vfs::File>, arg: usize) -> 
         // 设置文件的 O_NONBLOCK 标志
         let mut flags = file.flags();
         if value != 0 {
-            flags |= crate::uapi::fcntl::OpenFlags::O_NONBLOCK;
+            flags |= uapi::fcntl::OpenFlags::O_NONBLOCK;
         } else {
-            flags &= !crate::uapi::fcntl::OpenFlags::O_NONBLOCK;
+            flags &= !uapi::fcntl::OpenFlags::O_NONBLOCK;
         }
 
         match file.set_status_flags(flags) {
@@ -354,10 +354,10 @@ fn fs_error_to_errno(err: FsError) -> isize {
     match err {
         FsError::NotSupported => -EOPNOTSUPP as isize,
         FsError::InvalidArgument => -EINVAL as isize,
-        FsError::NotFound => -crate::uapi::errno::ENOENT as isize,
-        FsError::PermissionDenied => -crate::uapi::errno::EACCES as isize,
-        FsError::AlreadyExists => -crate::uapi::errno::EEXIST as isize,
-        FsError::IoError => -crate::uapi::errno::EIO as isize,
-        _ => -crate::uapi::errno::EIO as isize,
+        FsError::NotFound => -uapi::errno::ENOENT as isize,
+        FsError::PermissionDenied => -uapi::errno::EACCES as isize,
+        FsError::AlreadyExists => -uapi::errno::EEXIST as isize,
+        FsError::IoError => -uapi::errno::EIO as isize,
+        _ => -uapi::errno::EIO as isize,
     }
 }

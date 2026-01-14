@@ -135,7 +135,7 @@
 
 use crate::config::DEFAULT_MAX_FDS;
 use crate::sync::SpinLock;
-use crate::uapi::fcntl::{FdFlags, OpenFlags};
+use uapi::fcntl::{FdFlags, OpenFlags};
 use crate::vfs::{File, FsError};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -159,11 +159,16 @@ pub struct FDTable {
     max_fds: usize,
 }
 
-impl FdFlags {
+/// FdFlags 扩展 trait
+pub trait FdFlagsExt {
     /// 从 OpenFlags 中提取 FD 标志（用于兼容性）
     ///
     /// `O_CLOEXEC` 在 open() 时可以指定，但本质上是 FD 标志。
-    pub fn from_open_flags(flags: OpenFlags) -> Self {
+    fn from_open_flags(flags: OpenFlags) -> Self;
+}
+
+impl FdFlagsExt for FdFlags {
+    fn from_open_flags(flags: OpenFlags) -> Self {
         let mut fd_flags = FdFlags::empty();
         if flags.contains(OpenFlags::O_CLOEXEC) {
             fd_flags |= FdFlags::CLOEXEC;

@@ -14,8 +14,8 @@ use alloc::sync::Arc;
 static STDIO_TERMIOS: SpinLock<Termios> = SpinLock::new(Termios::DEFAULT);
 
 /// 全局窗口大小（所有标准I/O文件共享）
-static STDIO_WINSIZE: SpinLock<crate::uapi::ioctl::WinSize> =
-    SpinLock::new(crate::uapi::ioctl::WinSize {
+static STDIO_WINSIZE: SpinLock<uapi::ioctl::WinSize> =
+    SpinLock::new(uapi::ioctl::WinSize {
         ws_row: 24,
         ws_col: 80,
         ws_xpixel: 0,
@@ -110,9 +110,9 @@ impl File for StdinFile {
             uid: 0,
             gid: 0,
             size: 0,
-            atime: TimeSpec::now(),
-            mtime: TimeSpec::now(),
-            ctime: TimeSpec::now(),
+            atime: crate::time_ext::timespec_now(),
+            mtime: crate::time_ext::timespec_now(),
+            ctime: crate::time_ext::timespec_now(),
             nlinks: 1,
             blocks: 0,
             rdev: 0,
@@ -168,9 +168,9 @@ impl File for StdoutFile {
             uid: 0,
             gid: 0,
             size: 0,
-            atime: TimeSpec::now(),
-            mtime: TimeSpec::now(),
-            ctime: TimeSpec::now(),
+            atime: crate::time_ext::timespec_now(),
+            mtime: crate::time_ext::timespec_now(),
+            ctime: crate::time_ext::timespec_now(),
             nlinks: 1,
             blocks: 0,
             rdev: 0,
@@ -224,9 +224,9 @@ impl File for StderrFile {
             uid: 0,
             gid: 0,
             size: 0,
-            atime: TimeSpec::now(),
-            mtime: TimeSpec::now(),
-            ctime: TimeSpec::now(),
+            atime: crate::time_ext::timespec_now(),
+            mtime: crate::time_ext::timespec_now(),
+            ctime: crate::time_ext::timespec_now(),
             nlinks: 1,
             blocks: 0,
             rdev: 0,
@@ -244,8 +244,8 @@ impl File for StderrFile {
 /// 通用的 stdio ioctl 实现
 fn stdio_ioctl(request: u32, arg: usize) -> Result<isize, FsError> {
     use crate::arch::trap::SumGuard;
-    use crate::uapi::errno::{EINVAL, ENOTTY};
-    use crate::uapi::ioctl::*;
+    use uapi::errno::{EINVAL, ENOTTY};
+    use uapi::ioctl::*;
 
     match request {
         TCGETS => {
@@ -319,7 +319,7 @@ fn stdio_ioctl(request: u32, arg: usize) -> Result<isize, FsError> {
 
             unsafe {
                 let _guard = SumGuard::new();
-                let winsize_ptr = arg as *mut crate::uapi::ioctl::WinSize;
+                let winsize_ptr = arg as *mut uapi::ioctl::WinSize;
                 if winsize_ptr.is_null() {
                     return Ok(-EINVAL as isize);
                 }
@@ -328,7 +328,7 @@ fn stdio_ioctl(request: u32, arg: usize) -> Result<isize, FsError> {
                 core::ptr::write_bytes(
                     winsize_ptr as *mut u8,
                     0,
-                    core::mem::size_of::<crate::uapi::ioctl::WinSize>(),
+                    core::mem::size_of::<uapi::ioctl::WinSize>(),
                 );
 
                 // 返回保存的窗口大小
@@ -353,7 +353,7 @@ fn stdio_ioctl(request: u32, arg: usize) -> Result<isize, FsError> {
 
             unsafe {
                 let _guard = SumGuard::new();
-                let winsize_ptr = arg as *const crate::uapi::ioctl::WinSize;
+                let winsize_ptr = arg as *const uapi::ioctl::WinSize;
                 if winsize_ptr.is_null() {
                     return Ok(-EINVAL as isize);
                 }

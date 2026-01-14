@@ -7,7 +7,7 @@
 //! - 进程退出时自动释放所有锁
 
 use crate::sync::SpinLock;
-use crate::uapi::fcntl::{Flock, LockType};
+use uapi::fcntl::{Flock, LockType};
 use crate::vfs::FsError;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;

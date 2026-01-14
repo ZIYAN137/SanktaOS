@@ -1,15 +1,15 @@
 mod guard;
 pub mod macros;
 pub mod net_test;
-use crate::{
-    arch::intr::{are_interrupts_enabled, disable_interrupts, enable_interrupts},
-    earlyprintln,
-};
+use crate::arch::intr::{are_interrupts_enabled, disable_interrupts, enable_interrupts};
+use crate::earlyprintln;
 
 /// 测试运行器。它由测试框架自动调用，并传入一个包含所有测试的切片。
 #[cfg(test)]
 pub fn test_runner(tests: &[&dyn Fn()]) {
-    use crate::{arch::lib::sbi::shutdown, earlyprintln, test::macros::TEST_FAILED};
+    use crate::arch::lib::sbi::shutdown;
+    use crate::earlyprintln;
+    use crate::test::macros::TEST_FAILED;
     use core::sync::atomic::Ordering;
     earlyprintln!("\n\x1b[33m--- Running {} tests ---\x1b[0m", tests.len());
 
@@ -118,7 +118,9 @@ impl Drop for InterruptGuard {
 
 #[cfg(test)]
 mod tests {
-    use crate::{early_test, kassert, test_case};
+    use crate::early_test;
+    use crate::kassert;
+    use crate::test_case;
 
     test_case!(trivial_assertion, {
         kassert!(0 != 1);

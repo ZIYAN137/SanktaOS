@@ -1,6 +1,10 @@
-use alloc::{sync::Weak, vec::Vec};
+use alloc::sync::Weak;
+use alloc::vec::Vec;
 
-use crate::{fs::proc::ContentGenerator, kernel::TaskStruct, sync::SpinLock, vfs::FsError};
+use crate::fs::proc::ContentGenerator;
+use crate::kernel::TaskStruct;
+use crate::sync::SpinLock;
+use crate::vfs::FsError;
 
 /// 为指定任务生成 /proc/\[pid\]/cmdline 内容的生成器
 pub struct CmdlineGenerator {

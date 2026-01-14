@@ -13,7 +13,7 @@ use core::any::Any;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sync::Mutex;
-use crate::uapi::time::TimeSpec;
+use uapi::time::TimeSpec;
 use crate::vfs::{DirEntry, FileMode, FsError, Inode, InodeMetadata, InodeType};
 
 /// Sysfs 属性生成器
@@ -56,7 +56,7 @@ impl SysfsInode {
     /// 创建目录 inode
     pub fn new_directory(mode: FileMode) -> Arc<Self> {
         let inode_no = NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed);
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         Arc::new(Self {
             inode_no,
             inode_type: InodeType::Directory,
@@ -82,7 +82,7 @@ impl SysfsInode {
     pub fn new_attribute(attr: SysfsAttr) -> Arc<Self> {
         let inode_no = NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed);
         let mode = attr.mode.clone();
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         Arc::new(Self {
             inode_no,
             inode_type: InodeType::File,
@@ -107,7 +107,7 @@ impl SysfsInode {
     /// 创建符号链接 inode
     pub fn new_symlink(target: String) -> Arc<Self> {
         let inode_no = NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed);
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
         Arc::new(Self {
             inode_no,
             inode_type: InodeType::Symlink,

@@ -6,8 +6,8 @@ use crate::mm::address::{PageNum, UsizeConvert, Vaddr, Vpn, VpnRange};
 use crate::mm::memory_space::MmapFile;
 use crate::mm::memory_space::mapping_area::AreaType;
 use crate::mm::page_table::UniversalPTEFlag;
-use crate::uapi::errno::{EACCES, EBADF, EEXIST, EINVAL, EIO, ENOMEM, EOPNOTSUPP};
-use crate::uapi::mm::{MAP_FAILED, MapFlags, ProtFlags};
+use uapi::errno::{EACCES, EBADF, EEXIST, EINVAL, EIO, ENOMEM, EOPNOTSUPP};
+use uapi::mm::{MAP_FAILED, MapFlags, ProtFlags};
 use crate::{pr_err, pr_warn};
 
 /// brk - 改变数据段的结束地址（堆顶）

@@ -33,7 +33,7 @@ use alloc::sync::Arc;
 
 use crate::mm::memory_space::MemorySpace;
 use crate::sync::SpinLock;
-use crate::uapi::signal::NUM_SIGCHLD;
+use uapi::signal::NUM_SIGCHLD;
 use crate::{
     arch::trap::restore,
     kernel::{cpu::current_cpu, schedule},

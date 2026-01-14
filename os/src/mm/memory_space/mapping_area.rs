@@ -9,7 +9,7 @@ use crate::mm::memory_space::MmapFile;
 use crate::mm::page_table::{
     self, ActivePageTableInner, PageSize, PageTableInner, UniversalPTEFlag,
 };
-use crate::uapi::mm::MapFlags;
+use uapi::mm::MapFlags;
 use crate::{pr_err, pr_warn};
 
 /// 映射策略类型

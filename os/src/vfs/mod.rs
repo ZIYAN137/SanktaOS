@@ -162,12 +162,12 @@ pub mod inode;
 pub mod mount;
 pub mod path;
 
-pub use adapter::inode_type_to_d_type;
+pub use adapter::{inode_type_to_d_type, StatExt, StatxExt};
 pub use dentry::{DENTRY_CACHE, Dentry, DentryCache};
 pub use dev::{major, makedev, minor};
 pub use devno::{get_blkdev_index, get_chrdev_driver};
 pub use error::FsError;
-pub use fd_table::FDTable;
+pub use fd_table::{FDTable, FdFlagsExt};
 pub use file::File;
 pub use file_lock::file_lock_manager;
 pub use file_system::{FileSystem, StatFs};
@@ -180,9 +180,9 @@ pub use path::{
 };
 
 // Re-export UAPI types used by VFS
-pub use crate::uapi::fcntl::{FdFlags, OpenFlags, SeekWhence};
-pub use crate::uapi::fs::{LinuxDirent64, Stat, Statx};
-pub use crate::uapi::time::TimeSpec;
+pub use uapi::fcntl::{FdFlags, OpenFlags, SeekWhence};
+pub use uapi::fs::{LinuxDirent64, Stat, Statx};
+pub use uapi::time::TimeSpec;
 
 use alloc::{vec, vec::Vec};
 

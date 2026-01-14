@@ -631,7 +631,7 @@ pub fn get_ppid() -> c_int {
 /// - 成功: 返回进程组 ID
 /// - 失败: 返回 -ESRCH (进程不存在或 pid 为负数)
 pub fn get_pgid(pid: c_int) -> c_int {
-    use crate::uapi::errno::ESRCH;
+    use uapi::errno::ESRCH;
 
     if pid == 0 {
         return current_task().lock().pgid as c_int;
@@ -653,7 +653,7 @@ pub fn get_pgid(pid: c_int) -> c_int {
 
 /// 设置进程组 ID
 pub fn set_pgid(pid: c_int, pgid: c_int) -> c_int {
-    use crate::uapi::errno::{EACCES, EINVAL, EPERM, ESRCH};
+    use uapi::errno::{EACCES, EINVAL, EPERM, ESRCH};
 
     let current = current_task();
     let current_locked = current.lock();

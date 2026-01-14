@@ -85,7 +85,7 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -379,9 +379,9 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::kernel::{TASK_MANAGER, TaskStruct};
     use crate::mm::frame_allocator::alloc_contig_frames;
     use crate::sync::SpinLock;
-    use crate::uapi::resource::{INIT_RLIMITS, RlimitStruct};
-    use crate::uapi::signal::SignalFlags;
-    use crate::uapi::uts_namespace::UtsNamespace;
+    use uapi::resource::{INIT_RLIMITS, RlimitStruct};
+    use uapi::signal::SignalFlags;
+    use uapi::uts_namespace::UtsNamespace;
     use crate::vfs::fd_table::FDTable;
     use alloc::sync::Arc;
     use core::sync::atomic::Ordering;
@@ -407,7 +407,7 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(FDTable::new()),
         Arc::new(SpinLock::new(FsStruct::new(None, None))),

@@ -285,7 +285,7 @@ fn get_dmesg_restrict() -> u32 {
 /// * `Err(errno)` - 没有可用的块设备
 pub fn get_first_block_device() -> Result<Arc<dyn crate::device::block::BlockDriver>, i32> {
     use crate::device::BLK_DRIVERS;
-    use crate::uapi::errno::ENODEV;
+    use uapi::errno::ENODEV;
 
     let drivers = BLK_DRIVERS.read();
 
@@ -301,7 +301,8 @@ pub fn get_first_block_device() -> Result<Arc<dyn crate::device::block::BlockDri
 /// # 返回值
 /// 如果所有设备成功刷新返回 Ok(()),否则返回第一个错误
 pub fn flush_all_block_devices() -> Result<(), isize> {
-    use crate::{device::BLK_DRIVERS, uapi::errno::EIO};
+    use crate::device::BLK_DRIVERS;
+    use uapi::errno::EIO;
 
     let drivers = BLK_DRIVERS.read();
 
@@ -333,7 +334,8 @@ pub fn flush_all_block_devices() -> Result<(), isize> {
 /// - Err(-EINVAL): fd 不支持同步(如 pipe、socket)
 /// - Err(-EIO): 块设备刷新失败
 pub fn flush_block_device_by_fd(fd: usize) -> Result<(), isize> {
-    use crate::{uapi::errno::EIO, vfs::MOUNT_TABLE};
+    use uapi::errno::EIO;
+    use crate::vfs::MOUNT_TABLE;
 
     // 1. 获取文件对象
     let task = current_task();

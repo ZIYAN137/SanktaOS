@@ -74,7 +74,7 @@ impl ProcInode {
     /// 创建静态文件 inode
     pub fn new_static_file(_name: &str, content: Vec<u8>, mode: FileMode) -> Arc<Self> {
         let inode_no = NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed);
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
 
         Arc::new(Self {
             kind: ProcInodeKind::Generic,
@@ -111,7 +111,7 @@ impl ProcInode {
         inode_no: Option<usize>,
     ) -> Arc<Self> {
         let inode_no = inode_no.unwrap_or_else(|| NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed));
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
 
         Arc::new(Self {
             kind: ProcInodeKind::Generic,
@@ -144,7 +144,7 @@ impl ProcInode {
         kind: ProcInodeKind,
     ) -> Arc<Self> {
         let inode_no = inode_no.unwrap_or_else(|| NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed));
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
 
         Arc::new(Self {
             kind,
@@ -169,7 +169,7 @@ impl ProcInode {
     /// 创建符号链接 inode
     pub fn new_symlink(_name: &str, target: String) -> Arc<Self> {
         let inode_no = NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed);
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
 
         Arc::new(Self {
             kind: ProcInodeKind::Generic,
@@ -204,7 +204,7 @@ impl ProcInode {
         F: Fn() -> String + Send + Sync + 'static,
     {
         let inode_no = inode_no.unwrap_or_else(|| NEXT_INODE_NO.fetch_add(1, Ordering::Relaxed));
-        let now = TimeSpec::now();
+        let now = crate::time_ext::timespec_now();
 
         Arc::new(Self {
             kind: ProcInodeKind::Generic,

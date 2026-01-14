@@ -184,7 +184,7 @@ fn install_user_signal_trap_frame(
             0 as *mut _, // TODO: link未实现
             t.signal_stack.lock().clone(),
             t.blocked.to_sigset_t(),
-            MContextT::from_trap_frame(tf),
+            tf.to_mcontext(),
         );
         // Linux ABI: build rt_sigframe { siginfo, ucontext } on the user stack.
         let frame_size = core::mem::size_of::<RtSigFrame>();

@@ -1903,7 +1903,7 @@ mod memory_space_tests {
     // 16. 测试 mmap 文件映射基本功能
     test_case!(test_mmap_file_basic, {
         use crate::fs::tmpfs::TmpFs;
-        use crate::uapi::mm::{MapFlags, ProtFlags};
+        use uapi::mm::{MapFlags, ProtFlags};
         use crate::vfs::{File, FileMode, FileSystem};
         use alloc::sync::Arc;
 

@@ -4,7 +4,9 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
-use crate::{kernel::SharedTask, sync::SpinLock, vfs::TimeSpec};
+use crate::kernel::SharedTask;
+use crate::sync::SpinLock;
+use crate::vfs::TimeSpec;
 
 lazy_static::lazy_static! {
     /// 全局等待队列实例
