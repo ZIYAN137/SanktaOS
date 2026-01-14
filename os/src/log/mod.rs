@@ -1,153 +1,177 @@
 //! 内核日志子系统
 //!
-//! 该模块提供了一个类似 **Linux 内核风格的日志系统**，并在裸机环境中实现了**无锁环形缓冲区**。
-//!
-//! # 组件
-//!
-//! - [`buffer`] - 用于日志存储的无锁环形缓冲区
-//! - [`config`] - 配置常量（缓冲区大小、消息长度限制）
-//! - [`context`] - 上下文信息收集（CPU ID、任务 ID、时间戳）
-//! - [`log_core`] - 核心日志实现 (LogCore)
-//! - [`entry`] - 日志条目结构和序列化
-//! - [`level`] - 日志级别定义（从 Emergency 到 Debug）
-//! - [`macros`] - 面向用户的日志宏 (`pr_info!`, `pr_err!`, 等)
-//!
-//! # 设计概览
-//!
-//! ## 双输出策略
-//!
-//! 日志系统采用两层方法：
-//!
-//! 1. **即时控制台输出**：达到控制台级别阈值（默认：Warning 及以上）的日志会**直接打印到控制台**，以实现紧急可见性。
-//! 2. **环形缓冲区存储**：所有达到全局级别阈值（默认：Info 及以上）的日志都会被写入**无锁环形缓冲区**，用于异步消费或事后分析。
-//!
-//! ## 性能特点
-//!
-//! - **无锁并发**：使用原子操作（fetch_add, CAS）而非互斥锁，支持多生产者日志记录而**不会阻塞**。
-//! - **早期过滤**：日志级别检查在宏展开时发生，避免对禁用级别的日志进行格式化字符串评估。
-//! - **固定大小分配**：**没有动态内存分配**；所有结构体使用编译时已知的大小，适用于裸机环境。
-//! - **缓存优化**：读写器数据结构经过缓存行填充（64 字节），以防止多核系统上的**伪共享**。
-//! - **尽可能零拷贝**：在可行的情况下，日志条目是**就地构造**的，以最大限度地减少内存操作。
-//!
-//! ## 架构特定集成
-//!
-//! 日志系统与架构特定组件集成：
-//!
-//! - **定时器**：通过 `arch::timer::get_time()` 收集时间戳
-//! - **控制台**：通过 `console::Stdout` 输出（通常是 UART）
-//! - **CPU ID**：通过 `arch::kernel::cpu::cpu_id()` 获取当前 CPU ID
-//! - **任务 ID**：通过 `kernel::cpu::current_cpu()` 获取当前任务的 tid（若无任务则为 0）
-//!
-//! # 使用示例
-//!
-//! ```rust
-//! use crate::log::*;
-//!
-//! // 基本日志记录
-//! pr_info!("内核已初始化");
-//! pr_err!("分配 {} 字节失败", size);
-//!
-//! // 配置日志级别
-//! set_global_level(LogLevel::Debug);  // 记录所有级别
-//! set_console_level(LogLevel::Error); // 只打印错误及以上的级别
-//!
-//! // 读取缓冲的日志
-//! while let Some(entry) = read_log() {
-//!     // 处理日志条目
-//! }
-//! ```
+//! 该模块重新导出 klog crate 的功能，并提供架构特定的实现。
 
 #![allow(unused)]
-mod buffer;
-mod config;
-mod context;
-mod entry;
-mod level;
-mod log_core;
-pub mod macros;
 
-pub use config::{
+// 重新导出 klog crate 的所有公共 API
+pub use klog::{
+    format_log_entry, get_console_level, get_global_level, is_level_enabled, log_dropped_count,
+    log_impl, log_len, log_reader_index, log_unread_bytes, log_writer_index, peek_log, read_log,
+    set_console_level, set_global_level, LogContextProvider, LogEntry, LogLevel, LogOutput,
     DEFAULT_CONSOLE_LEVEL, DEFAULT_LOG_LEVEL, GLOBAL_LOG_BUFFER_SIZE, MAX_LOG_MESSAGE_LENGTH,
 };
-pub use entry::LogEntry;
-pub use level::LogLevel;
-pub use log_core::format_log_entry;
 
-// ========== 全局单例 ==========
+use crate::arch::{kernel::cpu::cpu_id, timer};
+use crate::console::Stdout;
+use crate::sync::PreemptGuard;
+use core::fmt::Write;
 
-/// 全局日志系统实例
+// ========== 重新定义宏以支持 crate:: 前缀 ==========
+
+/// 带有级别过滤的内部实现宏
+#[macro_export]
+macro_rules! __log_impl_filtered {
+    ($level:expr, $args:expr) => {
+        if $crate::log::is_level_enabled($level) {
+            $crate::log::log_impl($level, $args);
+        }
+    };
+}
+
+/// 以 **EMERGENCY (紧急)** 级别记录消息
+#[macro_export]
+macro_rules! pr_emerg {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Emergency,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **ALERT (警报)** 级别记录消息
+#[macro_export]
+macro_rules! pr_alert {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Alert,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **CRITICAL (关键)** 级别记录消息
+#[macro_export]
+macro_rules! pr_crit {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Critical,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **ERROR (错误)** 级别记录消息
+#[macro_export]
+macro_rules! pr_err {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Error,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **WARNING (警告)** 级别记录消息
+#[macro_export]
+macro_rules! pr_warn {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Warning,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **NOTICE (通知)** 级别记录消息
+#[macro_export]
+macro_rules! pr_notice {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Notice,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **INFO (信息)** 级别记录消息
+#[macro_export]
+macro_rules! pr_info {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Info,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+/// 以 **DEBUG (调试)** 级别记录消息
+#[macro_export]
+macro_rules! pr_debug {
+    ($($arg:tt)*) => {
+        $crate::__log_impl_filtered!(
+            $crate::log::LogLevel::Debug,
+            format_args!($($arg)*)
+        )
+    }
+}
+
+// ========== LogContextProvider 实现 ==========
+
+/// OS 层的日志上下文提供者
+struct OsLogContextProvider;
+
+impl LogContextProvider for OsLogContextProvider {
+    fn cpu_id(&self) -> usize {
+        cpu_id()
+    }
+
+    fn task_id(&self) -> u32 {
+        // 尝试获取当前任务的 tid
+        // 注意：在早期启动或中断上下文中可能没有当前任务
+        // 更重要的是：如果当前已经在持有 task lock 的上下文中（例如 wait4），
+        // 再次尝试获取锁会导致死锁。因此这里必须使用 try_lock。
+        let _guard = PreemptGuard::new();
+        crate::kernel::current_cpu()
+            .current_task
+            .as_ref()
+            .and_then(|task| task.try_lock().map(|t| t.tid))
+            .unwrap_or(0)
+    }
+
+    fn timestamp(&self) -> usize {
+        timer::get_time()
+    }
+}
+
+// ========== LogOutput 实现 ==========
+
+/// OS 层的日志输出
+struct OsLogOutput;
+
+impl LogOutput for OsLogOutput {
+    fn write_str(&self, s: &str) {
+        let mut stdout = Stdout;
+        let _ = stdout.write_str(s);
+    }
+}
+
+// ========== 全局实例 ==========
+
+static OS_LOG_CONTEXT_PROVIDER: OsLogContextProvider = OsLogContextProvider;
+static OS_LOG_OUTPUT: OsLogOutput = OsLogOutput;
+
+/// 初始化日志系统
 ///
-/// 使用 const fn 在编译时初始化，零运行时开销。
-/// 所有日志宏和公共 API 都委托给此实例。
-static GLOBAL_LOG: log_core::LogCore = log_core::LogCore::default();
-
-// ========== 公共 API (精简封装) ==========
-
-/// 核心日志实现（由宏调用）
-#[doc(hidden)]
-pub fn log_impl(level: LogLevel, args: core::fmt::Arguments) {
-    GLOBAL_LOG._log(level, args);
-}
-
-/// 检查日志级别是否启用（由宏调用）
-#[doc(hidden)]
-pub fn is_level_enabled(level: LogLevel) -> bool {
-    level as u8 <= GLOBAL_LOG._get_global_level() as u8
-}
-
-/// 从缓冲区读取下一个日志条目
-pub fn read_log() -> Option<LogEntry> {
-    GLOBAL_LOG._read_log()
-}
-
-/// 非破坏性读取：按索引 peek 日志条目，不移动读指针
-pub fn peek_log(index: usize) -> Option<LogEntry> {
-    GLOBAL_LOG._peek_log(index)
-}
-
-/// 获取当前可读取的起始索引
-pub fn log_reader_index() -> usize {
-    GLOBAL_LOG._log_reader_index()
-}
-
-/// 获取当前写入位置
-pub fn log_writer_index() -> usize {
-    GLOBAL_LOG._log_writer_index()
-}
-
-/// 返回未读日志条目的数量
-pub fn log_len() -> usize {
-    GLOBAL_LOG._log_len()
-}
-
-/// 返回未读日志的总字节数（格式化后）
-pub fn log_unread_bytes() -> usize {
-    GLOBAL_LOG._log_unread_bytes()
-}
-
-/// 返回已丢弃日志的计数
-pub fn log_dropped_count() -> usize {
-    GLOBAL_LOG._log_dropped_count()
-}
-
-/// 设置全局日志级别阈值
-pub fn set_global_level(level: LogLevel) {
-    GLOBAL_LOG._set_global_level(level);
-}
-
-/// 获取当前全局日志级别
-pub fn get_global_level() -> LogLevel {
-    GLOBAL_LOG._get_global_level()
-}
-
-/// 设置控制台输出级别阈值
-pub fn set_console_level(level: LogLevel) {
-    GLOBAL_LOG._set_console_level(level);
-}
-
-/// 获取当前控制台输出级别
-pub fn get_console_level() -> LogLevel {
-    GLOBAL_LOG._get_console_level()
+/// 注册 OS 层的 LogContextProvider 和 LogOutput 实现。
+/// 必须在使用日志宏之前调用。
+pub fn init() {
+    // Safety: 这些是静态实例，生命周期为 'static
+    unsafe {
+        klog::register_context_provider(&OS_LOG_CONTEXT_PROVIDER);
+        klog::register_log_output(&OS_LOG_OUTPUT);
+    }
 }
 
 // ========== 测试模块 ==========

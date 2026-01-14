@@ -3,11 +3,8 @@
 //! 该模块将所有日志状态和逻辑封装到一个单独的 `LogCore` 结构体中，
 //! 可以在保持**无锁、零分配**设计的同时，独立实例化用于测试。
 
-use crate::console::Stdout;
-
 use super::buffer::GlobalLogBuffer;
 use super::config::{DEFAULT_CONSOLE_LEVEL, DEFAULT_LOG_LEVEL};
-use super::context;
 use super::entry::LogEntry;
 use super::level::LogLevel;
 use core::fmt;
@@ -107,17 +104,16 @@ impl LogCore {
             return;
         }
 
-        // 2. 收集上下文
-        let log_context = context::collect_context();
+        // 2. 收集上下文（通过 trait）
+        let (cpu_id, task_id, timestamp) = if let Some(provider) = crate::get_context_provider() {
+            (provider.cpu_id(), provider.task_id(), provider.timestamp())
+        } else {
+            // 如果没有注册 provider，使用默认值
+            (0, 0, 0)
+        };
 
         // 3. 创建日志条目
-        let entry = LogEntry::from_args(
-            level,
-            log_context.cpu_id,
-            log_context.task_id,
-            log_context.timestamp,
-            args,
-        );
+        let entry = LogEntry::from_args(level, cpu_id, task_id, timestamp, args);
 
         // 4. 写入缓冲区 (无锁)
         self.buffer.write(&entry);
@@ -221,14 +217,11 @@ impl LogCore {
     /// - `format_log_entry` - 用于 syslog 系统调用
     /// - `buffer::calculate_formatted_length` - 用于精确字节计数
     fn direct_print_entry(&self, entry: &LogEntry) {
-        use core::fmt::Write;
+        use alloc::format;
 
-        let mut stdout = Stdout;
-        // 直接格式化输出，不使用堆分配
-        // 使用单个 writeln! 调用以确保整个日志条目在一个锁内完成
-        let _ = writeln!(
-            stdout,
-            "{}{} [{:12}] [CPU{}/T{:3}] {}{}",
+        // 格式化日志条目
+        let formatted = format!(
+            "{}{} [{:12}] [CPU{}/T{:3}] {}{}\n",
             entry.level().color_code(),
             entry.level().as_str(),
             entry.timestamp(),
@@ -237,6 +230,11 @@ impl LogCore {
             entry.message(),
             entry.level().reset_color_code()
         );
+
+        // 通过 trait 输出
+        if let Some(output) = crate::get_log_output() {
+            output.write_str(&formatted);
+        }
     }
 }
 

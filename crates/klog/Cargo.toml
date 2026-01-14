@@ -1,0 +1,11 @@
+[package]
+name = "klog"
+version.workspace = true
+edition.workspace = true
+description = "Kernel logging subsystem for SanktaOS"
+
+[dependencies]
+# 无外部依赖，纯 no_std
+
+[lints.rust]
+missing_docs = "warn"

@@ -230,6 +230,9 @@ pub fn main(hartid: usize) {
     // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
     unsafe { crate::arch::init_sync_arch_ops() };
 
+    // 初始化日志系统（必须在使用 pr_* 宏之前）
+    crate::log::init();
+
     run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");

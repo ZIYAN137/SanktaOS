@@ -5,8 +5,8 @@
 //! # 用法
 //!
 //! ```rust
-//! use crate::pr_info;
-//! use crate::pr_err;
+//! use klog::pr_info;
+//! use klog::pr_err;
 //!
 //! pr_info!("系统已初始化");
 //! pr_err!("分配 {} 字节失败", size);
@@ -34,10 +34,10 @@
 /// 在调用日志记录实现之前，**检查日志级别是否启用**。
 /// 这种早期检查避免了对禁用级别进行不必要的格式化字符串评估。
 #[macro_export]
-macro_rules! __log_impl_filtered {
+macro_rules! __klog_impl_filtered {
     ($level:expr, $args:expr) => {
-        if $crate::log::is_level_enabled($level) {
-            $crate::log::log_impl($level, $args);
+        if $crate::is_level_enabled($level) {
+            $crate::log_impl($level, $args);
         }
     };
 }
@@ -55,8 +55,8 @@ macro_rules! __log_impl_filtered {
 #[macro_export]
 macro_rules! pr_emerg {
 ($($arg:tt)*) => {
-$crate::__log_impl_filtered!(
-$crate::log::LogLevel::Emergency,
+$crate::__klog_impl_filtered!(
+$crate::LogLevel::Emergency,
 format_args!($($arg)*)
 )
 }
@@ -74,8 +74,8 @@ format_args!($($arg)*)
 #[macro_export]
 macro_rules! pr_alert {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Alert,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Alert,
             format_args!($($arg)*)
         )
     }
@@ -93,8 +93,8 @@ macro_rules! pr_alert {
 #[macro_export]
 macro_rules! pr_crit {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Critical,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Critical,
             format_args!($($arg)*)
         )
     }
@@ -113,8 +113,8 @@ macro_rules! pr_crit {
 #[macro_export]
 macro_rules! pr_err {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Error,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Error,
             format_args!($($arg)*)
         )
     }
@@ -133,8 +133,8 @@ macro_rules! pr_err {
 #[macro_export]
 macro_rules! pr_warn {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Warning,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Warning,
             format_args!($($arg)*)
         )
     }
@@ -152,8 +152,8 @@ macro_rules! pr_warn {
 #[macro_export]
 macro_rules! pr_notice {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Notice,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Notice,
             format_args!($($arg)*)
         )
     }
@@ -172,8 +172,8 @@ macro_rules! pr_notice {
 #[macro_export]
 macro_rules! pr_info {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Info,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Info,
             format_args!($($arg)*)
         )
     }
@@ -193,8 +193,8 @@ macro_rules! pr_info {
 #[macro_export]
 macro_rules! pr_debug {
     ($($arg:tt)*) => {
-        $crate::__log_impl_filtered!(
-            $crate::log::LogLevel::Debug,
+        $crate::__klog_impl_filtered!(
+            $crate::LogLevel::Debug,
             format_args!($($arg)*)
         )
     }

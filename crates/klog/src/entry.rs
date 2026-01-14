@@ -60,7 +60,7 @@ impl LogEntry {
     /// * `task_id` - 生成日志的任务 ID
     /// * `timestamp` - 日志的时间戳
     /// * `args` - 来自 `format_args!` 宏的格式化参数
-    pub(super) fn from_args(
+    pub(crate) fn from_args(
         level: LogLevel,
         cpu_id: usize,
         task_id: u32,
@@ -122,7 +122,7 @@ impl LogEntry {
     /// # 安全性
     ///
     /// `dest` 必须指向环形缓冲区中有效的 `LogEntry`
-    pub(super) unsafe fn copy_data_to(&self, dest: *mut LogEntry) {
+    pub(crate) unsafe fn copy_data_to(&self, dest: *mut LogEntry) {
         // 我们不能使用 ptr::write，因为它会覆盖 dest.seq
         // 我们必须逐个字段复制，**除了** seq
         unsafe {
@@ -143,7 +143,7 @@ impl LogEntry {
     /// # 安全性
     ///
     /// `dest` 必须指向环形缓冲区中有效的 `LogEntry`
-    pub(super) unsafe fn publish(&self, dest: *mut LogEntry, seq_num: usize) {
+    pub(crate) unsafe fn publish(&self, dest: *mut LogEntry, seq_num: usize) {
         // 使用 Release 内存顺序，以确保在 'seq' 更新之前
         // 所有数据写入都是可见的
         unsafe {
@@ -159,7 +159,7 @@ impl LogEntry {
     /// # 安全性
     ///
     /// `slot_ptr` 必须指向环形缓冲区中有效的 `LogEntry`
-    pub(super) unsafe fn is_ready(&self, slot_ptr: *const LogEntry, expected_seq: usize) -> bool {
+    pub(crate) unsafe fn is_ready(&self, slot_ptr: *const LogEntry, expected_seq: usize) -> bool {
         // 使用 Acquire 内存顺序与生产者的 Release 存储配对
         unsafe { (*slot_ptr).seq.load(Ordering::Acquire) == expected_seq }
     }

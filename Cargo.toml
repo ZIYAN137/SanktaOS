@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["os", "crates/uapi", "crates/sync"]
+members = ["os", "crates/uapi", "crates/sync", "crates/klog"]
 exclude = ["user"]
 
 [workspace.package]

@@ -43,7 +43,7 @@ impl LogLevel {
     /// 返回日志级别的字符串表示形式
     ///
     /// 返回一个简短的标签，如 `[ERR]`、`[INFO]` 等。
-    pub(super) const fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             LogLevel::Emergency => "[EMERG]",
             LogLevel::Alert => "[ALERT]",
@@ -66,7 +66,7 @@ impl LogLevel {
     /// - Notice: 亮白色
     /// - Info: 白色
     /// - Debug: 灰色
-    pub(super) const fn color_code(&self) -> &'static str {
+    pub const fn color_code(&self) -> &'static str {
         match self {
             Self::Emergency | Self::Alert | Self::Critical => "\x1b[1;31m",
             Self::Error => "\x1b[31m",
@@ -78,7 +78,7 @@ impl LogLevel {
     }
 
     /// 返回 ANSI 颜色重置代码
-    pub(super) const fn reset_color_code(&self) -> &'static str {
+    pub const fn reset_color_code(&self) -> &'static str {
         "\x1b[0m"
     }
 

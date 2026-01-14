@@ -127,37 +127,13 @@ impl<T> DerefMut for CachePadded64<T> {
     }
 }
 
-/// 全局日志缓冲区实例
-///
-/// 我们不需要锁 (如 Mutex) 或延迟初始化 (如 OnceCell)，因为：
-///
-/// 1.  **不需要 `Mutex` (锁):** `GlobalLogBuffer` 本身是线程安全的。
-///     它使用 `AtomicUsize` 字段以**内部可变性**设计。
-///     由于其所有方法 (`write`, `read`) 都对共享引用 (`&self`) 操作，
-///     并且所有内部修改都通过原子操作安全处理，因此整个
-///     结构体是 `Sync`。我们不需要将一个已经线程安全的
-///     类型封装在**另一个**锁中。
-///
-/// 2.  **不需要 `Lazy` 或 `OnceCell`:** `GlobalLogBuffer::new()`
-///     函数是一个 `const fn`。这意味着它在**编译时**执行，
-///     而不是在运行时执行。整个、完全初始化的 `GlobalLogBuffer`
-///     实例在内核编译时被直接烘焙到内核的数据段 (`.data` 或 `.bss`) 中。
-///
-///     因此，没有运行时初始化步骤，也就不存在 `Lazy` 旨在解决的
-///     "首次初始化"竞态条件。缓冲区从第一条 CPU 指令开始，
-///     就已完全初始化并存在于内存中。
-///
-/// 这种模式产生了零开销、锁无关且无数据竞争的
-/// 全局静态实例。
-static GLOBAL_LOG_BUFFER: GlobalLogBuffer = GlobalLogBuffer::new();
-
 /// 存储日志条目的锁无关环形缓冲区
 ///
 /// 采用多生产者单消费者 (MPSC) 设计，其中：
 /// - 多个 CPU 可以并发地写入日志而无需阻塞
 /// - 单个消费者线程按顺序读取日志
 #[repr(C)]
-pub(super) struct GlobalLogBuffer {
+pub(crate) struct GlobalLogBuffer {
     /// 写入侧数据（由生产者更新）
     writer_data: CachePadded64<WriterData>,
     /// 读取侧数据（由消费者更新）
@@ -186,7 +162,7 @@ struct ReaderData {
 
 impl GlobalLogBuffer {
     /// 在编译时创建一个新的全局日志缓冲区
-    pub(super) const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         const EMPTY: LogEntry = LogEntry::empty();
         Self {
             writer_data: CachePadded64 {
@@ -214,7 +190,7 @@ impl GlobalLogBuffer {
     /// 4. 将日志数据复制到槽位（*不包括* seq 字段）
     /// 5. 使用 **Release** 内存屏障原子地设置 seq 来发布条目
     /// 6. 增加未读字节计数
-    pub(super) fn write(&self, entry: &LogEntry) {
+    pub(crate) fn write(&self, entry: &LogEntry) {
         // step1: 原子地获取一个唯一的序列号（票据）
         let seq = self.writer_data.write_seq.fetch_add(1, Ordering::Relaxed);
 
@@ -284,7 +260,7 @@ impl GlobalLogBuffer {
     /// 如果没有可用条目，则返回 `None`。这是一个**锁无关**的
     /// 单消费者操作，使用 **Acquire** 内存顺序确保与生产者的正确同步。
     /// 读取后会减少未读字节计数。
-    pub(super) fn read(&self) -> Option<LogEntry> {
+    pub(crate) fn read(&self) -> Option<LogEntry> {
         let read_seq = self.reader_data.read_seq.load(Ordering::Acquire);
 
         let slot = read_seq % MAX_LOG_ENTRIES;
@@ -312,19 +288,19 @@ impl GlobalLogBuffer {
     }
 
     /// 返回缓冲区中未读日志条目的数量
-    pub(super) fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         let write = self.writer_data.write_seq.load(Ordering::Relaxed);
         let read = self.reader_data.read_seq.load(Ordering::Relaxed);
         write.saturating_sub(read)
     }
 
     /// 返回未读日志的总字节数（格式化后）
-    pub(super) fn unread_bytes(&self) -> usize {
+    pub(crate) fn unread_bytes(&self) -> usize {
         self.unread_bytes.load(Ordering::Acquire)
     }
 
     /// 返回由于缓冲区溢出而丢弃的日志总数
-    pub(super) fn dropped_count(&self) -> usize {
+    pub(crate) fn dropped_count(&self) -> usize {
         self.reader_data.dropped.load(Ordering::Relaxed)
     }
 
@@ -342,7 +318,7 @@ impl GlobalLogBuffer {
     ///
     /// # 并发安全
     /// 此方法是完全无锁的，可以与 write 和 read 并发调用。
-    pub(super) fn peek(&self, index: usize) -> Option<LogEntry> {
+    pub(crate) fn peek(&self, index: usize) -> Option<LogEntry> {
         let current_write = self.writer_data.write_seq.load(Ordering::Acquire);
         let current_read = self.reader_data.read_seq.load(Ordering::Acquire);
 
@@ -379,64 +355,12 @@ impl GlobalLogBuffer {
     }
 
     /// 获取当前可读取的起始索引（读指针位置）
-    pub(super) fn reader_index(&self) -> usize {
+    pub(crate) fn reader_index(&self) -> usize {
         self.reader_data.read_seq.load(Ordering::Acquire)
     }
 
     /// 获取当前写入位置（下一个要写入的索引）
-    pub(super) fn writer_index(&self) -> usize {
+    pub(crate) fn writer_index(&self) -> usize {
         self.writer_data.write_seq.load(Ordering::Acquire)
     }
-}
-
-/// 将日志条目写入全局缓冲区（内部使用）
-#[inline]
-pub(super) fn write_log(entry: &LogEntry) {
-    GLOBAL_LOG_BUFFER.write(entry);
-}
-
-/// 从全局缓冲区读取下一个日志条目
-///
-/// 如果没有可供读取的条目，则返回 `None`。
-#[inline]
-pub fn read_log() -> Option<LogEntry> {
-    GLOBAL_LOG_BUFFER.read()
-}
-
-/// 返回由于缓冲区溢出而丢弃的日志总数
-#[inline]
-pub fn log_dropped_count() -> usize {
-    GLOBAL_LOG_BUFFER.dropped_count()
-}
-
-/// 返回缓冲区中当前未读日志条目的数量
-#[inline]
-pub fn log_len() -> usize {
-    GLOBAL_LOG_BUFFER.len()
-}
-
-/// 返回未读日志的总字节数（格式化后）
-#[inline]
-pub fn log_unread_bytes() -> usize {
-    GLOBAL_LOG_BUFFER.unread_bytes()
-}
-
-/// 非破坏性读取：按索引 peek 日志条目
-///
-/// 不移动读指针，允许重复读取同一条目。
-#[inline]
-pub fn peek_log(index: usize) -> Option<LogEntry> {
-    GLOBAL_LOG_BUFFER.peek(index)
-}
-
-/// 获取当前可读取的起始索引
-#[inline]
-pub fn log_reader_index() -> usize {
-    GLOBAL_LOG_BUFFER.reader_index()
-}
-
-/// 获取当前写入位置
-#[inline]
-pub fn log_writer_index() -> usize {
-    GLOBAL_LOG_BUFFER.writer_index()
 }
