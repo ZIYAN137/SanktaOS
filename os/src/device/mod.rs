@@ -3,7 +3,7 @@
 //! 此模块重新导出 device crate 的所有公共接口，并提供 os crate 特定的实现。
 
 // Re-export device crate
-pub use device::*;
+pub use ::device::*;
 
 // os-specific 模块
 mod ops_impl;
