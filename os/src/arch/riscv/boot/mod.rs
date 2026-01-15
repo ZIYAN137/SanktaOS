@@ -280,6 +280,9 @@ pub fn main(hartid: usize) {
     // 初始化 VFS 操作（必须在使用 VFS 之前）
     crate::vfs::init_vfs_ops();
 
+    // 初始化 FS 操作（必须在使用 fs crate 之前）
+    crate::fs::init_fs_ops();
+
     // 启动从核（在启用定时器中断之前）
     let num_cpus = unsafe { NUM_CPU };
     if num_cpus > 1 {

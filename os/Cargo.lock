@@ -163,6 +163,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
+name = "fs"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.10.0",
+ "device",
+ "ext4_rs",
+ "lazy_static",
+ "log",
+ "mm",
+ "sync",
+ "uapi",
+ "vfs",
+]
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -271,6 +286,7 @@ dependencies = [
  "device",
  "ext4_rs",
  "fdt",
+ "fs",
  "hashbrown",
  "klog",
  "lazy_static",

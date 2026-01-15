@@ -312,6 +312,9 @@ pub fn main(hartid: usize) {
     // 初始化 VFS 操作（必须在使用 VFS 之前）
     crate::vfs::init_vfs_ops();
 
+    // 初始化 FS 操作（必须在使用 fs crate 之前）
+    crate::fs::init_fs_ops();
+
     earlyprintln!("[Boot] entering rest_init");
     rest_init();
 }

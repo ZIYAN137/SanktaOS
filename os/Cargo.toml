@@ -10,6 +10,7 @@ sync = { path = "../crates/sync" }
 klog = { path = "../crates/klog" }
 vfs = { path = "../crates/vfs" }
 device = { path = "../crates/device" }
+fs = { path = "../crates/fs" }
 talc = { version = "4" }
 lock_api = "0.4"
 bitflags = { version = "2.10.0" }
