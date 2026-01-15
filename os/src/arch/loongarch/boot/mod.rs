@@ -280,6 +280,12 @@ pub fn main(hartid: usize) {
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] LoongArch CPU {} is up!", hartid);
 
+    // 注册 mm crate 的配置和架构操作（必须在 mm::init() 之前）
+    unsafe {
+        crate::config::register_mm_config();
+        crate::arch::mm::register_mm_ops();
+    }
+
     let kernel_space = mm::init();
 
     // 激活内核地址空间并设置 current_memory_space（供 rest_init/current_memory_space 使用）

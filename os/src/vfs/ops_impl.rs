@@ -87,12 +87,18 @@ impl DeviceOps for DeviceOpsImpl {
         let min = minor(dev);
 
         match maj {
-            chrdev_major::TTY | chrdev_major::CONSOLE => {
+            chrdev_major::TTY => {
+                // TTY 设备：ttyS0 的 minor 是 64，映射到 SERIAL_DRIVERS[0]
+                // 标准 Linux 中 ttyS* 的 minor 从 64 开始
+                let idx = if min >= 64 { min - 64 } else { min };
                 let drivers = SERIAL_DRIVERS.read();
-                if min as usize >= drivers.len() {
-                    return None;
-                }
-                let driver = drivers.get(min as usize)?.clone();
+                let driver = drivers.get(idx as usize)?.clone();
+                Some(Arc::new(SerialDriverWrapper(driver)))
+            }
+            chrdev_major::CONSOLE => {
+                // console 设备：直接使用 SERIAL_DRIVERS[0]
+                let drivers = SERIAL_DRIVERS.read();
+                let driver = drivers.first()?.clone();
                 Some(Arc::new(SerialDriverWrapper(driver)))
             }
             _ => None,
