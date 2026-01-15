@@ -1,10 +1,12 @@
-use super::super::{DeviceType, Driver};
+//! 内存模拟块设备
+
 use super::BlockDriver;
-use crate::sync::SpinLock;
+use crate::driver::{DeviceType, Driver};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
+use sync::SpinLock;
 
 /// 内存模拟的块设备
 ///

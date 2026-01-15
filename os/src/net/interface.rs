@@ -1,5 +1,5 @@
 use crate::device::DeviceType;
-use crate::device::net::net_device::NetDevice;
+use crate::device::NetDevice;
 use crate::sync::SpinLock;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
@@ -434,11 +434,11 @@ impl crate::device::Driver for NetworkInterface {
         self.name.clone()
     }
 
-    fn as_net(&self) -> Option<&dyn crate::device::net::net_device::NetDevice> {
+    fn as_net(&self) -> Option<&dyn crate::device::NetDevice> {
         Some(self.device.as_ref())
     }
 
-    fn as_net_arc(self: Arc<Self>) -> Option<Arc<dyn crate::device::net::net_device::NetDevice>> {
+    fn as_net_arc(self: Arc<Self>) -> Option<Arc<dyn crate::device::NetDevice>> {
         Some(self.device.clone())
     }
 

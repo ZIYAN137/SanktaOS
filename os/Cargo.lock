@@ -101,6 +101,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "device"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.10.0",
+ "chrono",
+ "lazy_static",
+ "log",
+ "sync",
+]
+
+[[package]]
 name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -257,6 +268,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
  "chrono",
+ "device",
  "ext4_rs",
  "fdt",
  "hashbrown",

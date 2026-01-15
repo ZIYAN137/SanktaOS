@@ -8,7 +8,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::device::block::BlockDriver;
-use crate::device::net::net_device::NetDevice;
+use crate::device::NetDevice;
 use crate::device::rtc::RtcDriver;
 use crate::device::{BLK_DRIVERS, DRIVERS, DeviceType};
 

@@ -270,6 +270,10 @@ pub fn main(hartid: usize) {
 
     // 初始化工作
     trap::init_boot_trap();
+
+    // 初始化设备操作（必须在 platform::init() 之前，因为设备树初始化会注册中断）
+    crate::device::init_device_ops();
+
     platform::init(); // 完整的平台初始化 (包括 device_tree::init())
     time::init();
 

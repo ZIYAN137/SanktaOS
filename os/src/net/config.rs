@@ -102,7 +102,7 @@ impl NetworkConfigManager {
         } else {
             // 没有任何真实网卡（例如 QEMU 没挂 virtio-net）时，创建一个“空设备接口”，
             // 让 smoltcp/套接字栈至少能在 loopback(127.0.0.1) 场景工作。
-            use crate::device::net::null_net::NullNetDevice;
+            use crate::device::NullNetDevice;
             use alloc::sync::Arc;
 
             earlyprintln!("No net interfaces found; creating null loopback-only interface");
