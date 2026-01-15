@@ -8,7 +8,7 @@ use crate::device::device_tree::{DEVICE_TREE_INTC, DEVICE_TREE_REGISTRY};
 use crate::device::irq::IntcDriver;
 use crate::device::{DeviceType, Driver, IRQ_MANAGER};
 use crate::kernel::current_memory_space;
-use crate::mm::address::{Paddr, UsizeConvert};
+use mm::address::{Paddr, UsizeConvert};
 use crate::pr_info;
 use crate::pr_warn;
 use crate::sync::SpinLock as Mutex;

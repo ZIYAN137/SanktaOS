@@ -12,12 +12,13 @@
 //! 每级页表有 512 个条目（2^9），每个条目 8 字节。
 
 use super::PageTableEntry;
-use crate::mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
-use crate::mm::frame_allocator::{FrameTracker, alloc_frame};
-use crate::mm::page_table::{
+use mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
+use mm::frame_allocator::{FrameTracker, alloc_frame};
+use mm::page_table::{
     PageSize, PageTableEntry as PageTableEntryTrait, PageTableInner as PageTableInnerTrait,
     PagingError, PagingResult, UniversalPTEFlag,
 };
+use mm::TlbBatchContextWrapper;
 use alloc::vec::Vec;
 
 /// 页表内部结构
@@ -397,43 +398,41 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
 
         Err(PagingError::NotMapped)
     }
-}
 
-impl PageTableInner {
-    /// 带批处理支持的映射方法（与 RISC-V 端保持签名一致）
-    pub fn map_with_batch(
+    // 映射虚拟页到物理页（支持 TLB 批处理）
+    fn map_with_batch(
         &mut self,
         vpn: Vpn,
         ppn: Ppn,
         page_size: PageSize,
         flags: UniversalPTEFlag,
-        _batch: Option<&mut TlbBatchContext>,
+        _batch: Option<&mut TlbBatchContextWrapper>,
     ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::map(self, vpn, ppn, page_size, flags)?;
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
+        self.map(vpn, ppn, page_size, flags)?;
+        Self::tlb_flush(vpn);
         Ok(())
     }
 
-    /// 带批处理支持的解除映射方法（与 RISC-V 端保持签名一致）
-    pub fn unmap_with_batch(
+    // 解除映射（支持 TLB 批处理）
+    fn unmap_with_batch(
         &mut self,
         vpn: Vpn,
-        _batch: Option<&mut TlbBatchContext>,
+        _batch: Option<&mut TlbBatchContextWrapper>,
     ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::unmap(self, vpn)?;
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
+        self.unmap(vpn)?;
+        Self::tlb_flush(vpn);
         Ok(())
     }
 
-    /// 带批处理支持的更新权限方法（与 RISC-V 端保持签名一致）
-    pub fn update_flags_with_batch(
+    // 更新映射标志（支持 TLB 批处理）
+    fn update_flags_with_batch(
         &mut self,
         vpn: Vpn,
         flags: UniversalPTEFlag,
-        _batch: Option<&mut TlbBatchContext>,
+        _batch: Option<&mut TlbBatchContextWrapper>,
     ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::update_flags(self, vpn, flags)?;
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
+        self.update_flags(vpn, flags)?;
+        Self::tlb_flush(vpn);
         Ok(())
     }
 }
@@ -533,7 +532,7 @@ impl PageTableInner {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::mm::page_table::PageTableInner as PageTableInnerTrait;
+    use mm::page_table::PageTableInner as PageTableInnerTrait;
     use crate::{kassert, test_case};
 
     // 1. 页表创建测试

@@ -138,7 +138,7 @@ fn idle_loop() -> ! {
 /// 为指定 CPU 创建 idle 任务（LoongArch 版本）
 fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::arch::trap::TrapFrame;
-    use crate::mm::frame_allocator::alloc_contig_frames;
+    use mm::frame_allocator::alloc_contig_frames;
     use crate::vfs::fd_table::FDTable;
 
     // idle 任务从 TID 分配器正常分配（从 2 开始）

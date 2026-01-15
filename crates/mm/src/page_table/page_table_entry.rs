@@ -3,7 +3,7 @@
 //! 本模块定义了页表项（Page Table Entry, PTE）的通用接口和标志集，
 //! 以支持不同体系结构的页表实现。
 #![allow(dead_code)]
-use crate::mm::address::Ppn;
+use crate::address::Ppn;
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,18 +12,27 @@ bitflags::bitflags! {
     pub struct UniversalPTEFlag: usize {
 
             // ---- RISC-V SV39 兼容标志 ----
-            const VALID = 1 << 0;               // 指示该页表项是否有效
-            const READABLE = 1 << 1;            // 指示该页是否可读
-            const WRITEABLE = 1 << 2;           // 指示该页是否可写
-            const EXECUTABLE = 1 << 3;          // 指示该页是否可执行
-            const USER_ACCESSIBLE = 1 << 4;     // 指示该页是否可从用户模式访问
-            const GLOBAL = 1 << 5;              // 指示该页是否为全局页（Global）
-            const ACCESSED = 1 << 6;            // 指示该页是否已被访问
-            const DIRTY = 1 << 7;               // 指示该页是否已被写入（修改）
+            /// 指示该页表项是否有效
+            const VALID = 1 << 0;
+            /// 指示该页是否可读
+            const READABLE = 1 << 1;
+            /// 指示该页是否可写
+            const WRITEABLE = 1 << 2;
+            /// 指示该页是否可执行
+            const EXECUTABLE = 1 << 3;
+            /// 指示该页是否可从用户模式访问
+            const USER_ACCESSIBLE = 1 << 4;
+            /// 指示该页是否为全局页（Global）
+            const GLOBAL = 1 << 5;
+            /// 指示该页是否已被访问
+            const ACCESSED = 1 << 6;
+            /// 指示该页是否已被写入（修改）
+            const DIRTY = 1 << 7;
 
             // ---- 额外的通用标志 ----
             #[allow(dead_code)] // TODO(暂时注释): 巨页支持已暂时禁用
-            const HUGE = 1 << 8;                // 指示该页是否为巨页（Huge Page）
+            /// 指示该页是否为巨页（Huge Page）
+            const HUGE = 1 << 8;
     }
 }
 

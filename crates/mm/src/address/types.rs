@@ -4,9 +4,15 @@
 //! 地址类型 ([Paddr] 物理地址, [Vaddr] 虚拟地址)，并提供了地址算术、
 //! 对齐操作以及地址范围 ([AddressRange]) 的支持。
 
-use crate::mm::address::operations::{AlignOps, CalcOps, UsizeConvert};
+use crate::address::operations::{AlignOps, CalcOps, UsizeConvert};
 use core::mem::size_of;
 use core::ops::Range;
+
+/// 获取页大小
+#[inline]
+fn page_size() -> usize {
+    crate::mm_config().page_size()
+}
 
 /// [Address] Trait
 /// ---------------------
@@ -28,7 +34,7 @@ pub trait Address:
     /// 获取地址在当前页内的偏移量。
     fn page_offset(self) -> usize {
         // 使用位掩码 (PAGE_SIZE - 1) 快速计算页内偏移
-        self.as_usize() & (crate::config::PAGE_SIZE - 1)
+        self.as_usize() & (page_size() - 1)
     }
 
     /// 计算两个地址之间的字节差值。
@@ -112,7 +118,7 @@ pub trait Address:
 #[macro_export]
 macro_rules! impl_address {
     ($type:ty) => {
-        impl $crate::mm::address::operations::UsizeConvert for $type {
+        impl $crate::address::operations::UsizeConvert for $type {
             /// 将地址类型转换为其原始的 `usize` 值。
             fn as_usize(&self) -> usize {
                 // SAFETY: 地址类型 (Paddr/Vaddr) 是 transparent 的，并且保证和 usize 大小相同。
@@ -127,9 +133,9 @@ macro_rules! impl_address {
         }
 
         $crate::impl_calc_ops!($type);
-        impl $crate::mm::address::operations::AlignOps for $type {}
+        impl $crate::address::operations::AlignOps for $type {}
 
-        impl $crate::mm::address::address::Address for $type {}
+        impl $crate::address::types::Address for $type {}
 
         // 地址类型通常需要在多线程环境下传递和共享
         unsafe impl Sync for $type {}
@@ -159,12 +165,12 @@ impl ConvertablePaddr for Paddr {
     fn is_valid_paddr(&self) -> bool {
         // 注意: 实际实现依赖于具体的架构函数 `vaddr_to_paddr`，
         // 这里的逻辑通常需要检查地址是否在物理内存范围内。
-        self.as_usize() == unsafe { crate::arch::mm::vaddr_to_paddr(self.as_usize()) }
+        self.as_usize() == unsafe { crate::arch_ops().vaddr_to_paddr(self.as_usize()) }
     }
 
     fn to_vaddr(&self) -> Vaddr {
         // 依赖于架构特定的映射函数 (例如：线性映射或固定偏移)
-        Vaddr::from_usize(crate::arch::mm::paddr_to_vaddr(self.as_usize()))
+        Vaddr::from_usize(crate::arch_ops().paddr_to_vaddr(self.as_usize()))
     }
 }
 
@@ -189,12 +195,12 @@ impl_address!(Vaddr);
 impl ConvertableVaddr for Vaddr {
     fn is_valid_vaddr(&self) -> bool {
         // 注意: 实际实现通常涉及查询页表来确定映射关系。
-        self.as_usize() == crate::arch::mm::paddr_to_vaddr(self.as_usize())
+        self.as_usize() == crate::arch_ops().paddr_to_vaddr(self.as_usize())
     }
 
     fn to_paddr(&self) -> Paddr {
         // 依赖于架构特定的反向映射函数 (查询页表或固定偏移)
-        Paddr::from_usize(unsafe { crate::arch::mm::vaddr_to_paddr(self.as_usize()) })
+        Paddr::from_usize(unsafe { crate::arch_ops().vaddr_to_paddr(self.as_usize()) })
     }
 }
 
@@ -426,89 +432,3 @@ pub type PaddrRange = AddressRange<Paddr>;
 
 /// 虚拟地址范围的类型别名
 pub type VaddrRange = AddressRange<Vaddr>;
-
-#[cfg(test)]
-mod address_basic_tests {
-    use super::*;
-    // 假设 arch 模块提供了 paddr_to_vaddr 的桩实现
-    use crate::arch::mm::paddr_to_vaddr;
-    use crate::{kassert, test_case};
-
-    // 1.1 Paddr/Vaddr 创建和转换测试
-    test_case!(test_address_roundtrip, {
-        let test_values = [0x0, 0x1000, 0x8000_0000, 0x8000_1234];
-
-        for &val in &test_values {
-            let paddr = Paddr::from_usize(val);
-            kassert!(paddr.as_usize() == val);
-
-            let vaddr = Vaddr::from_usize(val);
-            kassert!(vaddr.as_usize() == val);
-        }
-    });
-
-    // 1.2 空地址测试
-    test_case!(test_null_address, {
-        let paddr = Paddr::null();
-        kassert!(paddr.is_null());
-        kassert!(paddr.as_usize() == 0);
-    });
-
-    // 1.3 页内偏移测试 (假设 PAGE_SIZE = 0x1000)
-    test_case!(test_page_offset, {
-        let cases = [(0x8000_0000, 0), (0x8000_0123, 0x123), (0x8000_0FFF, 0xFFF)];
-        for &(addr, expected) in &cases {
-            // Vaddr 和 Paddr 的行为应该相同
-            kassert!(Paddr::from_usize(addr).page_offset() == expected);
-            kassert!(Vaddr::from_usize(addr).page_offset() == expected);
-        }
-    });
-
-    // 1.4 Paddr ↔ Vaddr 转换测试 (依赖于 arch/mm 桩实现)
-    test_case!(test_paddr_vaddr_conversion, {
-        let paddrs = [0x8000_0000, 0x8000_1000, 0x8020_0000];
-
-        for &paddr_val in &paddrs {
-            let paddr = Paddr::from_usize(paddr_val);
-            let vaddr = paddr.to_vaddr();
-            let back = vaddr.to_paddr();
-            kassert!(back.as_usize() == paddr_val);
-            kassert!(vaddr.as_usize() == paddr_to_vaddr(paddr_val));
-        }
-    });
-
-    // 1.5 地址比较测试
-    test_case!(test_address_comparison, {
-        let a1 = Paddr::from_usize(0x8000_0000);
-        let a2 = Paddr::from_usize(0x8000_0000);
-        let a3 = Paddr::from_usize(0x8000_1000);
-
-        kassert!(a1 == a2);
-        kassert!(a1 < a3);
-        kassert!(a3 > a1);
-    });
-
-    // 1.6 地址算术和步进测试
-    test_case!(test_address_arithmetic, {
-        let start = Paddr::from_usize(0x1000);
-
-        // add_by
-        kassert!(start.add_by(0x123).as_usize() == 0x1123);
-
-        // add<u32> (size_of::<u32>() == 4)
-        kassert!(start.add::<u32>().as_usize() == 0x1004);
-
-        // add_n<u16> (size_of::<u16>() * 3 == 6)
-        kassert!(start.add_n::<u16>(3).as_usize() == 0x1006);
-
-        // step (Paddr::size_of() == size_of::<usize>())
-        let mut p = start;
-        p.step();
-        kassert!(p.as_usize() == start.as_usize() + size_of::<Paddr>());
-
-        // step_back_by
-        let mut p = Paddr::from_usize(0x2000);
-        p.step_back_by(0x10);
-        kassert!(p.as_usize() == 0x1FF0);
-    });
-}

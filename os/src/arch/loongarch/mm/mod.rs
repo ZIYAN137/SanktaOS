@@ -28,6 +28,8 @@ mod page_table_entry;
 pub use page_table::{PageTableInner, TlbBatchContext};
 pub use page_table_entry::PageTableEntry;
 
+use mm::{ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper};
+
 /// LoongArch64 直接映射窗口起始地址
 ///
 /// 内核虚拟地址空间从此地址开始，通过 DMW (Direct Mapping Window) 配置。
@@ -68,4 +70,52 @@ pub const unsafe fn vaddr_to_paddr(vaddr: usize) -> usize {
 #[inline]
 pub const fn paddr_to_vaddr(paddr: usize) -> usize {
     paddr | VADDR_START
+}
+
+// ============ ArchMmOps trait 实现 ============
+
+/// LoongArch 架构的内存管理操作实现
+struct LoongArchMmOps;
+
+impl ArchMmOps for LoongArchMmOps {
+    unsafe fn vaddr_to_paddr(&self, vaddr: usize) -> usize {
+        vaddr & PADDR_MASK
+    }
+
+    fn paddr_to_vaddr(&self, paddr: usize) -> usize {
+        paddr | VADDR_START
+    }
+
+    fn sigreturn_trampoline_bytes(&self) -> &'static [u8] {
+        crate::arch::trap::kernel_sigreturn_trampoline_bytes()
+    }
+
+    fn num_cpus(&self) -> usize {
+        unsafe { crate::kernel::NUM_CPU }
+    }
+
+    fn send_tlb_flush_ipi_all(&self) {
+        // LoongArch 多核 IPI 尚未实现，暂时只刷新本地 TLB
+        // TODO: 实现 LoongArch 多核 TLB shootdown
+    }
+
+    fn create_tlb_batch_context(&self) -> TlbBatchContextWrapper {
+        unsafe { TlbBatchContextWrapper::new(TlbBatchContext::new()) }
+    }
+}
+
+impl TlbBatchContextTrait for TlbBatchContext {
+    fn flush(&mut self) {
+        TlbBatchContext::flush(self);
+    }
+}
+
+static LOONGARCH_MM_OPS: LoongArchMmOps = LoongArchMmOps;
+
+/// 注册 LoongArch 架构的内存管理操作
+///
+/// # Safety
+/// 必须在单线程环境下调用，且只能调用一次
+pub unsafe fn register_mm_ops() {
+    mm::register_arch_ops(&LOONGARCH_MM_OPS);
 }

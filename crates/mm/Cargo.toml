@@ -1,0 +1,25 @@
+[package]
+name = "mm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sync = { path = "../sync" }
+uapi = { path = "../uapi" }
+bitflags = "2.10.0"
+talc = "4"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+log = "0.4"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+private_intra_doc_links = "deny"
+
+[lints.clippy]
+todo = "warn"
+needless_borrow = "deny"
+redundant_clone = "deny"

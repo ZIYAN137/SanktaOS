@@ -4,9 +4,9 @@
 use alloc::sync::Arc;
 
 use crate::mm::activate;
+use crate::mm::MemorySpace;
 use crate::{
     kernel::task::SharedTask,
-    mm::memory_space::MemorySpace,
     sync::{PerCpu, SpinLock},
 };
 use lazy_static::lazy_static;

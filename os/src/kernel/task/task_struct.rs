@@ -19,7 +19,7 @@ use crate::{
     mm::{
         address::{ConvertablePaddr, PageNum, UsizeConvert},
         frame_allocator::{FrameRangeTracker, FrameTracker},
-        memory_space::MemorySpace,
+        MemorySpace,
     },
     pr_debug,
     sync::SpinLock,

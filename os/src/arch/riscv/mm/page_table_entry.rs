@@ -1,6 +1,6 @@
-use crate::mm::address::{Ppn, UsizeConvert};
-use crate::mm::page_table::PageTableEntry as PageTableEntryTrait;
-use crate::mm::page_table::{UniversalConvertableFlag, UniversalPTEFlag};
+use mm::address::{Ppn, UsizeConvert};
+use mm::page_table::PageTableEntry as PageTableEntryTrait;
+use mm::page_table::{UniversalConvertableFlag, UniversalPTEFlag};
 
 // 使用 bitflags 宏定义 SV39 页表项的标志位
 bitflags::bitflags! {

@@ -1,14 +1,25 @@
-//! 物理内存帧分配器模块
+//! 帧分配器模块
 //!
-//! 提供了内核用于管理和分配物理内存页帧（Frame）的机制。
-//! 采用 RAII (Resource Acquisition Is Initialization) 模式，确保分配的帧
-//! 在超出作用域时自动被回收。
+//! 本模块提供物理内存帧的分配和跟踪功能。
+//!
+//! # 模块组成
+//!
+//! - [`FrameTracker`]：用于单个已分配帧的 **RAII** 封装器。
+//! - [`FrameRangeTracker`]：用于已分配帧范围的 **RAII** 封装器。
+//! - [`init_frame_allocator`]：初始化全局帧分配器。
+//! - [`alloc_frame`]：分配单个帧。
+//! - `alloc_frames`：分配多个（非连续）帧。
+//! - `alloc_contig_frames`：分配多个连续帧。
+//! - `alloc_contig_frames_aligned`：分配带对齐要求的多个连续帧。
 
-use crate::config::PAGE_SIZE;
-use crate::mm::address::{ConvertablePaddr, PageNum, Ppn, PpnRange, UsizeConvert};
-use crate::sync::SpinLock;
+use crate::address::{ConvertablePaddr, Paddr, PageNum, Ppn, PpnRange, UsizeConvert};
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
+use sync::SpinLock;
+
+// ============================================================================
+// FrameTracker - 单帧 RAII 封装
+// ============================================================================
 
 /// 物理帧跟踪器。
 /// 实现了 RAII 模式：当此结构体被 drop 时，它所管理的物理页帧会被自动回收。
@@ -29,22 +40,16 @@ impl FrameTracker {
     }
 }
 
-/// 将指定的物理页帧清零。
-fn clear_frame(ppn: Ppn) {
-    unsafe {
-        // 将 Ppn 转换为虚拟地址指针
-        let va = ppn.start_addr().to_vaddr().as_mut_ptr::<u8>();
-        // 写入 PAGE_SIZE 字节的 0
-        core::ptr::write_bytes(va, 0, PAGE_SIZE);
-    }
-}
-
 impl Drop for FrameTracker {
     /// 自动回收物理页帧。
     fn drop(&mut self) {
-        super::dealloc_frame(self);
+        dealloc_frame(self);
     }
 }
+
+// ============================================================================
+// FrameRangeTracker - 连续帧范围 RAII 封装
+// ============================================================================
 
 /// 连续物理帧范围跟踪器。
 /// 实现了 RAII 模式：当此结构体被 drop 时，它所管理的物理页帧范围会被自动回收。
@@ -87,9 +92,13 @@ impl FrameRangeTracker {
 impl Drop for FrameRangeTracker {
     /// 自动回收连续物理页帧。
     fn drop(&mut self) {
-        super::dealloc_contig_frames(self);
+        dealloc_contig_frames(self);
     }
 }
+
+// ============================================================================
+// TrackedFrames - 帧集合枚举
+// ============================================================================
 
 /// 跟踪的物理帧集合。
 /// 用于封装单个、多个不连续或多个连续的物理帧。
@@ -103,13 +112,32 @@ pub enum TrackedFrames {
     Contiguous(FrameRangeTracker),
 }
 
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
+/// 将指定的物理页帧清零。
+fn clear_frame(ppn: Ppn) {
+    let page_size = crate::mm_config().page_size();
+    unsafe {
+        // 将 Ppn 转换为虚拟地址指针
+        let va = ppn.start_addr().to_vaddr().as_mut_ptr::<u8>();
+        // 写入 PAGE_SIZE 字节的 0
+        core::ptr::write_bytes(va, 0, page_size);
+    }
+}
+
+// ============================================================================
+// 全局帧分配器
+// ============================================================================
+
 lazy_static! {
     /// 全局物理帧分配器，由自旋锁保护。
-    pub static ref FRAME_ALLOCATOR: SpinLock<FrameAllocator> = SpinLock::new(FrameAllocator::new());
+    static ref FRAME_ALLOCATOR: SpinLock<FrameAllocator> = SpinLock::new(FrameAllocator::new());
 }
 
 /// 物理帧分配器。
-/// 采用简单的“延迟分配”策略，并使用回收栈来重用已释放的帧。
+/// 采用简单的"延迟分配"策略，并使用回收栈来重用已释放的帧。
 pub struct FrameAllocator {
     /// 物理帧的起始 Ppn。
     start: Ppn,
@@ -233,7 +261,7 @@ impl FrameAllocator {
 
     /// 回收一个物理帧。
     /// 尝试将回收的帧与当前分配指针前的连续空闲区域合并。
-    pub fn dealloc_frame(&mut self, frame: &FrameTracker) {
+    fn dealloc_frame(&mut self, frame: &FrameTracker) {
         // 检查帧是否在有效范围内
         debug_assert!(
             frame.ppn() >= self.start && frame.ppn() < self.end,
@@ -270,7 +298,7 @@ impl FrameAllocator {
 
     /// 回收一个连续的物理帧范围。
     /// 尝试将回收的帧与当前分配指针前的连续空闲区域合并。
-    pub fn dealloc_contig_frames(&mut self, frame_range: &FrameRangeTracker) {
+    fn dealloc_contig_frames(&mut self, frame_range: &FrameRangeTracker) {
         let start = frame_range.start_ppn();
         let end = frame_range.end_ppn();
         // 检查范围是否在有效范围内
@@ -345,4 +373,127 @@ impl FrameAllocator {
             self.free_frames(),
         )
     }
+}
+
+impl Default for FrameAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// 公共 API
+// ============================================================================
+
+/// 使用可用的物理内存范围初始化全局帧分配器。
+///
+/// # 参数
+///
+/// * `start_addr` - 可用物理内存的起始地址
+/// * `end_addr` - 可用物理内存的结束地址
+pub fn init_frame_allocator(start_addr: usize, end_addr: usize) {
+    // 将起始地址向上取整到页号
+    let start_ppn = Ppn::from_addr_ceil(Paddr::from_usize(start_addr));
+    // 将结束地址向下取整到页号
+    let end_ppn = Ppn::from_addr_floor(Paddr::from_usize(end_addr));
+
+    let mut allocator = FRAME_ALLOCATOR.lock();
+    allocator.init(start_ppn, end_ppn);
+}
+
+/// 分配一个物理帧。
+///
+/// # 返回
+///
+/// 如果分配成功，返回 `Some(FrameTracker)`；否则返回 `None`。
+pub fn alloc_frame() -> Option<FrameTracker> {
+    FRAME_ALLOCATOR.lock().alloc_frame()
+}
+
+/// 分配多个物理帧（不保证连续）。
+///
+/// # 参数
+///
+/// * `num` - 需要分配的帧数量。
+///
+/// # 返回
+///
+/// 如果分配成功，返回 `Some(Vec<FrameTracker>)`；否则返回 `None`。
+pub fn alloc_frames(num: usize) -> Option<Vec<FrameTracker>> {
+    FRAME_ALLOCATOR.lock().alloc_frames(num)
+}
+
+/// 分配指定数量的**连续**物理帧。
+///
+/// # 参数
+///
+/// * `num` - 需要分配的帧数量。
+///
+/// # 返回
+///
+/// 如果分配成功，返回 `Some(FrameRangeTracker)`；否则返回 `None`。
+pub fn alloc_contig_frames(num: usize) -> Option<FrameRangeTracker> {
+    FRAME_ALLOCATOR.lock().alloc_contig_frames(num)
+}
+
+/// 分配指定数量的**连续**物理帧，并确保起始地址对齐。
+///
+/// # 参数
+///
+/// * `num` - 需要分配的帧数量。
+/// * `align_pages` - 对齐的页数（必须是 2 的幂）。
+///
+/// # 返回
+///
+/// 如果分配成功，返回 `Some(FrameRangeTracker)`；否则返回 `None`。
+pub fn alloc_contig_frames_aligned(num: usize, align_pages: usize) -> Option<FrameRangeTracker> {
+    FRAME_ALLOCATOR
+        .lock()
+        .alloc_contig_frames_aligned(num, align_pages)
+}
+
+/// 回收一个物理帧。此函数由 FrameTracker 的 Drop 实现调用。
+fn dealloc_frame(frame: &FrameTracker) {
+    FRAME_ALLOCATOR.lock().dealloc_frame(frame);
+}
+
+/// 回收多个物理帧（不保证连续）。
+#[allow(dead_code)]
+fn dealloc_frames(frames: &[FrameTracker]) {
+    let mut allocator = FRAME_ALLOCATOR.lock();
+    for frame in frames {
+        allocator.dealloc_frame(frame);
+    }
+}
+
+/// 回收一个连续的物理帧范围。此函数由 FrameRangeTracker 的 Drop 实现调用。
+fn dealloc_contig_frames(frame_range: &FrameRangeTracker) {
+    FRAME_ALLOCATOR.lock().dealloc_contig_frames(frame_range);
+}
+
+/// 获取总的物理帧数
+pub fn get_total_frames() -> usize {
+    FRAME_ALLOCATOR.lock().total_frames()
+}
+
+/// 获取已分配的帧数
+pub fn get_allocated_frames() -> usize {
+    FRAME_ALLOCATOR.lock().allocated_frames()
+}
+
+/// 获取空闲的帧数
+pub fn get_free_frames() -> usize {
+    FRAME_ALLOCATOR.lock().free_frames()
+}
+
+/// 获取帧分配器的当前状态
+///
+/// # 返回值
+/// - 当前分配指针的 Ppn
+/// - 物理帧的结束 Ppn (不包含)
+/// - 回收栈的长度
+/// - 已分配的帧数
+/// - 空闲的帧数
+pub fn get_stats() -> (usize, usize, usize, usize, usize) {
+    FRAME_ALLOCATOR.lock().get_stats()
 }

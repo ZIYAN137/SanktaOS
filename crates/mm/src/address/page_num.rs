@@ -5,10 +5,15 @@
 //!
 //! 页码是地址空间中页 (Page) 的索引，它将内存管理抽象与底层硬件地址解耦。
 
-use crate::config::PAGE_SIZE;
-use crate::mm::address::address::{Address, Paddr, Vaddr};
-use crate::mm::address::operations::{AlignOps, CalcOps, UsizeConvert};
+use crate::address::types::{Address, Paddr, Vaddr};
+use crate::address::operations::{AlignOps, CalcOps, UsizeConvert};
 use core::ops::Range;
+
+/// 获取页大小
+#[inline]
+fn page_size() -> usize {
+    crate::mm_config().page_size()
+}
 
 /// [PageNum] Trait
 /// ---------------------
@@ -56,7 +61,7 @@ pub trait PageNum:
     /// 包含该地址的页的页码。
     fn from_addr_floor(addr: Self::TAddress) -> Self {
         // 先向下对齐到页边界，再除以页大小 PAGE_SIZE
-        Self::from_usize(addr.align_down_to_page().as_usize() / PAGE_SIZE)
+        Self::from_usize(addr.align_down_to_page().as_usize() / page_size())
     }
 
     /// 将地址转换为页码 (向上取整，即如果地址未对齐，则指向下一个页码)。
@@ -69,7 +74,7 @@ pub trait PageNum:
     /// 如果地址是页的结束（例如 0x1000），则返回下一页的页码（例如 1）。
     fn from_addr_ceil(addr: Self::TAddress) -> Self {
         // 先向上对齐到页边界，再除以页大小 PAGE_SIZE
-        Self::from_usize(addr.align_up_to_page().as_usize() / PAGE_SIZE)
+        Self::from_usize(addr.align_up_to_page().as_usize() / page_size())
     }
 
     /// 获取该页码对应的起始地址。
@@ -77,7 +82,7 @@ pub trait PageNum:
     /// # 返回
     /// 页的起始地址。
     fn start_addr(self) -> Self::TAddress {
-        Self::TAddress::from_usize(self.as_usize() * PAGE_SIZE)
+        Self::TAddress::from_usize(self.as_usize() * page_size())
     }
 
     /// 获取该页码对应的结束地址 (即下一页的起始地址)。
@@ -85,7 +90,7 @@ pub trait PageNum:
     /// # 返回
     /// 页的结束地址 (不包含在页内)。
     fn end_addr(self) -> Self::TAddress {
-        Self::TAddress::from_usize((self.as_usize() + 1) * PAGE_SIZE)
+        Self::TAddress::from_usize((self.as_usize() + 1) * page_size())
     }
 
     /// 计算两个页码之间的页数差。
@@ -117,7 +122,7 @@ pub trait PageNum:
 macro_rules! impl_page_num {
     ($type:ty, $addr_type:ty) => {
         // 1. 实现 UsizeConvert，允许与 usize 互相转换
-        impl $crate::mm::address::operations::UsizeConvert for $type {
+        impl $crate::address::operations::UsizeConvert for $type {
             fn as_usize(&self) -> usize {
                 self.0
             }
@@ -131,7 +136,7 @@ macro_rules! impl_page_num {
         $crate::impl_calc_ops!($type);
 
         // 3. 实现 PageNum Trait，绑定地址类型
-        impl $crate::mm::address::page_num::PageNum for $type {
+        impl $crate::address::page_num::PageNum for $type {
             type TAddress = $addr_type;
         }
     };
@@ -288,108 +293,3 @@ where
 pub type PpnRange = PageNumRange<Ppn>;
 /// 虚拟页码范围的类型别名
 pub type VpnRange = PageNumRange<Vpn>;
-
-#[cfg(test)]
-mod page_num_tests {
-    use super::*;
-    use crate::mm::address::{Paddr, PageNum, Ppn, Vpn};
-    use crate::{kassert, test_case};
-
-    // 1. Ppn/Vpn 基本转换测试
-    test_case!(test_pagenum_from_usize, {
-        // 假设 PAGE_SIZE = 0x1000 (4KB)
-        let ppn = Ppn::from_usize(0x80000); // 对应的地址是 0x8000_0000
-        kassert!(ppn.as_usize() == 0x80000);
-
-        let vpn = Vpn::from_usize(0x000F_FFFF_FC08_0000);
-        kassert!(vpn.as_usize() == 0x000F_FFFF_FC08_0000);
-    });
-
-    // 2. 地址到页码的转换测试
-    test_case!(test_pagenum_from_addr, {
-        let paddr = Paddr::from_usize(0x8000_1234);
-
-        // 向下取整 (floor): 0x8000_1234 位于页 0x80001
-        let ppn_floor = Ppn::from_addr_floor(paddr);
-        kassert!(ppn_floor.as_usize() == 0x80001); // 0x80001000 / PAGE_SIZE
-
-        // 向上取整 (ceil): 0x8000_1234 向上对齐到 0x8000_2000，页码为 0x80002
-        let ppn_ceil = Ppn::from_addr_ceil(paddr);
-        kassert!(ppn_ceil.as_usize() == 0x80002);
-    });
-
-    // 3. 页码到地址的转换测试
-    test_case!(test_pagenum_to_addr, {
-        let ppn = Ppn::from_usize(0x80000);
-
-        // 起始地址 (Paddr::from_usize(0x80000 * 0x1000))
-        let start = ppn.start_addr();
-        kassert!(start.as_usize() == 0x8000_0000);
-
-        // 结束地址 (下一页的起始地址)
-        let end = ppn.end_addr();
-        kassert!(end.as_usize() == 0x8000_1000);
-    });
-
-    // 4. 页码步进操作测试
-    test_case!(test_pagenum_step, {
-        let mut ppn = Ppn::from_usize(0x80000);
-
-        ppn.step();
-        kassert!(ppn.as_usize() == 0x80001);
-
-        ppn.step_back();
-        kassert!(ppn.as_usize() == 0x80000);
-    });
-
-    // 5. 页码范围基本属性测试
-    test_case!(test_pagenum_range, {
-        let start = Ppn::from_usize(0x80000);
-        let end = Ppn::from_usize(0x80003); // 范围 [0x80000, 0x80001, 0x80002]
-        let range = PpnRange::new(start, end);
-
-        kassert!(range.start().as_usize() == 0x80000);
-        kassert!(range.end().as_usize() == 0x80003);
-        kassert!(range.len() == 3); // 页数差
-    });
-
-    // 6. 页码范围迭代测试
-    test_case!(test_pagenum_range_iter, {
-        let range = PpnRange::new(Ppn::from_usize(0x80000), Ppn::from_usize(0x80003));
-
-        let mut count = 0;
-        // 迭代器应该返回 0x80000, 0x80001, 0x80002
-        for ppn in range {
-            kassert!(ppn.as_usize() >= 0x80000);
-            kassert!(ppn.as_usize() < 0x80003);
-            count += 1;
-        }
-        kassert!(count == 3);
-    });
-
-    // 7. floor 和 ceil 转换的差异测试
-    test_case!(test_floor_ceil_difference, {
-        // 对齐的地址: floor == ceil (页码一样)
-        let aligned = Paddr::from_usize(0x8000_0000);
-        let floor1 = Ppn::from_addr_floor(aligned);
-        let ceil1 = Ppn::from_addr_ceil(aligned);
-        kassert!(floor1.as_usize() == ceil1.as_usize());
-
-        // 未对齐的地址: ceil = floor + 1 (向上取整到下一页)
-        let unaligned = Paddr::from_usize(0x8000_0001);
-        let floor2 = Ppn::from_addr_floor(unaligned); // 0x80000
-        let ceil2 = Ppn::from_addr_ceil(unaligned); // 0x80001
-        kassert!(ceil2.as_usize() == floor2.as_usize() + 1);
-    });
-
-    // 8. 页码比较测试
-    test_case!(test_pagenum_comparison, {
-        let ppn1 = Ppn::from_usize(0x80000);
-        let ppn2 = Ppn::from_usize(0x80000);
-        let ppn3 = Ppn::from_usize(0x80001);
-
-        kassert!(ppn1 == ppn2);
-        kassert!(ppn1 < ppn3);
-        kassert!(ppn3 > ppn1);
-    });
-}

@@ -1,25 +1,22 @@
 //! 页表模块
 //!
 //! 本模块提供与页表管理相关的功能，包括页表的创建、映射、解除映射、翻译等操作。
-//! HACK: 在一个模块目录/文件的顶层又声明了一个同名子模块，这会造成 “module inception”。
-//! 虽然功能上可行，但会引起 API/模块层次混淆，Clippy 建议消除这种重复。
-#![allow(clippy::module_inception)]
-mod page_table;
+mod table;
 mod page_table_entry;
 
-pub use page_table::*;
+pub use table::*;
 pub use page_table_entry::*;
-
-// 活动页表内部类型别名
-pub type ActivePageTableInner = crate::arch::mm::PageTableInner;
 
 /// 支持的页大小
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageSize {
+    /// 4KB 页
     Size4K = 0x1000,
     #[allow(dead_code)] // TODO(暂时注释): 大页支持已暂时禁用
+    /// 2MB 大页
     Size2M = 0x20_0000,
     #[allow(dead_code)] // TODO(暂时注释): 大页支持已暂时禁用
+    /// 1GB 大页
     Size1G = 0x4000_0000,
     // 暂时禁止更大的页大小
 }

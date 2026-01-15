@@ -1,12 +1,13 @@
 // TODO: 这个模块的安全性论证没有完成
 use super::PageTableEntry;
 use crate::arch::ipi::send_tlb_flush_ipi_all;
-use crate::mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
-use crate::mm::frame_allocator::{FrameTracker, alloc_frame};
-use crate::mm::page_table::{
+use mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
+use mm::frame_allocator::{FrameTracker, alloc_frame};
+use mm::page_table::{
     PageSize, PageTableEntry as PageTableEntryTrait, PageTableInner as PageTableInnerTrait,
     PagingError, PagingResult, UniversalPTEFlag,
 };
+use mm::TlbBatchContextWrapper;
 use alloc::vec::Vec;
 
 #[derive(Debug)]
@@ -408,6 +409,67 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
 
         Err(PagingError::NotMapped) // 未找到映射
     }
+
+    // 映射虚拟页到物理页（支持 TLB 批处理）
+    fn map_with_batch(
+        &mut self,
+        vpn: Vpn,
+        ppn: Ppn,
+        page_size: PageSize,
+        flags: UniversalPTEFlag,
+        batch: Option<&mut TlbBatchContextWrapper>,
+    ) -> PagingResult<()> {
+        self.map(vpn, ppn, page_size, flags)?;
+        // 总是刷新本地 TLB
+        Self::tlb_flush(vpn);
+        // 只有在非批处理模式下才发送 IPI
+        if batch.is_none() {
+            let num_cpu = unsafe { crate::kernel::NUM_CPU };
+            if num_cpu > 1 {
+                send_tlb_flush_ipi_all();
+            }
+        }
+        Ok(())
+    }
+
+    // 解除映射（支持 TLB 批处理）
+    fn unmap_with_batch(
+        &mut self,
+        vpn: Vpn,
+        batch: Option<&mut TlbBatchContextWrapper>,
+    ) -> PagingResult<()> {
+        self.unmap(vpn)?;
+        // 总是刷新本地 TLB
+        Self::tlb_flush(vpn);
+        // 只有在非批处理模式下才发送 IPI
+        if batch.is_none() {
+            let num_cpu = unsafe { crate::kernel::NUM_CPU };
+            if num_cpu > 1 {
+                send_tlb_flush_ipi_all();
+            }
+        }
+        Ok(())
+    }
+
+    // 更新映射标志（支持 TLB 批处理）
+    fn update_flags_with_batch(
+        &mut self,
+        vpn: Vpn,
+        flags: UniversalPTEFlag,
+        batch: Option<&mut TlbBatchContextWrapper>,
+    ) -> PagingResult<()> {
+        self.update_flags(vpn, flags)?;
+        // 总是刷新本地 TLB
+        Self::tlb_flush(vpn);
+        // 只有在非批处理模式下才发送 IPI
+        if batch.is_none() {
+            let num_cpu = unsafe { crate::kernel::NUM_CPU };
+            if num_cpu > 1 {
+                send_tlb_flush_ipi_all();
+            }
+        }
+        Ok(())
+    }
 }
 
 // PageTableInner 的额外实现（非 trait 方法）
@@ -425,6 +487,7 @@ impl PageTableInner {
     /// - 单核系统：只刷新本地 TLB，无 IPI 开销
     /// - 多核系统：异步刷新，不等待其他 CPU 确认
     /// - 测试模式：也会发送 IPI（如果是多核环境）
+    #[allow(dead_code)]
     fn tlb_flush_all_cpus(vpn: Vpn) {
         // 1. 刷新当前 CPU 的 TLB
         <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
@@ -436,67 +499,6 @@ impl PageTableInner {
         if num_cpu > 1 {
             send_tlb_flush_ipi_all();
         }
-    }
-
-    /// 带批处理支持的映射方法
-    pub fn map_with_batch(
-        &mut self,
-        vpn: Vpn,
-        ppn: Ppn,
-        page_size: PageSize,
-        flags: UniversalPTEFlag,
-        batch: Option<&mut TlbBatchContext>,
-    ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::map(self, vpn, ppn, page_size, flags)?;
-        // 总是刷新本地 TLB
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
-        // 只有在非批处理模式下才发送 IPI
-        if batch.is_none() {
-            let num_cpu = unsafe { crate::kernel::NUM_CPU };
-            if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
-            }
-        }
-        Ok(())
-    }
-
-    /// 带批处理支持的解除映射方法
-    pub fn unmap_with_batch(
-        &mut self,
-        vpn: Vpn,
-        batch: Option<&mut TlbBatchContext>,
-    ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::unmap(self, vpn)?;
-        // 总是刷新本地 TLB
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
-        // 只有在非批处理模式下才发送 IPI
-        if batch.is_none() {
-            let num_cpu = unsafe { crate::kernel::NUM_CPU };
-            if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
-            }
-        }
-        Ok(())
-    }
-
-    /// 带批处理支持的更新权限方法
-    pub fn update_flags_with_batch(
-        &mut self,
-        vpn: Vpn,
-        flags: UniversalPTEFlag,
-        batch: Option<&mut TlbBatchContext>,
-    ) -> PagingResult<()> {
-        <Self as PageTableInnerTrait<PageTableEntry>>::update_flags(self, vpn, flags)?;
-        // 总是刷新本地 TLB
-        <Self as PageTableInnerTrait<PageTableEntry>>::tlb_flush(vpn);
-        // 只有在非批处理模式下才发送 IPI
-        if batch.is_none() {
-            let num_cpu = unsafe { crate::kernel::NUM_CPU };
-            if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
-            }
-        }
-        Ok(())
     }
 }
 
@@ -557,7 +559,7 @@ fn ppn_to_satp(ppn: Ppn) -> usize {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::mm::page_table::PageTableInner as PageTableInnerTrait;
+    use mm::page_table::PageTableInner as PageTableInnerTrait;
     use crate::{kassert, test_case};
 
     // 1. 页表创建测试

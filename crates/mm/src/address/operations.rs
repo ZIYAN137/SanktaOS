@@ -3,7 +3,6 @@
 //! 此模块定义了用于自定义地址类型（如 Paddr 和 Vaddr）的数学、位操作和对齐 Trait。
 //! 目标是使强类型地址在使用时具备与 `usize` 相同的运算能力，同时保持类型安全。
 
-use crate::config::PAGE_SIZE;
 use core::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign,
     Shr, ShrAssign, Sub, SubAssign,
@@ -71,13 +70,13 @@ macro_rules! impl_calc_ops {
         impl core::ops::Add<usize> for $type {
             type Output = Self;
             fn add(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() + rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() + rhs)
             }
         }
         impl core::ops::Add<Self> for $type {
             type Output = Self;
             fn add(self, rhs: Self) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(
+                $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() + rhs.as_usize(),
                 )
             }
@@ -85,12 +84,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::AddAssign<usize> for $type {
             fn add_assign(&mut self, rhs: usize) {
                 *self =
-                    $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() + rhs)
+                    $crate::address::operations::UsizeConvert::from_usize(self.as_usize() + rhs)
             }
         }
         impl core::ops::AddAssign<Self> for $type {
             fn add_assign(&mut self, rhs: Self) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() + rhs.as_usize(),
                 )
             }
@@ -99,13 +98,13 @@ macro_rules! impl_calc_ops {
         impl core::ops::Sub<usize> for $type {
             type Output = Self;
             fn sub(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() - rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() - rhs)
             }
         }
         impl core::ops::Sub<Self> for $type {
             type Output = Self;
             fn sub(self, rhs: Self) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(
+                $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() - rhs.as_usize(),
                 )
             }
@@ -113,12 +112,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::SubAssign<usize> for $type {
             fn sub_assign(&mut self, rhs: usize) {
                 *self =
-                    $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() - rhs)
+                    $crate::address::operations::UsizeConvert::from_usize(self.as_usize() - rhs)
             }
         }
         impl core::ops::SubAssign<Self> for $type {
             fn sub_assign(&mut self, rhs: Self) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() - rhs.as_usize(),
                 )
             }
@@ -127,13 +126,13 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitAnd<usize> for $type {
             type Output = Self;
             fn bitand(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() & rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() & rhs)
             }
         }
         impl core::ops::BitAnd<Self> for $type {
             type Output = Self;
             fn bitand(self, rhs: Self) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(
+                $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() & rhs.as_usize(),
                 )
             }
@@ -141,12 +140,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitAndAssign<usize> for $type {
             fn bitand_assign(&mut self, rhs: usize) {
                 *self =
-                    $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() & rhs)
+                    $crate::address::operations::UsizeConvert::from_usize(self.as_usize() & rhs)
             }
         }
         impl core::ops::BitAndAssign<Self> for $type {
             fn bitand_assign(&mut self, rhs: Self) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() & rhs.as_usize(),
                 )
             }
@@ -155,13 +154,13 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitOr<usize> for $type {
             type Output = Self;
             fn bitor(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() | rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() | rhs)
             }
         }
         impl core::ops::BitOr<Self> for $type {
             type Output = Self;
             fn bitor(self, rhs: Self) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(
+                $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() | rhs.as_usize(),
                 )
             }
@@ -169,12 +168,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitOrAssign<usize> for $type {
             fn bitor_assign(&mut self, rhs: usize) {
                 *self =
-                    $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() | rhs)
+                    $crate::address::operations::UsizeConvert::from_usize(self.as_usize() | rhs)
             }
         }
         impl core::ops::BitOrAssign<Self> for $type {
             fn bitor_assign(&mut self, rhs: Self) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() | rhs.as_usize(),
                 )
             }
@@ -183,13 +182,13 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitXor<usize> for $type {
             type Output = Self;
             fn bitxor(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() ^ rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() ^ rhs)
             }
         }
         impl core::ops::BitXor<Self> for $type {
             type Output = Self;
             fn bitxor(self, rhs: Self) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(
+                $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() ^ rhs.as_usize(),
                 )
             }
@@ -197,12 +196,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::BitXorAssign<usize> for $type {
             fn bitxor_assign(&mut self, rhs: usize) {
                 *self =
-                    $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() ^ rhs)
+                    $crate::address::operations::UsizeConvert::from_usize(self.as_usize() ^ rhs)
             }
         }
         impl core::ops::BitXorAssign<Self> for $type {
             fn bitxor_assign(&mut self, rhs: Self) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() ^ rhs.as_usize(),
                 )
             }
@@ -211,12 +210,12 @@ macro_rules! impl_calc_ops {
         impl core::ops::Shl<usize> for $type {
             type Output = Self;
             fn shl(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() << rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() << rhs)
             }
         }
         impl core::ops::ShlAssign<usize> for $type {
             fn shl_assign(&mut self, rhs: usize) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() << rhs,
                 )
             }
@@ -224,19 +223,25 @@ macro_rules! impl_calc_ops {
         impl core::ops::Shr<usize> for $type {
             type Output = Self;
             fn shr(self, rhs: usize) -> Self::Output {
-                $crate::mm::address::operations::UsizeConvert::from_usize(self.as_usize() >> rhs)
+                $crate::address::operations::UsizeConvert::from_usize(self.as_usize() >> rhs)
             }
         }
         impl core::ops::ShrAssign<usize> for $type {
             fn shr_assign(&mut self, rhs: usize) {
-                *self = $crate::mm::address::operations::UsizeConvert::from_usize(
+                *self = $crate::address::operations::UsizeConvert::from_usize(
                     self.as_usize() >> rhs,
                 )
             }
         }
         // 标记该类型已实现 CalcOps
-        impl $crate::mm::address::operations::CalcOps for $type {}
+        impl $crate::address::operations::CalcOps for $type {}
     };
+}
+
+/// 获取页大小
+#[inline]
+fn page_size() -> usize {
+    crate::mm_config().page_size()
 }
 
 /// [AlignOps] Trait
@@ -261,7 +266,7 @@ pub trait AlignOps: UsizeConvert {
     }
     /// 检查地址是否已页对齐（对齐到 `PAGE_SIZE`）。
     fn is_page_aligned(self) -> bool {
-        self.is_aligned(PAGE_SIZE)
+        self.is_aligned(page_size())
     }
     /// 将地址向上对齐到给定的对齐边界。
     ///
@@ -291,10 +296,10 @@ pub trait AlignOps: UsizeConvert {
     }
     /// 将地址向上对齐到页大小（`PAGE_SIZE`）。
     fn align_up_to_page(self) -> Self {
-        self.align_up(PAGE_SIZE)
+        self.align_up(page_size())
     }
     /// 将地址向下对齐到页大小（`PAGE_SIZE`）。
     fn align_down_to_page(self) -> Self {
-        self.align_down(PAGE_SIZE)
+        self.align_down(page_size())
     }
 }

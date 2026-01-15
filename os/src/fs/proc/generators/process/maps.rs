@@ -5,7 +5,7 @@ use crate::{
     fs::proc::ContentGenerator,
     kernel::TaskStruct,
     mm::address::{PageNum, UsizeConvert},
-    mm::memory_space::mapping_area::{AreaType, MapType},
+    mm::{AreaType, MapType},
     sync::SpinLock,
     vfs::FsError,
 };
@@ -74,17 +74,17 @@ impl ContentGenerator for MapsGenerator {
             let end = a.vpn_range().end().start_addr().as_usize();
 
             let perm = a.permission();
-            let r = if perm.contains(crate::mm::page_table::UniversalPTEFlag::READABLE) {
+            let r = if perm.contains(mm::page_table::UniversalPTEFlag::READABLE) {
                 'r'
             } else {
                 '-'
             };
-            let w = if perm.contains(crate::mm::page_table::UniversalPTEFlag::WRITEABLE) {
+            let w = if perm.contains(mm::page_table::UniversalPTEFlag::WRITEABLE) {
                 'w'
             } else {
                 '-'
             };
-            let x = if perm.contains(crate::mm::page_table::UniversalPTEFlag::EXECUTABLE) {
+            let x = if perm.contains(mm::page_table::UniversalPTEFlag::EXECUTABLE) {
                 'x'
             } else {
                 '-'

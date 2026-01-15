@@ -32,7 +32,7 @@ use crate::{
     vfs::{create_stdio_files, fd_table, get_root_dentry},
 };
 // Needed for Ppn::as_usize
-use crate::mm::address::UsizeConvert;
+use mm::address::UsizeConvert;
 
 /// 已上线 CPU 位掩码
 ///
@@ -238,7 +238,7 @@ pub fn main(hartid: usize) {
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] RISC-V Hart {} is up!", hartid);
 
-    let kernel_space = mm::init();
+    mm::init();
 
     // 初始化 CPUS 并设置 tp 指向 CPU 0
     // 必须在任何可能调用 cpu_id() 的代码之前完成
@@ -253,6 +253,7 @@ pub fn main(hartid: usize) {
 
     // 激活内核地址空间并设置 current_memory_space
     {
+        let kernel_space = crate::mm::get_global_kernel_space();
         let _guard = crate::sync::PreemptGuard::new();
         current_cpu().switch_space(kernel_space);
         earlyprintln!("[Boot] Activated kernel address space");
@@ -377,7 +378,7 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::ipc::{SignalHandlerTable, SignalPending};
     use crate::kernel::FsStruct;
     use crate::kernel::{TASK_MANAGER, TaskStruct};
-    use crate::mm::frame_allocator::alloc_contig_frames;
+    use mm::frame_allocator::alloc_contig_frames;
     use crate::sync::SpinLock;
     use uapi::resource::{INIT_RLIMITS, RlimitStruct};
     use uapi::signal::SignalFlags;
@@ -492,23 +493,17 @@ pub extern "C" fn secondary_start(hartid: usize) -> ! {
     pr_info!("[SMP] CPU {} set idle task as current_task", hartid);
 
     // 切换到最终的内核页表（与 CPU0 共享），避免长期停留在 boot_pagetable
-    if let Some(kernel_space) = crate::mm::get_global_kernel_space() {
-        {
-            let _guard = crate::sync::PreemptGuard::new();
-            current_cpu().switch_space(kernel_space.clone());
-        }
-        let root_ppn = kernel_space.lock().root_ppn();
-        pr_info!(
-            "[SMP] CPU {} switched to global kernel space, root PPN: 0x{:x}",
-            hartid,
-            root_ppn.as_usize()
-        );
-    } else {
-        pr_warn!(
-            "[SMP] CPU {} could not get global kernel space; still on boot_pagetable",
-            hartid
-        );
+    let kernel_space = crate::mm::get_global_kernel_space();
+    {
+        let _guard = crate::sync::PreemptGuard::new();
+        current_cpu().switch_space(kernel_space.clone());
     }
+    let root_ppn = kernel_space.lock().root_ppn();
+    pr_info!(
+        "[SMP] CPU {} switched to global kernel space, root PPN: 0x{:x}",
+        hartid,
+        root_ppn.as_usize()
+    );
 
     // 初始化定时器
     timer::init();

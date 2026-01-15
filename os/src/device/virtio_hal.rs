@@ -1,8 +1,8 @@
 //! HAL (硬件抽象层) 实现，用于适配 virtio-drivers 0.12.0 库
 
 use crate::arch::mm::{paddr_to_vaddr, vaddr_to_paddr};
-use crate::mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
-use crate::mm::frame_allocator::FrameRangeTracker;
+use mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
+use mm::frame_allocator::FrameRangeTracker;
 use crate::sync::SpinLock;
 use alloc::collections::btree_map::BTreeMap;
 use core::ptr::NonNull;
@@ -22,7 +22,7 @@ unsafe impl Hal for VirtIOHal {
     /// 分配并清零指定数量的连续物理页用于DMA
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (PhysAddr, NonNull<u8>) {
         // 使用系统的连续物理帧分配器
-        let frame_range = match crate::mm::frame_allocator::alloc_contig_frames(pages) {
+        let frame_range = match mm::frame_allocator::alloc_contig_frames(pages) {
             Some(range) => range,
             None => {
                 // 返回空指针，让上层代码处理错误

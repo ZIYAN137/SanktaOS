@@ -1,6 +1,9 @@
 //! 平台无关的常量
 #![allow(unused)]
 
+use crate::arch::constant::SV39_BOT_HALF_TOP;
+pub use crate::arch::platform::virt::*;
+
 // about CPU and SMP
 /// 最大支持的 CPU 核心数
 pub const MAX_CPU_COUNT: usize = 8;
@@ -47,5 +50,40 @@ pub const VIRTIO_BLK_SECTOR_SIZE: usize = 512;
 /// 文件系统镜像大小 (与 qemu-run.sh 中的 fs.img 大小一致)
 pub const FS_IMAGE_SIZE: usize = 1024 * 1024 * 1024; // 1 GB
 
-use crate::arch::constant::SV39_BOT_HALF_TOP;
-pub use crate::arch::platform::virt::*;
+// ============ MmConfig trait 实现 ============
+
+use mm::MmConfig;
+
+/// OS 内存配置实现
+struct OsMmConfig;
+
+impl MmConfig for OsMmConfig {
+    fn page_size(&self) -> usize {
+        PAGE_SIZE
+    }
+    fn memory_end(&self) -> usize {
+        MEMORY_END
+    }
+    fn user_stack_size(&self) -> usize {
+        USER_STACK_SIZE
+    }
+    fn user_stack_top(&self) -> usize {
+        USER_STACK_TOP
+    }
+    fn max_user_heap_size(&self) -> usize {
+        MAX_USER_HEAP_SIZE
+    }
+    fn user_sigreturn_trampoline(&self) -> usize {
+        USER_SIGRETURN_TRAMPOLINE
+    }
+}
+
+static OS_MM_CONFIG: OsMmConfig = OsMmConfig;
+
+/// 注册内存配置
+///
+/// # Safety
+/// 必须在单线程环境下调用，且只能调用一次
+pub unsafe fn register_mm_config() {
+    mm::register_config(&OS_MM_CONFIG);
+}

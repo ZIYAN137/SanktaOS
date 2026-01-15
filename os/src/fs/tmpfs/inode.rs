@@ -8,8 +8,8 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
 use crate::config::PAGE_SIZE;
-use crate::mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
-use crate::mm::frame_allocator::{FrameTracker, alloc_frame};
+use mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
+use mm::frame_allocator::{FrameTracker, alloc_frame};
 use crate::sync::{Mutex, SpinLock};
 use uapi::time::TimeSpec;
 use crate::vfs::{DirEntry, FileMode, FsError, Inode, InodeMetadata, InodeType};

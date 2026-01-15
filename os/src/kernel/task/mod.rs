@@ -31,7 +31,7 @@ pub use work_queue::*;
 
 use alloc::sync::Arc;
 
-use crate::mm::memory_space::MemorySpace;
+use crate::mm::MemorySpace;
 use crate::sync::SpinLock;
 use uapi::signal::NUM_SIGCHLD;
 use crate::{
@@ -148,8 +148,9 @@ pub fn cleanup_current_process_resources_on_exit() {
         return;
     }
 
-    // 1) 先切换到全局内核页表，避免释放“正在使用的 satp”。
-    if let Some(kernel_space) = crate::mm::get_global_kernel_space() {
+    // 1) 先切换到全局内核页表，避免释放"正在使用的 satp"。
+    {
+        let kernel_space = crate::mm::get_global_kernel_space();
         let _guard = crate::sync::PreemptGuard::new();
         current_cpu().switch_space(kernel_space);
     }

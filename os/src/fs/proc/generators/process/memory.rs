@@ -1,5 +1,6 @@
 use crate::config::PAGE_SIZE;
-use crate::mm::memory_space::MemorySpace;
+use crate::mm::MemorySpace;
+use crate::mm::AreaType;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProcMemStats {
@@ -24,8 +25,6 @@ impl ProcMemStats {
 }
 
 pub fn collect_user_vm_stats(space: &MemorySpace) -> ProcMemStats {
-    use crate::mm::memory_space::mapping_area::AreaType;
-
     let mut s = ProcMemStats::default();
 
     for area in space.areas().iter() {

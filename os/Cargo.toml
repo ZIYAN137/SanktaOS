@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mm = { path = "../crates/mm" }
 uapi = { path = "../crates/uapi" }
 sync = { path = "../crates/sync" }
 klog = { path = "../crates/klog" }

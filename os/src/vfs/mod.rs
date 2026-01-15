@@ -159,6 +159,7 @@ pub mod file_lock;
 pub mod file_system;
 pub mod impls;
 pub mod inode;
+pub mod mm_bridge;
 pub mod mount;
 pub mod path;
 
@@ -173,6 +174,7 @@ pub use file_lock::file_lock_manager;
 pub use file_system::{FileSystem, StatFs};
 pub use impls::{PipeFile, RegFile, StderrFile, StdinFile, StdoutFile, create_stdio_files};
 pub use inode::{DirEntry, FileMode, Inode, InodeMetadata, InodeType};
+pub use mm_bridge::{FileWrapper, InodeWrapper};
 pub use mount::{MOUNT_TABLE, MountFlags, MountPoint, MountTable, get_root_dentry};
 pub use path::{
     normalize_path, parse_path, split_path, vfs_lookup, vfs_lookup_from, vfs_lookup_no_follow,

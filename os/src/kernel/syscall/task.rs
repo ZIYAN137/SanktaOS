@@ -24,7 +24,7 @@ use crate::{
     mm::{
         address::{UsizeConvert, Vaddr},
         frame_allocator::{alloc_contig_frames, alloc_frame},
-        memory_space::MemorySpace,
+        MemorySpace,
     },
     sync::SpinLock,
     uapi::{
@@ -1255,7 +1255,7 @@ fn do_execve_prepare(
         Err(crate::kernel::task::ExecImageError::Fs(FsError::IsDirectory)) => return Err(-EISDIR),
         Err(crate::kernel::task::ExecImageError::Fs(_)) => return Err(-EIO),
         Err(crate::kernel::task::ExecImageError::Paging(
-            crate::mm::page_table::PagingError::OutOfMemory,
+            mm::page_table::PagingError::OutOfMemory,
         )) => return Err(-ENOMEM),
         Err(_) => return Err(-ENOEXEC),
     };

@@ -225,6 +225,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
 
 [[package]]
+name = "mm"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.10.0",
+ "lazy_static",
+ "log",
+ "sync",
+ "talc",
+ "uapi",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -252,6 +264,7 @@ dependencies = [
  "lazy_static",
  "lock_api",
  "loongArch64",
+ "mm",
  "once_cell",
  "paste",
  "riscv",

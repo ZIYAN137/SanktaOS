@@ -5,12 +5,14 @@ use crate::config::{
     MAX_USER_HEAP_SIZE, MEMORY_END, PAGE_SIZE, USER_SIGRETURN_TRAMPOLINE, USER_STACK_SIZE,
     USER_STACK_TOP,
 };
-use crate::mm::address::{Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn, VpnRange};
-use crate::mm::memory_space::MmapFile;
-use crate::mm::memory_space::mapping_area::{AreaType, MapType, MappingArea};
-use crate::mm::page_table::{ActivePageTableInner, PageTableInner, PagingError, UniversalPTEFlag};
+use mm::address::{Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn, VpnRange};
+// 从 mm crate 导入类型
+use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
+use mm::page_table::{PageTableInner, PagingError, UniversalPTEFlag};
+use crate::arch::mm::PageTableInner as ActivePageTableInner;
 use crate::sync::SpinLock;
 use crate::{pr_err, pr_warn};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
 
@@ -29,9 +31,9 @@ unsafe extern "C" {
 }
 
 lazy_static! {
-    /// 全局内核内存空间（受 SpinLock 保护）
-    static ref KERNEL_SPACE: SpinLock<MemorySpace> = {
-        SpinLock::new(MemorySpace::new_kernel())
+    /// 全局内核内存空间（受 SpinLock 保护，使用 Arc 共享）
+    static ref KERNEL_SPACE: Arc<SpinLock<MemorySpace>> = {
+        Arc::new(SpinLock::new(MemorySpace::new_kernel()))
     };
 }
 
@@ -52,6 +54,11 @@ where
 {
     let mut guard = KERNEL_SPACE.lock();
     f(&mut guard)
+}
+
+/// 获取全局内核空间的共享句柄
+pub fn get_global_kernel_space() -> Arc<SpinLock<MemorySpace>> {
+    KERNEL_SPACE.clone()
 }
 
 /// 表示地址空间的内存空间结构体
