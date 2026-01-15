@@ -1,16 +1,13 @@
 //! 文件锁管理
 //!
-//! 实现 POSIX 文件锁（advisory locks）语义：
-//! - 读锁（共享锁）之间兼容
-//! - 写锁（独占锁）与任何锁互斥
-//! - 同一进程的锁可以合并/覆盖
-//! - 进程退出时自动释放所有锁
+//! 实现 POSIX 文件锁（advisory locks）语义
 
-use crate::sync::SpinLock;
-use uapi::fcntl::{Flock, LockType};
-use crate::vfs::FsError;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use sync::SpinLock;
+use uapi::fcntl::{Flock, LockType};
+
+use crate::FsError;
 
 /// 文件锁条目
 #[derive(Debug, Clone)]
@@ -76,8 +73,6 @@ impl FileLockManager {
     }
 
     /// 测试锁（F_GETLK）
-    ///
-    /// 检查是否有锁会阻塞请求的锁。如果有冲突，返回冲突锁的信息。
     pub fn test_lock(
         &self,
         dev: u64,
@@ -97,7 +92,7 @@ impl FileLockManager {
             _ => return Err(FsError::InvalidArgument),
         };
 
-        // 构造请求的锁（使用传入的范围参数）
+        // 构造请求的锁
         let requested_lock = FileLockEntry {
             lock_type,
             start,
@@ -126,38 +121,6 @@ impl FileLockManager {
     }
 
     /// 设置锁（F_SETLK / F_SETLKW）
-    ///
-    /// # 参数
-    /// - `blocking`: true 表示阻塞（F_SETLKW），false 表示非阻塞（F_SETLK）
-    ///
-    /// # TODO: 实现 F_SETLKW 阻塞等待
-    /// 当前实现在锁冲突时立即返回 WouldBlock，即使 blocking=true。
-    ///
-    /// 完整的 F_SETLKW 实现需要：
-    /// 1. 在 FileLockManager 中为每个文件维护一个 WaitQueue
-    /// 2. 锁冲突时，如果 blocking=true：
-    ///    - 将当前任务加入该文件的等待队列
-    ///    - 调用 yield_task() 让出 CPU
-    ///    - 被唤醒后重新检查并尝试获取锁（可能需要循环）
-    /// 3. 释放锁时（包括进程退出），唤醒等待队列中的所有任务
-    /// 4. 需要处理信号中断（返回 EINTR）
-    ///
-    /// 参考实现：
-    /// ```ignore
-    /// loop {
-    ///     if can_acquire_lock() {
-    ///         acquire_and_break();
-    ///     }
-    ///     if !blocking {
-    ///         return Err(WouldBlock);
-    ///     }
-    ///     // 检查信号
-    ///     if has_pending_signal() {
-    ///         return Err(Interrupted);
-    ///     }
-    ///     wait_queue.sleep(current_task());
-    /// }
-    /// ```
     pub fn set_lock(
         &self,
         dev: u64,
@@ -196,8 +159,6 @@ impl FileLockManager {
                 // 检查冲突
                 for existing_lock in file_locks.iter() {
                     if existing_lock.conflicts_with(&new_lock) {
-                        // 有冲突
-                        // TODO: 如果 blocking=true，应该阻塞等待
                         return Err(FsError::WouldBlock);
                     }
                 }
@@ -219,6 +180,12 @@ impl FileLockManager {
             file_locks.retain(|lock| lock.pid != pid);
         }
         locks.retain(|_, file_locks| !file_locks.is_empty());
+    }
+}
+
+impl Default for FileLockManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

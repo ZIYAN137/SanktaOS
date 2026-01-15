@@ -1,7 +1,6 @@
-use super::*;
 use crate::device::block::ram_disk::RamDisk;
 use crate::fs::simple_fs::SimpleFs;
-use crate::vfs::file_system::FileSystem;
+use crate::vfs::{Dentry, File, FileMode, FsError, Inode, OpenFlags, RegFile};
 use alloc::string::String;
 use alloc::sync::Arc;
 

@@ -139,7 +139,7 @@ fn idle_loop() -> ! {
 fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::arch::trap::TrapFrame;
     use mm::frame_allocator::alloc_contig_frames;
-    use crate::vfs::fd_table::FDTable;
+    use crate::vfs::FDTable;
 
     // idle 任务从 TID 分配器正常分配（从 2 开始）
     let tid = TASK_MANAGER.lock().allocate_tid();
@@ -298,6 +298,9 @@ pub fn main(hartid: usize) {
     earlyprintln!("[Boot] time::init finished");
     timer::init();
     earlyprintln!("[Boot] timer::init finished");
+
+    // 初始化 VFS 操作（必须在使用 VFS 之前）
+    crate::vfs::init_vfs_ops();
 
     earlyprintln!("[Boot] entering rest_init");
     rest_init();

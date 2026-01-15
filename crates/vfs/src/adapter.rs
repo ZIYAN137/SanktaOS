@@ -2,8 +2,8 @@
 //!
 //! 用于处理数据结构之间的转换
 
-use super::{InodeMetadata, InodeType};
-use uapi::fs::{LinuxDirent64, STATX_BASIC_STATS, Stat, Statx, StatxTimestamp};
+use crate::{InodeMetadata, InodeType};
+use uapi::fs::{Stat, Statx, StatxTimestamp, STATX_BASIC_STATS};
 
 /// Stat 结构扩展 trait
 pub trait StatExt {

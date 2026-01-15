@@ -91,8 +91,7 @@ use crate::fs::simple_fs::SimpleFs;
 use crate::fs::tmpfs::TmpFs;
 // use crate::fs::smfs::SimpleMemoryFileSystem;
 use crate::pr_info;
-use crate::vfs::dev::makedev;
-use crate::vfs::devno::{blkdev_major, chrdev_major};
+use crate::vfs::{blkdev_major, chrdev_major, makedev};
 use crate::vfs::{FileMode, FsError, MOUNT_TABLE, MountFlags, vfs_lookup};
 
 // pub fn init_ext4() -> Result<(), crate::vfs::FsError> {

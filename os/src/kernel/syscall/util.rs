@@ -13,9 +13,8 @@ use crate::{
     kernel::current_task,
     uapi::{errno::EINVAL, log::SyslogAction},
     vfs::{
-        DENTRY_CACHE, Dentry, File, FileMode, FsError, InodeType, OpenFlags, get_root_dentry,
-        impls::{BlockDeviceFile, CharDeviceFile, RegFile},
-        split_path, vfs_lookup_from,
+        BlkDeviceFile, CharDeviceFile, DENTRY_CACHE, Dentry, File, FileMode, FsError, InodeType,
+        OpenFlags, RegFile, get_root_dentry, split_path, vfs_lookup_from,
     },
 };
 
@@ -438,7 +437,7 @@ pub fn create_file_from_dentry(
         }
         InodeType::BlockDevice => {
             // 块设备
-            Arc::new(BlockDeviceFile::new(dentry, flags)?)
+            Arc::new(BlkDeviceFile::new(dentry, flags)?)
         }
         InodeType::Socket | InodeType::Fifo => {
             // FIFO（命名管道） 和 Unix 域套接字 暂不支持

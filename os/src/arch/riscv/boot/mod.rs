@@ -29,7 +29,7 @@ use crate::{
         signal::SignalFlags,
         uts_namespace::UtsNamespace,
     },
-    vfs::{create_stdio_files, fd_table, get_root_dentry},
+    vfs::{create_stdio_files, FDTable, get_root_dentry},
 };
 // Needed for Ppn::as_usize
 use mm::address::UsizeConvert;
@@ -61,7 +61,7 @@ pub fn rest_init() {
     let tid = 1;
     let kstack_tracker = alloc_contig_frames(4).expect("kthread_spawn: failed to alloc kstack");
     let trap_frame_tracker = alloc_frame().expect("kthread_spawn: failed to alloc trap_frame");
-    let fd_table = fd_table::FDTable::new();
+    let fd_table = FDTable::new();
     let (stdin, stdout, stderr) = create_stdio_files();
     fd_table
         .install_at(0, stdin)
@@ -267,6 +267,9 @@ pub fn main(hartid: usize) {
     platform::init(); // 完整的平台初始化 (包括 device_tree::init())
     time::init();
 
+    // 初始化 VFS 操作（必须在使用 VFS 之前）
+    crate::vfs::init_vfs_ops();
+
     // 启动从核（在启用定时器中断之前）
     let num_cpus = unsafe { NUM_CPU };
     if num_cpus > 1 {
@@ -383,7 +386,7 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use uapi::resource::{INIT_RLIMITS, RlimitStruct};
     use uapi::signal::SignalFlags;
     use uapi::uts_namespace::UtsNamespace;
-    use crate::vfs::fd_table::FDTable;
+    use crate::vfs::FDTable;
     use alloc::sync::Arc;
     use core::sync::atomic::Ordering;
 

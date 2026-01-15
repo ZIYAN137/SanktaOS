@@ -5,8 +5,7 @@
 
 use alloc::sync::Arc;
 use mm::{MmFile, MmInode};
-
-use super::{File, Inode};
+use vfs::{File, Inode};
 
 /// Inode 的包装类型，实现 MmInode trait
 pub struct InodeWrapper(pub Arc<dyn Inode>);

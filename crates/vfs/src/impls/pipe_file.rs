@@ -2,10 +2,11 @@
 //!
 //! 管道是流式单向通信设备，读端和写端分别由两个 [`PipeFile`] 实例表示。
 
-use crate::sync::SpinLock;
-use crate::vfs::{File, FileMode, FsError, InodeMetadata, InodeType, OpenFlags, TimeSpec};
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
+use sync::SpinLock;
+
+use crate::{File, FileMode, FsError, InodeMetadata, InodeType, OpenFlags, TimeSpec};
 
 /// 管道环形缓冲区
 ///
@@ -22,9 +23,9 @@ struct PipeRingBuffer {
 }
 
 impl PipeRingBuffer {
-    const DEFAULT_CAPACITY: usize = 4096; // POSIX 规定最小 512 字节
-    const MIN_CAPACITY: usize = 4096; // Linux 最小管道大小
-    const MAX_CAPACITY: usize = 1048576; // Linux 最大管道大小 (1MB)
+    const DEFAULT_CAPACITY: usize = 4096;
+    const MIN_CAPACITY: usize = 4096;
+    const MAX_CAPACITY: usize = 1048576;
 
     fn new() -> Self {
         Self {
@@ -35,18 +36,15 @@ impl PipeRingBuffer {
         }
     }
 
-    /// 获取管道容量
     fn get_capacity(&self) -> usize {
         self.capacity
     }
 
-    /// 设置管道容量
     fn set_capacity(&mut self, new_capacity: usize) -> Result<(), FsError> {
         if new_capacity < Self::MIN_CAPACITY || new_capacity > Self::MAX_CAPACITY {
             return Err(FsError::InvalidArgument);
         }
 
-        // 如果新容量小于当前数据量，拒绝修改
         if new_capacity < self.buffer.len() {
             return Err(FsError::InvalidArgument);
         }
@@ -55,14 +53,11 @@ impl PipeRingBuffer {
         Ok(())
     }
 
-    /// 读取数据 (非阻塞)
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, FsError> {
         if self.buffer.is_empty() {
-            // 写端已关闭且缓冲区为空 -> EOF
             if self.write_end_count == 0 {
                 return Ok(0);
             }
-            // 写端未关闭但缓冲区为空 -> 暂时返回0 (TODO: 配合调度器实现阻塞)
             return Ok(0);
         }
 
@@ -74,14 +69,11 @@ impl PipeRingBuffer {
         Ok(nread)
     }
 
-    /// 写入数据 (非阻塞)
     fn write(&mut self, buf: &[u8]) -> Result<usize, FsError> {
-        // 读端已关闭 -> EPIPE (应发送 SIGPIPE 信号)
         if self.read_end_count == 0 {
             return Err(FsError::BrokenPipe);
         }
 
-        // 缓冲区已满 -> 暂时只写入可用空间 (TODO: 阻塞等待)
         let available = self.capacity - self.buffer.len();
         if available == 0 {
             return Ok(0);
@@ -121,17 +113,9 @@ enum PipeEnd {
 
 impl PipeFile {
     /// 创建管道对 (返回 [读端, 写端])
-    ///
-    /// # 示例
-    /// ```rust
-    /// let (pipe_read, pipe_write) = PipeFile::create_pair();
-    /// fd_table.install_at(3, Arc::new(pipe_read) as Arc<dyn File>)?;
-    /// fd_table.install_at(4, Arc::new(pipe_write) as Arc<dyn File>)?;
-    /// ```
     pub fn create_pair() -> (Self, Self) {
         let buffer = Arc::new(SpinLock::new(PipeRingBuffer::new()));
 
-        // 初始化引用计数
         {
             let mut buf = buffer.lock();
             buf.read_end_count = 1;
@@ -179,7 +163,6 @@ impl File for PipeFile {
             return false;
         }
         let buf = self.buffer.lock();
-        // Readable if buffer has data OR write end is closed (EOF)
         !buf.buffer.is_empty() || buf.write_end_count == 0
     }
 
@@ -188,44 +171,28 @@ impl File for PipeFile {
             return false;
         }
         let buf = self.buffer.lock();
-        // Writable if buffer has space AND read end is open
         buf.read_end_count > 0 && buf.buffer.len() < buf.capacity
     }
 
     fn read(&self, buf: &mut [u8]) -> Result<usize, FsError> {
-        if !self.readable() {
+        if self.end_type != PipeEnd::Read {
             return Err(FsError::InvalidArgument);
         }
 
         let mut ring_buf = self.buffer.lock();
-        let result = ring_buf.read(buf);
-        // Only wake up writers if we actually freed buffer space
-        if let Ok(bytes_read) = result {
-            if bytes_read > 0 {
-                crate::kernel::syscall::io::wake_poll_waiters();
-            }
-        }
-        result
+        ring_buf.read(buf)
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, FsError> {
-        if !self.writable() {
+        if self.end_type != PipeEnd::Write {
             return Err(FsError::InvalidArgument);
         }
 
         let mut ring_buf = self.buffer.lock();
-        let result = ring_buf.write(buf);
-        // Only wake up readers if we actually wrote data
-        if let Ok(bytes_written) = result {
-            if bytes_written > 0 {
-                crate::kernel::syscall::io::wake_poll_waiters();
-            }
-        }
-        result
+        ring_buf.write(buf)
     }
 
     fn metadata(&self) -> Result<InodeMetadata, FsError> {
-        // 管道没有真实的 inode,返回虚拟元数据
         Ok(InodeMetadata {
             inode_no: 0,
             inode_type: InodeType::Fifo,
@@ -267,7 +234,6 @@ impl File for PipeFile {
         Ok(())
     }
 
-    // lseek 使用默认实现 (返回 NotSupported)
     fn as_any(&self) -> &dyn core::any::Any {
         self
     }
@@ -275,7 +241,6 @@ impl File for PipeFile {
 
 impl Drop for PipeFile {
     fn drop(&mut self) {
-        // 减少引用计数
         let mut buf = self.buffer.lock();
         match self.end_type {
             PipeEnd::Read => buf.read_end_count -= 1,

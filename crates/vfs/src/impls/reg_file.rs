@@ -1,8 +1,9 @@
 //! 普通文件（Regular File）的 File trait 实现
 
-use crate::sync::SpinLock;
-use crate::vfs::{Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence};
 use alloc::sync::Arc;
+use sync::SpinLock;
+
+use crate::{Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence};
 
 /// 普通文件的 File 实现
 ///
@@ -74,45 +75,36 @@ impl File for RegFile {
     }
 
     fn read(&self, buf: &mut [u8]) -> Result<usize, FsError> {
-        // 检查权限
         if !self.readable() {
             return Err(FsError::PermissionDenied);
         }
 
-        // 获取当前偏移量
         let mut offset_guard = self.offset.lock();
         let current_offset = *offset_guard;
 
-        // 调用 inode 的 read_at
         let nread = self.inode.read_at(current_offset, buf)?;
 
-        // 更新偏移量
         *offset_guard = current_offset + nread;
 
         Ok(nread)
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, FsError> {
-        // 检查权限
         if !self.writable() {
             return Err(FsError::PermissionDenied);
         }
 
-        // 获取写入偏移量
         let mut offset_guard = self.offset.lock();
         let flags = self.flags.lock();
         let write_offset = if flags.contains(OpenFlags::O_APPEND) {
-            // O_APPEND: 总是写到文件末尾
             self.inode.metadata()?.size
         } else {
             *offset_guard
         };
-        drop(flags); // 释放 flags 锁
+        drop(flags);
 
-        // 调用 inode 的 write_at
         let nwritten = self.inode.write_at(write_offset, buf)?;
 
-        // 更新偏移量
         *offset_guard = write_offset + nwritten;
 
         Ok(nwritten)
@@ -133,7 +125,6 @@ impl File for RegFile {
             SeekWhence::End => file_size + offset,
         };
 
-        // 检查偏移量合法性 (不能为负)
         if new_offset < 0 {
             return Err(FsError::InvalidArgument);
         }
