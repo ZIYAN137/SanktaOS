@@ -57,10 +57,10 @@
 
 ## RISC-V
 
-- [RISC-V寄存器](arch/riscv/riscv_register.md)
-- [用户栈布局](arch/riscv/stack_layout.md)
-- [多核启动](arch/riscv/smp_boot.md)
-- [核间中断 (IPI)](arch/riscv/ipi.md)
+- [RISC-V 概述](arch/riscv/README.md)
+  - [寄存器速查](arch/riscv/riscv_register.md)
+  - [多核启动（SMP）](arch/riscv/smp_boot.md)
+  - [核间中断（IPI）](arch/riscv/ipi.md)
 
 ## LoongArch64
 

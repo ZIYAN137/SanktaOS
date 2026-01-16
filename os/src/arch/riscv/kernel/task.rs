@@ -1,4 +1,18 @@
-//! RISC-V 架构的任务管理相关功能
+//! RISC-V 用户态初始栈布局（execve/spawn）
+//!
+//! 本文件提供用户态初始栈的构造逻辑（argc/argv/envp/auxv 等），供 execve/spawn 等路径使用。
+//! 生成的指针会被写入 TrapFrame，符合常见 ABI 约定：
+//! - `a0 = argc`
+//! - `a1 = argv`（指向 `argv[]` 指针数组）
+//! - `a2 = envp`（指向 `envp[]` 指针数组）
+//!
+//! # 布局约定（概览）
+//!
+//! - 栈向下增长：从高地址向低地址压入字符串与指针数组。
+//! - `argv`/`envp` 指针数组以 0 结尾，并包含一段 auxv（AT_* 键值对，以 AT_NULL 结束）。
+//! - 最终用户栈指针按 ABI 约定对齐（当前实现以 16 字节对齐为目标）。
+//!
+//! 说明：实现细节以 `setup_stack_layout` 的代码与注释为准。
 use core::mem::size_of;
 use core::ptr;
 
@@ -7,8 +21,15 @@ use riscv::register::sstatus;
 
 use crate::arch::constant::STACK_ALIGN_MASK;
 
-/// 为新任务设置用户栈布局，包含命令行参数和环境变量
-/// 返回新的栈指针位置，以及 argc, argv, envp 的地址
+/// 为新任务构造用户态初始栈布局（argv/envp/auxv）。
+///
+/// # 返回值
+///
+/// `(new_sp, argc, argv_ptr, envp_ptr)`：
+/// - `new_sp`：最终用户栈指针（已对齐）
+/// - `argc`：参数个数
+/// - `argv_ptr`：`argv[]` 指针数组起始地址
+/// - `envp_ptr`：`envp[]` 指针数组起始地址
 pub fn setup_stack_layout(
     sp: usize,
     argv: &[&str],
