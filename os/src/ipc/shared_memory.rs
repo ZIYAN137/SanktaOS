@@ -1,6 +1,18 @@
 //! 共享内存模块
 //!
 //! 提供共享物理页的分配与映射到当前进程用户空间的能力。
+//!
+//! # 设计概览
+//!
+//! - [`SharedMemory`] 持有一组物理页（`FrameTracker`），生命周期由 RAII 管理。
+//! - [`SharedMemoryTable`] 以 `Vec<Arc<SharedMemory>>` 的形式登记若干共享段，仅提供
+//!   “创建/移除登记项/计数”等最小管理能力。
+//!
+//! # 注意事项
+//!
+//! - [`SharedMemoryTable::remove`] 当前只会从表中移除登记项，不会自动取消已建立的映射。
+//! - [`SharedMemory::map_to_user`] 以“当前任务的用户空间”为目标建立映射；当前签名为
+//!   `self`（按值），调用方需确保拥有该共享段的所有权。
 
 use alloc::{sync::Arc, vec::Vec};
 

@@ -58,11 +58,6 @@
 
 # 进程间通信
 - [进程间通信概述](ipc/README.md)
-  - [管道](ipc/pipe.md)
-  - [消息](ipc/message.md)
-  - [共享内存](ipc/shared_memory.md)
-  - [信号](ipc/signal.md)
-  - [信号生命周期](ipc/signal_lifecycle.md)
 
 # 系统调用
 
