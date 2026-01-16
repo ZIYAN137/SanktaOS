@@ -76,7 +76,7 @@ $ python3 scripts/rewrite_links.py docs/
 Processing Markdown files in docs/...
 
 Modified: docs/arch/memory.md (3 links)
-Modified: docs/fs/simple_fs.md (5 links)
+Modified: docs/fs/README.md (5 links)
 Modified: docs/process/scheduler.md (2 links)
 
 Summary:

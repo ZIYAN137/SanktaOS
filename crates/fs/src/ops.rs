@@ -1,6 +1,20 @@
 //! FS 运行时操作 trait 定义和注册
 //!
 //! 此模块定义了 FS 层需要的外部依赖接口，通过 trait 抽象实现与 os crate 的解耦。
+//!
+//! ## FsOps
+//!
+//! [`FsOps`] 由 `os` crate 实现并注册，供 FS 子系统查询运行时信息：
+//!
+//! - 配置：页大小、ext4 块大小、镜像大小、块设备扇区大小
+//! - 时间：`timespec_now()`
+//! - 任务/进程信息：供 procfs 生成 `/proc/[pid]/*`
+//! - 系统信息：供 procfs 生成 `/proc/meminfo`、`/proc/uptime`、`/proc/mounts` 等
+//!
+//! ## 注册与生命周期
+//!
+//! - [`register_fs_ops`] 必须在单线程环境下调用且只能调用一次（启动早期）。
+//! - [`fs_ops`] 用于获取已注册实例；若未注册会 panic。
 
 use alloc::string::String;
 use alloc::sync::Arc;
