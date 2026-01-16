@@ -1,4 +1,11 @@
-//! Socket implementation using smoltcp
+//! socket 与 VFS 集成（基于 smoltcp）
+//!
+//! 本模块负责把 `smoltcp` 的 TCP/UDP socket 暴露为“文件描述符可操作的对象”，主要包括：
+//! - [`SocketFile`]：实现 `vfs::File`，用于在 OS 的 FD 表中承载 socket；
+//! - [`SOCKET_SET`]：全局 `smoltcp::iface::SocketSet`，用于存放与管理协议栈 socket；
+//! - 轮询推进：通过 `poll_network_*` 驱动收发，必要时唤醒 `poll/select` 等等待者。
+//!
+//! 系统调用入口在 `os/src/kernel/syscall/network.rs`；本文档以当前实现为准。
 
 use alloc::collections::VecDeque;
 use alloc::vec;

@@ -1,6 +1,6 @@
 # netperf / netserver 测试说明（已知现象）
 
-本页用于记录在 ComixOS 上运行 `netperf/netserver` 时的测试方法与当前已知现象，便于后续回归与排查。
+本页用于记录在 SanktaOS 上运行 `netperf/netserver` 时的测试方法与当前已知现象，便于后续回归与排查。
 
 ## 如何运行
 
@@ -48,4 +48,3 @@ accept_connections: select failure: Interrupted system call (errno 4)
 
 1. **内核实现更完整的 `SA_RESTART` / syscall restart 语义**（让 `select/poll` 在特定信号到来后自动重启，尽量不向用户态暴露 `EINTR`）。
 2. **修改/替换 `netserver`**：将 `select()` 返回 `EINTR` 视为可重试（不打印错误、直接继续）。
-
