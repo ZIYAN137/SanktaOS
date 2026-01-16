@@ -9,7 +9,7 @@ use crate::kassert;
 #[test_case]
 fn test_trait_polymorphism() {
     // 创建不同类型的 File 实现
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"disk file").unwrap();
     let dentry = create_test_dentry("test.txt", inode);
 
@@ -23,14 +23,16 @@ fn test_trait_polymorphism() {
 
     // 统一的 File trait 接口调用
     kassert!(disk_file.readable());
-    kassert!(pipe_file_r.readable());
+    // Pipe 的 readable()/writable() 表达的是“当前是否可读/可写（不会阻塞）”，新建时读端通常不可读
+    kassert!(!pipe_file_r.readable());
     kassert!(!pipe_file_w.readable());
+    kassert!(pipe_file_w.writable());
 }
 
 #[test_case]
 fn test_disk_file_vs_pipe_file_lseek() {
     // RegFile 支持 lseek
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"0123456789").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -50,7 +52,7 @@ fn test_disk_file_vs_pipe_file_lseek() {
 #[test_case]
 fn test_disk_file_vs_pipe_file_offset() {
     // RegFile 有 offset
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -69,7 +71,7 @@ fn test_disk_file_vs_pipe_file_offset() {
 #[test_case]
 fn test_disk_file_vs_pipe_file_flags() {
     // RegFile 有真实的 flags
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDWR);
 
@@ -92,7 +94,7 @@ fn test_fdtable_with_mixed_files() {
     let fd_table = FDTable::new();
 
     // 添加 RegFile
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"disk").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
     let fd1 = fd_table.alloc(disk_file).unwrap();
@@ -146,7 +148,7 @@ fn test_read_write_through_fdtable() {
 #[test_case]
 fn test_metadata_consistency() {
     // 不同类型的文件返回正确的 metadata
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 

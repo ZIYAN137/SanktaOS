@@ -6,7 +6,7 @@ use crate::kassert;
 #[test_case]
 fn test_file_read() {
     // 创建文件系统和文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let content = b"Hello, World!";
     let inode = create_test_file_with_content(&fs, "test.txt", content).unwrap();
 
@@ -23,7 +23,7 @@ fn test_file_read() {
 #[test_case]
 fn test_file_write() {
     // 创建文件系统和文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"").unwrap();
 
     // 创建 File 对象（可写）
@@ -43,7 +43,7 @@ fn test_file_write() {
 #[test_case]
 fn test_file_lseek_set() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let content = b"0123456789";
     let inode = create_test_file_with_content(&fs, "test.txt", content).unwrap();
 
@@ -62,7 +62,7 @@ fn test_file_lseek_set() {
 #[test_case]
 fn test_file_lseek_cur() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let content = b"0123456789";
     let inode = create_test_file_with_content(&fs, "test.txt", content).unwrap();
 
@@ -85,7 +85,7 @@ fn test_file_lseek_cur() {
 #[test_case]
 fn test_file_lseek_end() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let content = b"0123456789";
     let inode = create_test_file_with_content(&fs, "test.txt", content).unwrap();
 
@@ -106,7 +106,7 @@ fn test_file_lseek_end() {
 #[test_case]
 fn test_file_append_mode() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"Hello").unwrap();
 
     // 以追加模式打开
@@ -128,7 +128,7 @@ fn test_file_append_mode() {
 #[test_case]
 fn test_file_readable_check() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
 
     // 只写模式
@@ -147,7 +147,7 @@ fn test_file_readable_check() {
 #[test_case]
 fn test_file_writable_check() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
 
     // 只读模式
@@ -168,7 +168,7 @@ fn test_file_writable_check() {
 #[test_case]
 fn test_file_read_permission_denied() {
     // 创建文件（只写）
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_WRONLY);
 
@@ -182,7 +182,7 @@ fn test_file_read_permission_denied() {
 #[test_case]
 fn test_file_write_permission_denied() {
     // 创建文件（只读）
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -195,7 +195,7 @@ fn test_file_write_permission_denied() {
 #[test_case]
 fn test_file_lseek_negative_set() {
     // 创建文件
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 

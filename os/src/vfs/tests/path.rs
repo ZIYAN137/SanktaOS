@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::vfs::path::PathComponent;
+use crate::vfs::PathComponent;
 use crate::kassert;
 use alloc::string::ToString;
 
@@ -172,10 +172,10 @@ fn test_normalize_path_root_parent() {
 
 #[test_case]
 fn test_lookup_across_mount_point() {
-    use super::create_test_simplefs;
+    use super::create_test_fs;
 
     // 创建一个测试文件系统
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
 
     // 在文件系统内创建一个文件
     let root = fs.root_inode();
@@ -202,10 +202,10 @@ fn test_lookup_across_mount_point() {
 
 #[test_case]
 fn test_dentry_mount_cache() {
-    use super::create_test_simplefs;
+    use super::create_test_fs;
 
     // 创建测试文件系统
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
 
     // 挂载到 /cache_test
     let mount_result = MOUNT_TABLE.mount(fs.clone(), "/cache_test", MountFlags::empty(), None);
@@ -229,10 +229,10 @@ fn test_dentry_mount_cache() {
 
 #[test_case]
 fn test_check_mount_point_function() {
-    use super::create_test_simplefs;
+    use super::create_test_fs;
 
     // 创建根文件系统并挂载
-    let root_fs = create_test_simplefs();
+    let root_fs = create_test_fs();
     let mount_result = MOUNT_TABLE.mount(root_fs.clone(), "/", MountFlags::empty(), None);
 
     // 如果根已经挂载，跳过（测试环境可能已有根）
@@ -246,7 +246,7 @@ fn test_check_mount_point_function() {
     kassert!(mkdir_result.is_ok());
 
     // 创建另一个文件系统并挂载到 /mountpoint
-    let child_fs = create_test_simplefs();
+    let child_fs = create_test_fs();
     let mount_child = MOUNT_TABLE.mount(child_fs.clone(), "/mountpoint", MountFlags::empty(), None);
     kassert!(mount_child.is_ok());
 

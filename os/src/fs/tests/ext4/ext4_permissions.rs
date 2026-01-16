@@ -1,5 +1,5 @@
 use super::*;
-use crate::vfs::inode::InodeType;
+use crate::vfs::InodeType;
 use crate::{kassert, test_case};
 
 // P1 重要功能测试 - chown/chmod

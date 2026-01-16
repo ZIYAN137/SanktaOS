@@ -1,7 +1,7 @@
 //! Ext4 rename operation tests
 
 use super::create_test_ext4_with_root;
-use crate::vfs::inode::FileMode;
+use crate::vfs::FileMode;
 
 /// Test basic file rename in same directory
 #[test_case]

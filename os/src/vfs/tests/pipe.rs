@@ -79,13 +79,18 @@ fn test_pipe_readable_writable() {
     let read_file: Arc<dyn File> = Arc::new(pipe_read);
     let write_file: Arc<dyn File> = Arc::new(pipe_write);
 
-    // 读端只可读
-    kassert!(read_file.readable());
+    // PipeFile::readable()/writable() 更接近“当前是否可读/可写（不会阻塞）”的语义：
+    // - 新建管道时缓冲区为空且写端仍存在，因此读端此时不可读
+    kassert!(!read_file.readable());
     kassert!(!read_file.writable());
 
-    // 写端只可写
+    // 写端只可写（且缓冲区未满时可写）
     kassert!(!write_file.readable());
     kassert!(write_file.writable());
+
+    // 写入数据后，读端应变为可读
+    write_file.write(b"hello").unwrap();
+    kassert!(read_file.readable());
 }
 
 #[test_case]

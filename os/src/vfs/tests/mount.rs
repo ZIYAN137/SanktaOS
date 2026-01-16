@@ -1,5 +1,5 @@
 use super::*;
-use crate::vfs::file_system::FileSystem;
+use crate::vfs::FileSystem;
 use crate::kassert;
 use alloc::string::String;
 
@@ -8,7 +8,7 @@ use alloc::string::String;
 #[test_case]
 fn test_mount_fs() {
     // 创建文件系统
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
 
     // 挂载到 /test
     let result = MOUNT_TABLE.mount(
@@ -27,7 +27,7 @@ fn test_mount_fs() {
 #[test_case]
 fn test_mount_list() {
     // 挂载文件系统
-    let fs1 = create_test_simplefs();
+    let fs1 = create_test_fs();
 
     MOUNT_TABLE
         .mount(fs1, "/mnt_test", MountFlags::empty(), None)
@@ -44,7 +44,7 @@ fn test_mount_list() {
 #[test_case]
 fn test_umount_fs() {
     // 创建文件系统并挂载
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     MOUNT_TABLE
         .mount(fs, "/test_umount2", MountFlags::empty(), None)
         .ok();
@@ -67,8 +67,8 @@ fn test_umount_fs() {
 #[test_case]
 fn test_overmount() {
     // 创建两个文件系统
-    let fs1 = create_test_simplefs();
-    let fs2 = create_test_simplefs();
+    let fs1 = create_test_fs();
+    let fs2 = create_test_fs();
 
     // 在同一路径挂载两次
     let result1 = MOUNT_TABLE.mount(fs1, "/overmount_test", MountFlags::empty(), None);

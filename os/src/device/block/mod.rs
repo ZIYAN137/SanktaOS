@@ -6,3 +6,6 @@ pub mod virtio_blk;
 
 // Re-export device crate 的 BlockDriver trait
 pub use device::block::BlockDriver;
+
+// Re-export device crate 的 RamDisk（用于测试与开发）
+pub use device::block::RamDisk;

@@ -194,7 +194,7 @@ mod tests {
 
     // 编译期接口实现断言（无法运行时失败，只在类型不满足时编译报错）
     test_case!(test_virtioblk_trait_impls, {
-        fn assert_driver<T: super::super::Driver>() {}
+        fn assert_driver<T: crate::device::Driver>() {}
         fn assert_block<T: super::BlockDriver>() {}
         assert_driver::<VirtIOBlkDriver>();
         assert_block::<VirtIOBlkDriver>();

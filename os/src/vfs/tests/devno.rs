@@ -1,7 +1,10 @@
 //! 设备号管理测试
 
 use super::*;
-use crate::vfs::{dev::*, devno::*};
+use crate::vfs::{
+    blkdev_major, chrdev_major, get_blkdev_index, get_chrdev_driver,
+    dev::{major, makedev, minor},
+};
 use crate::kassert;
 
 #[test_case]

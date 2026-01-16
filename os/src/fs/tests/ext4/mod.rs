@@ -1,11 +1,8 @@
 use crate::device::block::BlockDriver;
-use crate::device::block::ram_disk::RamDisk;
+use crate::device::block::RamDisk;
 use crate::fs::ext4::Ext4FileSystem;
 use crate::sync::SpinLock;
-use crate::vfs::dentry::{Dentry, DentryCache};
-use crate::vfs::error::FsError;
-use crate::vfs::file_system::FileSystem;
-use crate::vfs::inode::{FileMode, Inode};
+use crate::vfs::{Dentry, DentryCache, FileMode, FileSystem, FsError, Inode};
 use alloc::string::String;
 use alloc::sync::Arc;
 use lazy_static::lazy_static;

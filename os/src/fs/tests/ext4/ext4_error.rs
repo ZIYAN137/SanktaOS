@@ -1,5 +1,5 @@
 use super::*;
-use crate::vfs::file_system::FileSystem;
+use crate::vfs::FileSystem;
 use crate::{kassert, test_case};
 use alloc::vec;
 

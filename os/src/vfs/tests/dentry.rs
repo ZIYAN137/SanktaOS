@@ -1,6 +1,5 @@
 use super::*;
-use crate::fs::simple_fs::SimpleFs;
-use crate::vfs::file_system::FileSystem;
+use crate::vfs::FileSystem;
 use crate::kassert;
 use alloc::format;
 use alloc::string::ToString;
@@ -11,7 +10,7 @@ use alloc::sync::Arc;
 #[test_case]
 fn test_dentry_create() {
     // 创建一个测试文件系统和 dentry
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
     let dentry = Dentry::new("test".to_string(), root_inode.clone());
 
@@ -22,7 +21,7 @@ fn test_dentry_create() {
 #[test_case]
 fn test_dentry_lookup_child_not_found() {
     // 查找不存在的子项
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
     let parent = Dentry::new("parent".to_string(), root_inode);
 
@@ -33,7 +32,7 @@ fn test_dentry_lookup_child_not_found() {
 #[test_case]
 fn test_dentry_parent_none_initially() {
     // 测试初始时没有父节点
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
     let dentry = Dentry::new("test".to_string(), root_inode);
 
@@ -43,7 +42,7 @@ fn test_dentry_parent_none_initially() {
 
 #[test_case]
 fn test_dentry_add_child() {
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
 
     let parent = Dentry::new("parent".to_string(), root_inode.clone());
@@ -58,7 +57,7 @@ fn test_dentry_add_child() {
 
 #[test_case]
 fn test_dentry_parent_relationship() {
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
 
     let parent = Dentry::new("parent".to_string(), root_inode.clone());
@@ -73,7 +72,7 @@ fn test_dentry_parent_relationship() {
 
 #[test_case]
 fn test_dentry_full_path() {
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
 
     let root = Dentry::new("/".to_string(), root_inode.clone());
@@ -91,7 +90,7 @@ fn test_dentry_full_path() {
 
 #[test_case]
 fn test_dentry_multiple_children() {
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
     let parent = Dentry::new("parent".to_string(), root_inode.clone());
 
@@ -110,7 +109,7 @@ fn test_dentry_multiple_children() {
 
 #[test_case]
 fn test_dentry_overwrite_child() {
-    let fs = SimpleFs::new();
+    let fs = create_test_fs();
     let root_inode = fs.root_inode();
     let parent = Dentry::new("parent".to_string(), root_inode.clone());
 

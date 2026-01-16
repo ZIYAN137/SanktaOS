@@ -1,6 +1,5 @@
 use super::*;
-use crate::vfs::file_system::FileSystem;
-use crate::vfs::inode::InodeType;
+use crate::vfs::{FileSystem, InodeType};
 use crate::{kassert, println, test_case};
 use alloc::vec;
 use alloc::vec::Vec;

@@ -16,7 +16,7 @@ fn test_fdtable_create() {
 fn test_fdtable_alloc() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -28,7 +28,7 @@ fn test_fdtable_alloc() {
 fn test_fdtable_get() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -41,7 +41,7 @@ fn test_fdtable_get() {
 fn test_fdtable_close() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -62,7 +62,7 @@ fn test_fdtable_close() {
 fn test_fdtable_dup() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -82,7 +82,7 @@ fn test_fdtable_dup() {
 fn test_fdtable_dup2() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode1 = create_test_file_with_content(&fs, "test1.txt", b"test1").unwrap();
     let inode2 = create_test_file_with_content(&fs, "test2.txt", b"test2").unwrap();
     let file1 = create_test_file("test1.txt", inode1, OpenFlags::O_RDONLY);
@@ -104,7 +104,7 @@ fn test_fdtable_dup2() {
 fn test_fdtable_install_at() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -121,7 +121,7 @@ fn test_fdtable_install_at() {
 fn test_fdtable_clone() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
@@ -171,7 +171,7 @@ fn test_fdtable_dup_invalid_fd() {
 fn test_fdtable_alloc_multiple() {
     // 创建 FDTable
     let fd_table = FDTable::new();
-    let fs = create_test_simplefs();
+    let fs = create_test_fs();
 
     // 分配多个 FD
     for i in 0..5 {

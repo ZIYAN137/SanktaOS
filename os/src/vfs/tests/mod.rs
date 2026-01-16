@@ -1,14 +1,16 @@
-use crate::device::block::ram_disk::RamDisk;
-use crate::fs::simple_fs::SimpleFs;
-use crate::vfs::{Dentry, File, FileMode, FsError, Inode, OpenFlags, RegFile};
+use crate::device::block::RamDisk;
+use crate::fs::TmpFs;
+use crate::vfs::*;
 use alloc::string::String;
 use alloc::sync::Arc;
 
 // 测试辅助函数 (fixtures)
 
-/// 创建一个空的测试用 SimpleFS 实例
-pub fn create_test_simplefs() -> Arc<SimpleFs> {
-    SimpleFs::new()
+/// 创建一个测试用文件系统实例
+///
+/// 当前使用 TmpFs 作为测试文件系统（simple_fs 已移除）。
+pub fn create_test_fs() -> Arc<dyn FileSystem> {
+    TmpFs::new(0) as Arc<dyn FileSystem>
 }
 
 /// 创建一个指定大小的测试用 RamDisk
@@ -20,7 +22,7 @@ pub fn create_test_ramdisk(size_in_blocks: usize) -> Arc<RamDisk> {
 
 /// 在测试 SimpleFS 中创建一个文件并写入内容
 pub fn create_test_file_with_content(
-    fs: &Arc<SimpleFs>,
+    fs: &Arc<dyn FileSystem>,
     path: &str,
     content: &[u8],
 ) -> Result<Arc<dyn Inode>, FsError> {
@@ -31,7 +33,7 @@ pub fn create_test_file_with_content(
 }
 
 /// 在测试 SimpleFS 中创建一个目录
-pub fn create_test_dir(fs: &Arc<SimpleFs>, path: &str) -> Result<Arc<dyn Inode>, FsError> {
+pub fn create_test_dir(fs: &Arc<dyn FileSystem>, path: &str) -> Result<Arc<dyn Inode>, FsError> {
     let root = fs.root_inode();
     root.mkdir(path, FileMode::from_bits_truncate(0o755))
 }
