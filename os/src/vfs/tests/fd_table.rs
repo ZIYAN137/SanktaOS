@@ -1,18 +1,19 @@
 use super::*;
-use crate::{kassert, test_case};
+use crate::kassert;
 
 // P0 核心功能测试
 
-test_case!(test_fdtable_create, {
+#[test_case]
+fn test_fdtable_create() {
     // 创建 FDTable
     let fd_table = FDTable::new();
 
     // FDTable 应该初始化为空
     let result = fd_table.get(0);
     kassert!(result.is_err());
-});
-
-test_case!(test_fdtable_alloc, {
+}
+#[test_case]
+fn test_fdtable_alloc() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -22,9 +23,9 @@ test_case!(test_fdtable_alloc, {
     // 分配 FD
     let fd = fd_table.alloc(file).unwrap();
     kassert!(fd >= 0);
-});
-
-test_case!(test_fdtable_get, {
+}
+#[test_case]
+fn test_fdtable_get() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -35,9 +36,9 @@ test_case!(test_fdtable_get, {
     let fd = fd_table.alloc(file.clone()).unwrap();
     let retrieved = fd_table.get(fd);
     kassert!(retrieved.is_ok());
-});
-
-test_case!(test_fdtable_close, {
+}
+#[test_case]
+fn test_fdtable_close() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -54,11 +55,11 @@ test_case!(test_fdtable_close, {
     // 再次获取应该失败
     let retrieved = fd_table.get(fd);
     kassert!(retrieved.is_err());
-});
-
+}
 // P1 重要功能测试
 
-test_case!(test_fdtable_dup, {
+#[test_case]
+fn test_fdtable_dup() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -76,9 +77,9 @@ test_case!(test_fdtable_dup, {
     let file1 = fd_table.get(fd).unwrap();
     let file2 = fd_table.get(new_fd).unwrap();
     kassert!(Arc::ptr_eq(&file1, &file2));
-});
-
-test_case!(test_fdtable_dup2, {
+}
+#[test_case]
+fn test_fdtable_dup2() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -98,9 +99,9 @@ test_case!(test_fdtable_dup2, {
     // fd2 现在应该指向 file1
     let retrieved = fd_table.get(fd2).unwrap();
     kassert!(Arc::ptr_eq(&retrieved, &file1));
-});
-
-test_case!(test_fdtable_install_at, {
+}
+#[test_case]
+fn test_fdtable_install_at() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -115,9 +116,9 @@ test_case!(test_fdtable_install_at, {
     let retrieved = fd_table.get(5);
     kassert!(retrieved.is_ok());
     kassert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
-});
-
-test_case!(test_fdtable_clone, {
+}
+#[test_case]
+fn test_fdtable_clone() {
     // 创建 FDTable 和文件
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -134,20 +135,20 @@ test_case!(test_fdtable_clone, {
     let retrieved = cloned.get(fd);
     kassert!(retrieved.is_ok());
     kassert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
-});
-
+}
 // P2 边界和错误处理测试
 
-test_case!(test_fdtable_get_invalid_fd, {
+#[test_case]
+fn test_fdtable_get_invalid_fd() {
     // 创建 FDTable
     let fd_table = FDTable::new();
 
     // 获取无效的 FD
     let retrieved = fd_table.get(99);
     kassert!(retrieved.is_err());
-});
-
-test_case!(test_fdtable_close_invalid_fd, {
+}
+#[test_case]
+fn test_fdtable_close_invalid_fd() {
     // 创建 FDTable
     let fd_table = FDTable::new();
 
@@ -155,9 +156,9 @@ test_case!(test_fdtable_close_invalid_fd, {
     let result = fd_table.close(99);
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::BadFileDescriptor)));
-});
-
-test_case!(test_fdtable_dup_invalid_fd, {
+}
+#[test_case]
+fn test_fdtable_dup_invalid_fd() {
     // 创建 FDTable
     let fd_table = FDTable::new();
 
@@ -165,9 +166,9 @@ test_case!(test_fdtable_dup_invalid_fd, {
     let result = fd_table.dup(99);
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::BadFileDescriptor)));
-});
-
-test_case!(test_fdtable_alloc_multiple, {
+}
+#[test_case]
+fn test_fdtable_alloc_multiple() {
     // 创建 FDTable
     let fd_table = FDTable::new();
     let fs = create_test_simplefs();
@@ -180,4 +181,4 @@ test_case!(test_fdtable_alloc_multiple, {
         let result = fd_table.alloc(file);
         kassert!(result.is_ok());
     }
-});
+}
