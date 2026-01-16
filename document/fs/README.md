@@ -14,7 +14,6 @@ comix 内核目前支持以下文件系统类型：
 | [ProcFS](procfs.md) | 伪文件系统 | 进程信息 | ❌ | 动态生成、只读 |
 | [SysFS](sysfs.md) | 伪文件系统 | 系统设备 | ❌ | 设备树、属性导出 |
 | [Ext4](ext4.md) | 磁盘 | 持久化存储 | ✅ | Linux标准、完整读写 |
-| [SimpleFS](simple_fs.md) | 测试 | 调试/测试 | ❌ | 预加载镜像 |
 
 ## 文件系统特性对比
 
@@ -25,12 +24,10 @@ graph LR
     A[读写性能] --> B[Tmpfs: 最快]
     A --> C[ProcFS/SysFS: 动态生成]
     A --> D[Ext4: 块设备速度]
-    A --> E[SimpleFS: 内存访问]
     
     style B fill:#90EE90
     style C fill:#FFD700
     style D fill:#87CEEB
-    style E fill:#DDA0DD
 ```
 
 ### 使用场景
@@ -115,26 +112,6 @@ init_ext4_from_block_device()?;  // 挂载ext4为根文件系统
 - 性能受硬件限制
 - 部分高级特性未支持（mknod等）
 
-#### SimpleFS - 测试与调试
-```rust
-// 适用场景：
-// - 单元测试
-// - 快速原型
-// - 预加载测试数据
-
-init_simple_fs()?;  // 从编译时嵌入的镜像加载
-```
-
-**优点**:
-- 镜像编译时嵌入
-- 快速启动
-- 测试环境一致
-
-**限制**:
-- 只读
-- 镜像大小受限
-- 仅用于测试
-
 ## 架构设计
 
 ### FS层与VFS层的关系
@@ -157,7 +134,6 @@ graph TB
         G[ProcFS]
         H[SysFS]
         I[Ext4]
-        J[SimpleFS]
     end
     
     subgraph "设备层"
@@ -174,30 +150,23 @@ graph TB
     E --> G
     E --> H
     E --> I
-    E --> J
     
     I --> K
     F -.内存.-> M[RamDisk]
-    J -.内存.-> M
     
     style E fill:#FFD700
     style F fill:#90EE90
     style G fill:#87CEEB
     style H fill:#DDA0DD
     style I fill:#FFA07A
-    style J fill:#F0E68C
 ```
 
 ### 文件系统初始化流程
 
 ```rust
 pub fn init_filesystems() -> Result<(), FsError> {
-    // 1. 挂载根文件系统 (Ext4 或 SimpleFS)
-    #[cfg(feature = "ext4")]
+    // 1. 挂载根文件系统（默认：Ext4）
     init_ext4_from_block_device()?;
-    
-    #[cfg(not(feature = "ext4"))]
-    init_simple_fs()?;
     
     // 2. 创建必要的目录
     let root = vfs::get_root_dentry()?;
@@ -394,8 +363,7 @@ pub const TMPFS_DEFAULT_SIZE: usize = 64;
 /// Ext4 块大小
 pub const EXT4_BLOCK_SIZE: usize = 4096;
 
-/// SimpleFS 镜像路径
-pub const SIMPLE_FS_IMAGE: &str = env!("SIMPLE_FS_IMAGE");
+// NOTE: SimpleFS 已移除；测试与调试请使用 tmpfs 或 ext4 测试镜像。
 ```
 
 ## 调试与监控
@@ -450,7 +418,7 @@ pr_info!("Free blocks: {}", statfs.free_blocks);
 - **持久化数据** → Ext4
 - **进程信息** → ProcFS
 - **设备信息** → SysFS
-- **测试环境** → SimpleFS
+- **测试环境** → Tmpfs
 
 ### 2. 错误处理
 
@@ -458,8 +426,8 @@ pr_info!("Free blocks: {}", statfs.free_blocks);
 match init_ext4_from_block_device() {
     Ok(_) => pr_info!("Ext4 mounted successfully"),
     Err(FsError::NoDevice) => {
-        pr_warn!("No block device, fallback to SimpleFS");
-        init_simple_fs()?;
+        pr_warn!("No block device, fallback to tmpfs");
+        mount_tmpfs("/", 0)?;
     }
     Err(e) => return Err(e),
 }
@@ -517,7 +485,6 @@ pr_info!("Found {} block devices", drivers.len());
 - [ProcFS 详解](procfs.md)
 - [SysFS 详解](sysfs.md)
 - [Ext4 详解](ext4.md)
-- [SimpleFS 详解](simple_fs.md)
 
 ### 源代码位置
 
@@ -526,7 +493,6 @@ pr_info!("Found {} block devices", drivers.len());
 - **ProcFS**: `os/src/fs/proc/`
 - **SysFS**: `os/src/fs/sysfs/`
 - **Ext4**: `os/src/fs/ext4/`
-- **SimpleFS**: `os/src/fs/simple_fs.rs`
 
 ### 参考标准
 

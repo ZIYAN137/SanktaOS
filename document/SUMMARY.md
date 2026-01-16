@@ -75,7 +75,6 @@
   - [ProcFS - 进程信息](fs/procfs.md)
   - [SysFS - 系统设备](fs/sysfs.md)
   - [Ext4 - Linux文件系统](fs/ext4.md)
-  - [SimpleFS - 测试文件系统](fs/simple_fs.md)
 
 # 设备与驱动
 
@@ -111,7 +110,6 @@
 ---
 
 - [脚本工具](scripts/README.md)
-  - [SimpleFS 镜像打包](scripts/make_init_simple_fs.md)
   - [文档链接转换](scripts/rewrite_links.md)
   - [代码质量检查](scripts/style-check.md)
 
