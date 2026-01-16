@@ -39,6 +39,7 @@
   - [抢占控制](sync/preempt.md)
   - [SMP 与中断](sync/smp_interrupts.md)
   - [死锁检测](sync/deadlock.md)
+  - [API 参考](sync/api_reference.md)
 
 # 内核子系统
 
