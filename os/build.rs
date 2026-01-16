@@ -1,8 +1,6 @@
 //! Build script for the OS kernel
 //!
-//! This script automatically:
-//! 1. Compiles user programs in ../user directory
-//! 2. Creates ext4 filesystem image
+//! This script automatically creates ext4 filesystem image
 
 use std::env;
 use std::fs;
@@ -16,45 +14,8 @@ fn main() {
 
     // 设置路径
     let project_root = PathBuf::from(&manifest_dir).parent().unwrap().to_path_buf();
-    let user_dir = project_root.join("user");
 
-    println!("cargo:rerun-if-changed=../user");
-
-    // 步骤 1: 编译用户程序
-    if user_dir.exists() {
-        println!("cargo:warning=[build.rs] Building user programs...");
-        let status = Command::new("make")
-            .current_dir(&user_dir)
-            .env("BUILD_MODE", "release")
-            // 清除可能从父目录继承的 CARGO 环境变量，避免用户程序继承 os 的构建配置
-            .env_remove("CARGO_ENCODED_RUSTFLAGS")
-            .env_remove("CARGO_BUILD_RUSTFLAGS")
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status();
-
-        match status {
-            Ok(s) if s.success() => {
-                println!("cargo:warning=[build.rs] User programs built successfully");
-            }
-            Ok(s) => {
-                panic!(
-                    "User program build failed with status: {}. Aborting kernel build.",
-                    s
-                );
-            }
-            Err(e) => {
-                panic!(
-                    "Failed to execute make for user programs: {}. Aborting kernel build.",
-                    e
-                );
-            }
-        }
-    } else {
-        println!("cargo:warning=[build.rs] User directory not found, skipping user build");
-    }
-
-    // 步骤 2: 创建 ext4 镜像
+    // 步骤 1: 创建 ext4 镜像
     // 检测是否为测试模式
     // 注意: CARGO_CFG_TEST 只在运行测试时设置，编译时不会设置
     // 因此我们检查 TEST 环境变量 (由 Makefile 传递) 或检查是否有测试相关的 cfg
@@ -62,7 +23,7 @@ fn main() {
         || env::var("CARGO_CFG_TEST").is_ok()
         || env::var("PROFILE").map(|p| p == "test").unwrap_or(false);
 
-    // 3.1: 创建用于 include_bytes! 嵌入的镜像
+    // 1.1: 创建用于 include_bytes! 嵌入的镜像
     let ext4_embed_img = PathBuf::from(&out_dir).join("ext4_test.img");
     if is_test {
         // 测试模式: 创建 8MB 镜像用于测试
@@ -84,7 +45,7 @@ fn main() {
         println!("cargo:rustc-env=EXT4_FS_IMAGE={}", dummy_img.display());
     }
 
-    // 3.2: 非测试模式下创建完整的运行时镜像
+    // 1.2: 非测试模式下创建完整的运行时镜像
     if !is_test {
         let target = env::var("TARGET").unwrap_or_default();
         let arch_key = match env::var("ARCH") {
@@ -110,13 +71,11 @@ fn main() {
         } else {
             project_root.join("data").join("risc-v_musl")
         };
-        // user_bin_dir 已经在上面通过 user_dir 引用了, user/bin
-        let user_bin_dir = user_dir.join("bin");
         let arch_stamp = PathBuf::from(&out_dir).join(format!("fs_img_arch_{}.txt", arch_key));
 
         // 检查依赖
         println!("cargo:rerun-if-changed={}", data_dir.display());
-        let dependencies = vec![data_dir.clone(), user_bin_dir];
+        let dependencies = vec![data_dir.clone()];
 
         let force_rebuild = match fs::read_to_string(&arch_stamp) {
             Ok(saved) => saved.trim() != arch_key,
@@ -277,8 +236,8 @@ fn create_empty_ext4_image(path: &PathBuf, size_mb: usize) {
     }
 }
 
-/// 创建完整的 ext4 镜像 (包含 data/ 和 user/bin/)
-fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, project_root: &Path) {
+/// 创建完整的 ext4 镜像 (包含 data/)
+fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, _project_root: &Path) {
     const IMG_SIZE_MB: usize = 4096; // 4GB
     const BLOCK_SIZE: usize = 1024 * 1024;
 
@@ -305,17 +264,7 @@ fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, project_root: &Path) 
         );
     }
 
-    // 3. 创建 /home/user/bin 目录并复制 user/bin
-    let home_user_bin = temp_root.join("home").join("user").join("bin");
-    fs::create_dir_all(&home_user_bin).expect("Failed to create home/user/bin");
-
-    let user_bin_src = project_root.join("user").join("bin");
-    if user_bin_src.exists() {
-        copy_dir_recursive(&user_bin_src, &home_user_bin).expect("Failed to copy user/bin");
-        println!("cargo:warning=[build.rs] Copied user/bin to /home/user/bin");
-    }
-
-    // 4. 创建空镜像
+    // 3. 创建空镜像
     let dd_status = Command::new("dd")
         .arg("if=/dev/zero")
         .arg(format!("of={}", path.display()))
@@ -330,7 +279,7 @@ fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, project_root: &Path) 
         panic!("Failed to create disk image");
     }
 
-    // 5. 使用 mkfs.ext4 -d 选项从临时目录创建文件系统
+    // 4. 使用 mkfs.ext4 -d 选项从临时目录创建文件系统
     let mkfs_status = Command::new("mkfs.ext4")
         .arg("-F")
         .arg("-b")
@@ -349,7 +298,7 @@ fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, project_root: &Path) 
         panic!("Failed to format ext4 image with data!");
     }
 
-    // 6. 清理临时目录
+    // 5. 清理临时目录
     fs::remove_dir_all(&temp_root).ok();
 
     println!("cargo:warning=[build.rs] Full ext4 image created successfully (1GB).");
