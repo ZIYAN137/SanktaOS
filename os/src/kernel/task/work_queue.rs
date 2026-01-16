@@ -15,12 +15,15 @@ use crate::{
 };
 
 lazy_static::lazy_static! {
+    /// 全局工作队列实例。
+    ///
+    /// `kworker()` 会在启动后将自己注册为 worker，并循环从队列中取出工作项执行。
     pub static ref GLOBAL_WORK_QUEUE: SpinLock<WorkQueue> = SpinLock::new(WorkQueue::new());
 }
 
 /// 工作项结构体
 pub struct WorkItem {
-    /// 任务函数
+    /// 工作项要执行的函数。
     pub task: fn(),
 }
 
@@ -51,7 +54,7 @@ impl WorkQueue {
         }
     }
 
-    /// 将工作项加入工作队列，并唤醒工作线程
+    /// 将工作项加入工作队列，并尝试唤醒一个处于可中断睡眠的工作线程。
     pub fn schedule_work(&mut self, work: WorkItem) {
         self.work_queue.push_back(work);
         if self.sleeping > 0 {
@@ -64,13 +67,18 @@ impl WorkQueue {
         }
     }
 
-    /// 添加工作线程到工作队列
+    /// 将一个工作线程登记到该工作队列。
     pub fn add_worker(&mut self, task: SharedTask) {
         self.worker.push(task);
     }
 }
 
-/// 工作线程主函数
+/// 工作线程主函数。
+///
+/// 工作线程会不断从 [`GLOBAL_WORK_QUEUE`] 中拉取任务：
+///
+/// - 若队列非空：弹出一个工作项并执行
+/// - 若队列为空：将自身置为可中断睡眠并让出 CPU，等待被 `schedule_work` 唤醒
 pub fn kworker() {
     GLOBAL_WORK_QUEUE.lock().add_worker(current_task());
     loop {
