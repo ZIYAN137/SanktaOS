@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """
-mdBook 链接重写脚本：将 /os/src/... 路径转换为 GitHub URL
+mdBook 链接重写脚本：将 /os/src/... 路径转换为 GitHub URL。
 
 使用方式：
   python3 scripts/rewrite_links.py docs/
+
+可通过环境变量覆盖默认仓库与分支：
+  - GITHUB_REPO：例如 https://github.com/ZIYAN137/SanktaOS
+  - GITHUB_BRANCH：例如 main（未设置时会尝试使用 GITHUB_REF_NAME）
 """
 
+import os
 import re
 import sys
 from pathlib import Path
 
-# GitHub 仓库配置
-GITHUB_REPO = "https://github.com/comix-kernel/comix"
-GITHUB_BRANCH = "main"
+# GitHub 仓库配置（可由 CI/本地通过环境变量覆盖）
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "https://github.com/ZIYAN137/SanktaOS")
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH") or os.environ.get("GITHUB_REF_NAME", "main")
 
 # 链接模式：支持以下格式
 # 1. [text](/os/src/path/file.rs)

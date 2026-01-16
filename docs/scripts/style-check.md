@@ -6,7 +6,7 @@
 
 本地运行 CI 中的代码质量检查流程，方便开发者在提交代码前进行验证，避免 CI 失败。
 
-**位置**：`/workspaces/comix/scripts/style-check.sh`
+**位置**：`scripts/style-check.sh`
 
 ## 主要功能
 
@@ -47,13 +47,13 @@
 
 ```
 ======================================
-  Comix 代码质量检查 (Style Check)
+  SanktaOS 代码质量检查 (Style Check)
 ======================================
 
 🔍 步骤 1/3: 运行 Cargo Check (快速验证编译)
 命令: cargo check --target riscv64gc-unknown-none-elf
 
-    Checking comix-os v0.1.0 (/workspaces/comix/os)
+    Checking os v0.1.0 (os)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.34s
 
   📊 Warnings: 3
@@ -67,7 +67,7 @@
 🔬 步骤 3/3: 运行 Clippy Lint 检查
 命令: cargo clippy --target riscv64gc-unknown-none-elf
 
-    Checking comix-os v0.1.0 (/workspaces/comix/os)
+    Checking os v0.1.0 (os)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.23s
 
   📊 Warnings: 5
@@ -181,7 +181,7 @@ rustup component add rust-src rustfmt clippy llvm-tools-preview --toolchain nigh
 **解决方法**：
 ```bash
 # 确保在项目根目录
-cd /workspaces/comix
+cd /path/to/SanktaOS
 ./scripts/style-check.sh
 ```
 

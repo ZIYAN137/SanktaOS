@@ -6,7 +6,7 @@
 
 将 Markdown 文档中的内部路径链接转换为 GitHub 仓库 URL，使 mdBook 文档能够直接链接到 GitHub 上的源代码。
 
-**位置**：`/workspaces/comix/scripts/rewrite_links.py`
+**位置**：`scripts/rewrite_links.py`
 
 ## 主要功能
 
@@ -26,20 +26,21 @@
 
 ### 输出格式
 ```markdown
-[描述文本](https://github.com/comix-kernel/comix/blob/main/os/src/path/file.rs)
-[描述文本](https://github.com/comix-kernel/comix/blob/main/os/src/path/file.rs#L12)
-[描述文本](https://github.com/comix-kernel/comix/blob/main/os/src/path/file.rs#L12-L34)
+[描述文本](https://github.com/ZIYAN137/SanktaOS/blob/main/os/src/path/file.rs)
+[描述文本](https://github.com/ZIYAN137/SanktaOS/blob/main/os/src/path/file.rs#L12)
+[描述文本](https://github.com/ZIYAN137/SanktaOS/blob/main/os/src/path/file.rs#L12-L34)
 ```
 
 ## GitHub 配置
 
-- **仓库**：`https://github.com/comix-kernel/comix`
-- **分支**：`main`
+默认配置：
+- **仓库**：`https://github.com/ZIYAN137/SanktaOS`
+- **分支**：`main`（未设置时会尝试使用 CI 的 `GITHUB_REF_NAME`）
 
-如需修改配置，编辑脚本中的以下常量：
-```python
-GITHUB_REPO = "https://github.com/comix-kernel/comix"
-GITHUB_BRANCH = "main"
+如需覆盖配置，推荐使用环境变量（便于 CI 复用）：
+```bash
+export GITHUB_REPO="https://github.com/<owner>/<repo>"
+export GITHUB_BRANCH="<branch>"
 ```
 
 ## 使用方法
@@ -108,15 +109,13 @@ Summary:
 脚本使用以下正则表达式匹配链接：
 
 ```python
-LINK_PATTERN = r'\[([^\]]+)\]\((/[^\)]+\.rs(?::\d+(?:-\d+)?)?)\)'
+LINK_PATTERN = r'\[([^\]]+)\]\(/os/src/([^\)]+)\)'
 ```
 
 **匹配说明**：
 - `[...]` - 链接文本
-- `(/...)` - 以 `/` 开头的路径
-- `.rs` - Rust 源文件
-- `:\d+` - 可选的行号
-- `-\d+` - 可选的结束行号
+- `(/os/src/...)` - 以 `/os/src/` 开头的路径
+- 支持 `:line` 与 `:start-end` 的行号/行范围（会转换为 `#L..` 锚点）
 
 ## 依赖要求
 

@@ -39,7 +39,7 @@ if [ ! -f "os/Cargo.toml" ]; then
 fi
 
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}  Comix 代码质量检查 (Style Check)  ${NC}"
+echo -e "${BLUE}  SanktaOS 代码质量检查 (Style Check)  ${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 
