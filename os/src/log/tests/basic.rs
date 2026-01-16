@@ -2,7 +2,8 @@
 
 use super::*;
 
-test_case!(test_write_and_read, {
+#[test_case]
+fn test_write_and_read() {
     // Create an independent LogCore instance with Debug level enabled
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
@@ -18,9 +19,10 @@ test_case!(test_write_and_read, {
 
     // Buffer should be empty
     kassert!(log._log_len() == 0);
-});
+}
 
-test_case!(test_format_arguments, {
+#[test_case]
+fn test_format_arguments() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Test formatting
@@ -32,9 +34,10 @@ test_case!(test_format_arguments, {
 
     let e2 = log._read_log().unwrap();
     kassert!(e2.message() == "hex: 0xdead");
-});
+}
 
-test_case!(test_fifo_order, {
+#[test_case]
+fn test_fifo_order() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Write multiple logs
@@ -53,9 +56,10 @@ test_case!(test_fifo_order, {
     }
 
     kassert!(log._log_len() == 0);
-});
+}
 
-test_case!(test_empty_buffer_read, {
+#[test_case]
+fn test_empty_buffer_read() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Empty buffer
@@ -65,4 +69,4 @@ test_case!(test_empty_buffer_read, {
     // Read empty buffer multiple times
     kassert!(log._read_log().is_none());
     kassert!(log._read_log().is_none());
-});
+}

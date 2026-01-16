@@ -2,7 +2,7 @@
 
 use super::level::LogLevel;
 use super::log_core::LogCore;
-use crate::{kassert, test_case};
+use crate::kassert;
 
 // ========== Test Helper Macros ==========
 

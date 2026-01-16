@@ -4,7 +4,8 @@
 
 use super::*;
 
-test_case!(test_unread_bytes_basic, {
+#[test_case]
+fn test_unread_bytes_basic() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 初始状态：未读字节数应为 0
@@ -26,9 +27,10 @@ test_case!(test_unread_bytes_basic, {
 
     // 应该回到 0（只有一条日志）
     kassert!(bytes_after_read == 0);
-});
+}
 
-test_case!(test_unread_bytes_multiple, {
+#[test_case]
+fn test_unread_bytes_multiple() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入多条日志
@@ -55,9 +57,10 @@ test_case!(test_unread_bytes_multiple, {
     let _entry3 = logger._read_log();
     let bytes_after_three = logger._log_unread_bytes();
     kassert!(bytes_after_three == 0); // 全部读完
-});
+}
 
-test_case!(test_unread_bytes_accuracy, {
+#[test_case]
+fn test_unread_bytes_accuracy() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入一条已知长度的日志
@@ -76,9 +79,10 @@ test_case!(test_unread_bytes_accuracy, {
     kassert!(reported_bytes > 0);
     kassert!(reported_bytes >= actual_bytes - 10); // 允许少量误差（数字位数变化）
     kassert!(reported_bytes <= actual_bytes + 10);
-});
+}
 
-test_case!(test_unread_bytes_different_lengths, {
+#[test_case]
+fn test_unread_bytes_different_lengths() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入不同长度的消息
@@ -96,9 +100,10 @@ test_case!(test_unread_bytes_different_lengths, {
     kassert!(bytes_both > bytes_short);
     let diff = bytes_both - bytes_short;
     kassert!(diff > 30); // 长消息至少增加 30+ 字节
-});
+}
 
-test_case!(test_unread_bytes_with_different_levels, {
+#[test_case]
+fn test_unread_bytes_with_different_levels() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 不同级别的日志，长度略有不同（级别标签长度不同）
@@ -112,9 +117,10 @@ test_case!(test_unread_bytes_with_different_levels, {
 
     // 相同消息，不同级别，字节数应该略有不同
     kassert!(bytes_emerg != bytes_info);
-});
+}
 
-test_case!(test_unread_bytes_empty_message, {
+#[test_case]
+fn test_unread_bytes_empty_message() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 空消息
@@ -123,9 +129,10 @@ test_case!(test_unread_bytes_empty_message, {
     let bytes = logger._log_unread_bytes();
     // 即使消息为空，也有格式化开销（级别、时间戳、上下文等）
     kassert!(bytes > 40); // 至少有固定开销
-});
+}
 
-test_case!(test_unread_bytes_persistence, {
+#[test_case]
+fn test_unread_bytes_persistence() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入日志
@@ -140,4 +147,4 @@ test_case!(test_unread_bytes_persistence, {
     // 读取后才变化
     logger._read_log();
     kassert!(logger._log_unread_bytes() == 0);
-});
+}

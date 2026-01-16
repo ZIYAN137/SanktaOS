@@ -4,7 +4,8 @@
 
 use super::*;
 
-test_case!(test_peek_basic, {
+#[test_case]
+fn test_peek_basic() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入一条日志
@@ -27,9 +28,10 @@ test_case!(test_peek_basic, {
     let entry2 = logger._peek_log(start_index);
     kassert!(entry2.is_some());
     kassert!(logger._log_reader_index() == start_index);
-});
+}
 
-test_case!(test_peek_vs_read, {
+#[test_case]
+fn test_peek_vs_read() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入两条日志
@@ -48,9 +50,10 @@ test_case!(test_peek_vs_read, {
 
     // 验证内容相同
     kassert!(entry1_peek.message() == entry1_read.message());
-});
+}
 
-test_case!(test_peek_multiple, {
+#[test_case]
+fn test_peek_multiple() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入多条日志
@@ -77,9 +80,10 @@ test_case!(test_peek_multiple, {
     kassert!(entry1.unwrap().message().contains("Message 1"));
     kassert!(entry2.unwrap().message().contains("Message 2"));
     kassert!(entry3.unwrap().message().contains("Message 3"));
-});
+}
 
-test_case!(test_peek_out_of_range, {
+#[test_case]
+fn test_peek_out_of_range() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入一条日志
@@ -95,9 +99,10 @@ test_case!(test_peek_out_of_range, {
     kassert!(logger._peek_log(end_index).is_none()); // 等于 writer，无效
     kassert!(logger._peek_log(end_index + 1).is_none()); // 超出范围
     kassert!(logger._peek_log(start_index - 1).is_none()); // 小于 reader
-});
+}
 
-test_case!(test_peek_after_read, {
+#[test_case]
+fn test_peek_after_read() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入三条日志
@@ -118,9 +123,10 @@ test_case!(test_peek_after_read, {
 
     // Peek 第三条应该成功
     kassert!(logger._peek_log(start_index + 2).is_some());
-});
+}
 
-test_case!(test_peek_index_tracking, {
+#[test_case]
+fn test_peek_index_tracking() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     let initial_reader = logger._log_reader_index();
@@ -144,9 +150,10 @@ test_case!(test_peek_index_tracking, {
 
     // 再次相等
     kassert!(logger._log_reader_index() == logger._log_writer_index());
-});
+}
 
-test_case!(test_peek_with_byte_counting, {
+#[test_case]
+fn test_peek_with_byte_counting() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入日志
@@ -166,9 +173,10 @@ test_case!(test_peek_with_byte_counting, {
     // Read 才会改变字节计数
     logger._read_log();
     kassert!(logger._log_unread_bytes() == 0);
-});
+}
 
-test_case!(test_peek_empty_buffer, {
+#[test_case]
+fn test_peek_empty_buffer() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     let start_index = logger._log_reader_index();
@@ -176,9 +184,10 @@ test_case!(test_peek_empty_buffer, {
     // 空缓冲区，peek 应该返回 None
     kassert!(logger._peek_log(start_index).is_none());
     kassert!(logger._peek_log(start_index + 1).is_none());
-});
+}
 
-test_case!(test_peek_sequential_access, {
+#[test_case]
+fn test_peek_sequential_access() {
     let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
 
     // 写入多条
@@ -199,4 +208,4 @@ test_case!(test_peek_sequential_access, {
 
     // 读指针未移动
     kassert!(logger._log_reader_index() == start_index);
-});
+}

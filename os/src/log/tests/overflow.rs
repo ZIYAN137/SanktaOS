@@ -2,7 +2,8 @@
 
 use super::*;
 
-test_case!(test_buffer_overflow, {
+#[test_case]
+fn test_buffer_overflow() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Write many logs to trigger overflow
@@ -17,9 +18,10 @@ test_case!(test_buffer_overflow, {
 
     kassert!(dropped > 0); // Should have dropped logs
     kassert!(buffered + dropped == TOTAL);
-});
+}
 
-test_case!(test_overflow_fifo_behavior, {
+#[test_case]
+fn test_overflow_fifo_behavior() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Fill buffer + trigger overflow
@@ -35,9 +37,10 @@ test_case!(test_overflow_fifo_behavior, {
 
     // Verify message format is correct (oldest entry after overwriting)
     kassert!(first_entry.message().starts_with("entry"));
-});
+}
 
-test_case!(test_write_after_overflow, {
+#[test_case]
+fn test_write_after_overflow() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Trigger overflow
@@ -57,4 +60,4 @@ test_case!(test_write_after_overflow, {
     // Should work normally
     kassert!(log._log_len() == 1);
     kassert!(log._read_log().unwrap().message() == "after overflow");
-});
+}

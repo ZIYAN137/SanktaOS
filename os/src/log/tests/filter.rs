@@ -2,7 +2,8 @@
 
 use super::*;
 
-test_case!(test_global_level_filtering, {
+#[test_case]
+fn test_global_level_filtering() {
     let log = LogCore::new(LogLevel::Warning, LogLevel::Warning);
 
     // Write logs at different levels
@@ -19,9 +20,10 @@ test_case!(test_global_level_filtering, {
     kassert!(log._read_log().unwrap().message() == "error");
     kassert!(log._read_log().unwrap().message() == "warning");
     kassert!(log._log_len() == 0);
-});
+}
 
-test_case!(test_level_boundary, {
+#[test_case]
+fn test_level_boundary() {
     let log = LogCore::new(LogLevel::Info, LogLevel::Warning);
 
     // Boundary test: Info (6) == 6
@@ -33,9 +35,10 @@ test_case!(test_level_boundary, {
     kassert!(log._log_len() == 1); // Still 1
 
     kassert!(log._read_log().unwrap().message() == "boundary");
-});
+}
 
-test_case!(test_dynamic_level_change, {
+#[test_case]
+fn test_dynamic_level_change() {
     let log = LogCore::new(LogLevel::Info, LogLevel::Warning);
 
     test_log!(log, LogLevel::Debug, "debug1"); // Filtered
@@ -54,9 +57,10 @@ test_case!(test_dynamic_level_change, {
     kassert!(log._read_log().unwrap().message() == "info1");
     kassert!(log._read_log().unwrap().message() == "debug2");
     kassert!(log._read_log().unwrap().message() == "info2");
-});
+}
 
-test_case!(test_all_levels, {
+#[test_case]
+fn test_all_levels() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Write all levels
@@ -78,4 +82,4 @@ test_case!(test_all_levels, {
         let entry = log._read_log().unwrap();
         kassert!(entry.message() == *expected);
     }
-});
+}

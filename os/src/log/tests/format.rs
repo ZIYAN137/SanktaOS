@@ -2,7 +2,8 @@
 
 use super::*;
 
-test_case!(test_message_truncation, {
+#[test_case]
+fn test_message_truncation() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     // Create a long message (>256 bytes)
@@ -13,27 +14,30 @@ test_case!(test_message_truncation, {
 
     // Should be truncated to 256 bytes
     kassert!(entry.message().len() <= 256);
-});
+}
 
-test_case!(test_empty_message, {
+#[test_case]
+fn test_empty_message() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     test_log!(log, LogLevel::Info, "");
 
     let entry = log._read_log().unwrap();
     kassert!(entry.message() == "");
-});
+}
 
-test_case!(test_special_characters, {
+#[test_case]
+fn test_special_characters() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     test_log!(log, LogLevel::Info, "special: !@#$%^&*()");
 
     let entry = log._read_log().unwrap();
     kassert!(entry.message() == "special: !@#$%^&*()");
-});
+}
 
-test_case!(test_utf8_message, {
+#[test_case]
+fn test_utf8_message() {
     let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
 
     test_log!(log, LogLevel::Info, "你好，世界！");
@@ -44,4 +48,4 @@ test_case!(test_utf8_message, {
 
     let e2 = log._read_log().unwrap();
     kassert!(e2.message() == "Hello, мир!");
-});
+}
