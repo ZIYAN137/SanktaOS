@@ -31,9 +31,7 @@
 
 ## 中断与陷阱
 
-- [中断处理](kernel/trap/trap.md)
-  - [上下文保存](kernel/trap/context.md)
-  - [特权级切换](kernel/trap/switch.md)
+- [中断与陷阱概述](kernel/trap/trap.md)
 
 # 虚拟文件系统
 
