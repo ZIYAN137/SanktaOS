@@ -1,6 +1,5 @@
 use super::super::*;
 use crate::vfs::PathComponent;
-use crate::kassert;
 use alloc::string::ToString;
 
 // P0 核心功能测试
@@ -9,96 +8,96 @@ use alloc::string::ToString;
 fn test_normalize_path_absolute() {
     // 测试绝对路径
     let result = normalize_path("/foo/bar");
-    kassert!(result == "/foo/bar");
+    assert!(result == "/foo/bar");
 
     // 根目录
     let result = normalize_path("/");
-    kassert!(result == "/");
+    assert!(result == "/");
 
     // 多个斜杠
     let result = normalize_path("///foo///bar///");
-    kassert!(result == "/foo/bar");
+    assert!(result == "/foo/bar");
 }
 
 #[test_case]
 fn test_normalize_path_current() {
     // 测试 "." 组件
     let result = normalize_path("/foo/./bar");
-    kassert!(result == "/foo/bar");
+    assert!(result == "/foo/bar");
 
     let result = normalize_path("./foo");
-    kassert!(result == "foo");
+    assert!(result == "foo");
 
     let result = normalize_path(".");
-    kassert!(result == ".");
+    assert!(result == ".");
 }
 
 #[test_case]
 fn test_normalize_path_parent() {
     // 测试 ".." 组件
     let result = normalize_path("/foo/bar/..");
-    kassert!(result == "/foo");
+    assert!(result == "/foo");
 
     let result = normalize_path("/foo/../bar");
-    kassert!(result == "/bar");
+    assert!(result == "/bar");
 
     // 根目录不能越过
     let result = normalize_path("/..");
-    kassert!(result == "/");
+    assert!(result == "/");
 
     let result = normalize_path("/../..");
-    kassert!(result == "/");
+    assert!(result == "/");
 }
 
 #[test_case]
 fn test_normalize_path_relative() {
     // 测试相对路径
     let result = normalize_path("foo/bar");
-    kassert!(result == "foo/bar");
+    assert!(result == "foo/bar");
 
     let result = normalize_path("foo/../bar");
-    kassert!(result == "bar");
+    assert!(result == "bar");
 
     // 相对路径可以有 ".." 前缀
     let result = normalize_path("../foo");
-    kassert!(result == "../foo");
+    assert!(result == "../foo");
 
     let result = normalize_path("../../foo");
-    kassert!(result == "../../foo");
+    assert!(result == "../../foo");
 }
 
 #[test_case]
 fn test_split_path_absolute() {
     // 测试分割绝对路径
     let result = split_path("/foo/bar.txt");
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
     let (dir, filename) = result.unwrap();
-    kassert!(dir == "/foo");
-    kassert!(filename == "bar.txt");
+    assert!(dir == "/foo");
+    assert!(filename == "bar.txt");
 
     // 根目录下的文件
     let result = split_path("/hello");
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
     let (dir, filename) = result.unwrap();
-    kassert!(dir == "/");
-    kassert!(filename == "hello");
+    assert!(dir == "/");
+    assert!(filename == "hello");
 }
 
 #[test_case]
 fn test_split_path_relative() {
     // 测试分割相对路径
     let result = split_path("foo/bar.txt");
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
     let (dir, filename) = result.unwrap();
-    kassert!(dir == "foo");
-    kassert!(filename == "bar.txt");
+    assert!(dir == "foo");
+    assert!(filename == "bar.txt");
 
     // 无路径分隔符
     let result = split_path("hello.txt");
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
     let (dir, filename) = result.unwrap();
-    kassert!(dir == ".");
-    kassert!(filename == "hello.txt");
+    assert!(dir == ".");
+    assert!(filename == "hello.txt");
 }
 
 // P2 边界和错误处理测试
@@ -107,35 +106,35 @@ fn test_split_path_relative() {
 fn test_normalize_path_empty() {
     // 空路径被当作当前目录
     let result = normalize_path("");
-    kassert!(result == ".");
+    assert!(result == ".");
 }
 
 #[test_case]
 fn test_normalize_path_complex() {
     // 复杂路径
     let result = normalize_path("/foo/./bar/../baz/./qux/..");
-    kassert!(result == "/foo/baz");
+    assert!(result == "/foo/baz");
 
     let result = normalize_path("foo/bar/../../baz");
-    kassert!(result == "baz");
+    assert!(result == "baz");
 }
 
 #[test_case]
 fn test_split_path_trailing_slash() {
     // 结尾的斜杠
     let result = split_path("/foo/bar/");
-    kassert!(result.is_err());
-    kassert!(matches!(result, Err(FsError::InvalidArgument)));
+    assert!(result.is_err());
+    assert!(matches!(result, Err(FsError::InvalidArgument)));
 }
 
 #[test_case]
 fn test_split_path_multiple_slashes() {
     // 多个斜杠会被规范化
     let result = split_path("///foo///bar.txt");
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
     let (dir, filename) = result.unwrap();
-    kassert!(dir == "/foo");
-    kassert!(filename == "bar.txt");
+    assert!(dir == "/foo");
+    assert!(filename == "bar.txt");
 }
 
 // P1 重要功能测试
@@ -144,28 +143,28 @@ fn test_split_path_multiple_slashes() {
 fn test_parse_path_components() {
     // 测试解析路径组件
     let components = parse_path("/foo/bar");
-    kassert!(components.len() == 3);
-    kassert!(components[0] == PathComponent::Root);
-    kassert!(components[1] == PathComponent::Normal("foo".to_string()));
-    kassert!(components[2] == PathComponent::Normal("bar".to_string()));
+    assert!(components.len() == 3);
+    assert!(components[0] == PathComponent::Root);
+    assert!(components[1] == PathComponent::Normal("foo".to_string()));
+    assert!(components[2] == PathComponent::Normal("bar".to_string()));
 
     let components = parse_path("foo/./bar/../baz");
-    kassert!(components.len() == 5);
-    kassert!(components[0] == PathComponent::Normal("foo".to_string()));
-    kassert!(components[1] == PathComponent::Current);
-    kassert!(components[2] == PathComponent::Normal("bar".to_string()));
-    kassert!(components[3] == PathComponent::Parent);
-    kassert!(components[4] == PathComponent::Normal("baz".to_string()));
+    assert!(components.len() == 5);
+    assert!(components[0] == PathComponent::Normal("foo".to_string()));
+    assert!(components[1] == PathComponent::Current);
+    assert!(components[2] == PathComponent::Normal("bar".to_string()));
+    assert!(components[3] == PathComponent::Parent);
+    assert!(components[4] == PathComponent::Normal("baz".to_string()));
 }
 
 #[test_case]
 fn test_normalize_path_root_parent() {
     // 根目录的父目录是自己
     let result = normalize_path("/foo/..");
-    kassert!(result == "/");
+    assert!(result == "/");
 
     let result = normalize_path("/foo/bar/../..");
-    kassert!(result == "/");
+    assert!(result == "/");
 }
 
 // P4 跨文件系统 lookup 测试
@@ -180,20 +179,20 @@ fn test_lookup_across_mount_point() {
     // 在文件系统内创建一个文件
     let root = fs.root_inode();
     let create_result = root.create("testfile", FileMode::from_bits_truncate(0o644));
-    kassert!(create_result.is_ok());
+    assert!(create_result.is_ok());
 
     // 挂载到 /mnt_lookup_test
     let mount_result = MOUNT_TABLE.mount(fs.clone(), "/mnt_lookup_test", MountFlags::empty(), None);
-    kassert!(mount_result.is_ok());
+    assert!(mount_result.is_ok());
 
     // 获取挂载点
     let mount_point = MOUNT_TABLE.find_mount("/mnt_lookup_test");
-    kassert!(mount_point.is_some());
+    assert!(mount_point.is_some());
 
     if let Some(mp) = mount_point {
         // 从挂载点的根开始查找文件
         let lookup_result = vfs_lookup_from(mp.root.clone(), "testfile");
-        kassert!(lookup_result.is_ok());
+        assert!(lookup_result.is_ok());
     }
 
     // 清理
@@ -209,18 +208,18 @@ fn test_dentry_mount_cache() {
 
     // 挂载到 /cache_test
     let mount_result = MOUNT_TABLE.mount(fs.clone(), "/cache_test", MountFlags::empty(), None);
-    kassert!(mount_result.is_ok());
+    assert!(mount_result.is_ok());
 
     // 获取挂载点
     let mount_point = MOUNT_TABLE.find_mount("/cache_test");
-    kassert!(mount_point.is_some());
+    assert!(mount_point.is_some());
 
     if let Some(mp) = mount_point {
         // 检查挂载点的根 dentry
-        kassert!(mp.root.name == "/");
+        assert!(mp.root.name == "/");
 
         // 检查是否有挂载缓存（通过 find_mount 已经验证）
-        kassert!(mp.mount_path == "/cache_test");
+        assert!(mp.mount_path == "/cache_test");
     }
 
     // 清理
@@ -243,27 +242,27 @@ fn test_check_mount_point_function() {
     // 在根文件系统创建目录
     let root_inode = root_fs.root_inode();
     let mkdir_result = root_inode.mkdir("mountpoint", FileMode::from_bits_truncate(0o755));
-    kassert!(mkdir_result.is_ok());
+    assert!(mkdir_result.is_ok());
 
     // 创建另一个文件系统并挂载到 /mountpoint
     let child_fs = create_test_fs();
     let mount_child = MOUNT_TABLE.mount(child_fs.clone(), "/mountpoint", MountFlags::empty(), None);
-    kassert!(mount_child.is_ok());
+    assert!(mount_child.is_ok());
 
     // 在子文件系统创建文件
     let child_root = child_fs.root_inode();
     let create_result = child_root.create("file_in_child", FileMode::from_bits_truncate(0o644));
-    kassert!(create_result.is_ok());
+    assert!(create_result.is_ok());
 
     // 通过 vfs_lookup 访问 /mountpoint，应该跨越挂载点
     let dentry = vfs_lookup("/mountpoint");
     if let Ok(d) = dentry {
         // 应该返回挂载文件系统的根
-        kassert!(d.name == "/");
+        assert!(d.name == "/");
 
         // 继续查找子文件系统中的文件
         let file_lookup = vfs_lookup_from(d, "file_in_child");
-        kassert!(file_lookup.is_ok());
+        assert!(file_lookup.is_ok());
     }
 
     // 清理
@@ -280,5 +279,5 @@ fn test_vfs_lookup_no_follow_nonexistent() {
     // 查找一个不太可能存在的路径
     let result = vfs_lookup_no_follow("/nonexistent_test_file_12345");
     // 应该返回错误
-    kassert!(result.is_err());
+    assert!(result.is_err());
 }

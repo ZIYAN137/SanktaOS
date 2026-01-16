@@ -1,6 +1,5 @@
 use super::*;
 use crate::vfs::FileSystem;
-use crate::kassert;
 use alloc::format;
 use alloc::string::ToString;
 use alloc::sync::Arc;
@@ -14,8 +13,8 @@ fn test_dentry_create() {
     let root_inode = fs.root_inode();
     let dentry = Dentry::new("test".to_string(), root_inode.clone());
 
-    kassert!(dentry.name == "test");
-    kassert!(Arc::ptr_eq(&dentry.inode, &root_inode));
+    assert!(dentry.name == "test");
+    assert!(Arc::ptr_eq(&dentry.inode, &root_inode));
 }
 
 #[test_case]
@@ -26,7 +25,7 @@ fn test_dentry_lookup_child_not_found() {
     let parent = Dentry::new("parent".to_string(), root_inode);
 
     let found = parent.lookup_child("nonexistent");
-    kassert!(found.is_none());
+    assert!(found.is_none());
 }
 
 #[test_case]
@@ -37,7 +36,7 @@ fn test_dentry_parent_none_initially() {
     let dentry = Dentry::new("test".to_string(), root_inode);
 
     let parent = dentry.parent();
-    kassert!(parent.is_none());
+    assert!(parent.is_none());
 }
 
 #[test_case]
@@ -51,8 +50,8 @@ fn test_dentry_add_child() {
     parent.add_child(child.clone());
 
     let found = parent.lookup_child("child");
-    kassert!(found.is_some());
-    kassert!(Arc::ptr_eq(&found.unwrap(), &child));
+    assert!(found.is_some());
+    assert!(Arc::ptr_eq(&found.unwrap(), &child));
 }
 
 #[test_case]
@@ -66,8 +65,8 @@ fn test_dentry_parent_relationship() {
     parent.add_child(child.clone());
 
     let found_parent = child.parent();
-    kassert!(found_parent.is_some());
-    kassert!(Arc::ptr_eq(&found_parent.unwrap(), &parent));
+    assert!(found_parent.is_some());
+    assert!(Arc::ptr_eq(&found_parent.unwrap(), &parent));
 }
 
 #[test_case]
@@ -85,7 +84,7 @@ fn test_dentry_full_path() {
     dir2.add_child(file.clone());
 
     let path = file.full_path();
-    kassert!(path == "/dir1/dir2/file.txt");
+    assert!(path == "/dir1/dir2/file.txt");
 }
 
 #[test_case]
@@ -103,7 +102,7 @@ fn test_dentry_multiple_children() {
     for i in 0..5 {
         let child_name = format!("child{}", i);
         let found = parent.lookup_child(&child_name);
-        kassert!(found.is_some());
+        assert!(found.is_some());
     }
 }
 
@@ -120,6 +119,6 @@ fn test_dentry_overwrite_child() {
     parent.add_child(child2.clone());
 
     let found = parent.lookup_child("child");
-    kassert!(found.is_some());
-    kassert!(Arc::ptr_eq(&found.unwrap(), &child2));
+    assert!(found.is_some());
+    assert!(Arc::ptr_eq(&found.unwrap(), &child2));
 }

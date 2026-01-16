@@ -1,7 +1,5 @@
 use super::*;
 use crate::vfs::{PipeFile, RegFile};
-use crate::kassert;
-
 /// 测试 File trait 的多态行为
 
 // P0 核心功能测试
@@ -22,11 +20,11 @@ fn test_trait_polymorphism() {
     let pipe_file_w: Arc<dyn File> = Arc::new(pipe_write);
 
     // 统一的 File trait 接口调用
-    kassert!(disk_file.readable());
+    assert!(disk_file.readable());
     // Pipe 的 readable()/writable() 表达的是“当前是否可读/可写（不会阻塞）”，新建时读端通常不可读
-    kassert!(!pipe_file_r.readable());
-    kassert!(!pipe_file_w.readable());
-    kassert!(pipe_file_w.writable());
+    assert!(!pipe_file_r.readable());
+    assert!(!pipe_file_w.readable());
+    assert!(pipe_file_w.writable());
 }
 
 #[test_case]
@@ -37,16 +35,16 @@ fn test_disk_file_vs_pipe_file_lseek() {
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
     let result = disk_file.lseek(5, SeekWhence::Set);
-    kassert!(result.is_ok());
-    kassert!(result.unwrap() == 5);
+    assert!(result.is_ok());
+    assert!(result.unwrap() == 5);
 
     // PipeFile 不支持 lseek
     let (pipe_read, _) = PipeFile::create_pair();
     let pipe_file: Arc<dyn File> = Arc::new(pipe_read);
 
     let result = pipe_file.lseek(0, SeekWhence::Set);
-    kassert!(result.is_err());
-    kassert!(matches!(result, Err(FsError::NotSupported)));
+    assert!(result.is_err());
+    assert!(matches!(result, Err(FsError::NotSupported)));
 }
 
 #[test_case]
@@ -56,16 +54,16 @@ fn test_disk_file_vs_pipe_file_offset() {
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
-    kassert!(disk_file.offset() == 0);
+    assert!(disk_file.offset() == 0);
     let mut buf = [0u8; 2];
     disk_file.read(&mut buf).unwrap();
-    kassert!(disk_file.offset() == 2);
+    assert!(disk_file.offset() == 2);
 
     // PipeFile 的 offset 总是 0（使用默认实现）
     let (pipe_read, _) = PipeFile::create_pair();
     let pipe_file: Arc<dyn File> = Arc::new(pipe_read);
 
-    kassert!(pipe_file.offset() == 0);
+    assert!(pipe_file.offset() == 0);
 }
 
 #[test_case]
@@ -76,14 +74,14 @@ fn test_disk_file_vs_pipe_file_flags() {
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDWR);
 
     let flags = disk_file.flags();
-    kassert!(flags.contains(OpenFlags::O_RDWR));
+    assert!(flags.contains(OpenFlags::O_RDWR));
 
     // PipeFile 的 flags 是空的（使用默认实现）
     let (pipe_read, _) = PipeFile::create_pair();
     let pipe_file: Arc<dyn File> = Arc::new(pipe_read);
 
     let flags = pipe_file.flags();
-    kassert!(flags.is_empty());
+    assert!(flags.is_empty());
 }
 
 // P1 重要功能测试
@@ -109,12 +107,12 @@ fn test_fdtable_with_mixed_files() {
         .unwrap();
 
     // 验证可以取出
-    kassert!(fd_table.get(fd1).is_ok());
-    kassert!(fd_table.get(fd2).is_ok());
-    kassert!(fd_table.get(fd3).is_ok());
+    assert!(fd_table.get(fd1).is_ok());
+    assert!(fd_table.get(fd2).is_ok());
+    assert!(fd_table.get(fd3).is_ok());
 
     // 验证不同的 fd
-    kassert!(fd1 != fd2 && fd2 != fd3 && fd1 != fd3);
+    assert!(fd1 != fd2 && fd2 != fd3 && fd1 != fd3);
 }
 
 #[test_case]
@@ -139,8 +137,8 @@ fn test_read_write_through_fdtable() {
     let read_file = fd_table.get(fd_read).unwrap();
     let mut buf = [0u8; 11];
     let nread = read_file.read(&mut buf).unwrap();
-    kassert!(nread == 11);
-    kassert!(&buf[..] == b"via fdtable");
+    assert!(nread == 11);
+    assert!(&buf[..] == b"via fdtable");
 }
 
 // P2 边界和错误处理测试
@@ -153,14 +151,14 @@ fn test_metadata_consistency() {
     let disk_file = create_test_file("test.txt", inode, OpenFlags::O_RDONLY);
 
     let meta = disk_file.metadata().unwrap();
-    kassert!(meta.inode_type == InodeType::File);
-    kassert!(meta.size == 4);
+    assert!(meta.inode_type == InodeType::File);
+    assert!(meta.size == 4);
 
     // PipeFile 的 metadata
     let (pipe_read, _) = PipeFile::create_pair();
     let pipe_file: Arc<dyn File> = Arc::new(pipe_read);
 
     let meta = pipe_file.metadata().unwrap();
-    kassert!(meta.inode_type == InodeType::Fifo);
-    kassert!(meta.size == 0);
+    assert!(meta.inode_type == InodeType::Fifo);
+    assert!(meta.size == 0);
 }

@@ -1,6 +1,4 @@
 use super::*;
-use crate::kassert;
-
 // P0 核心功能测试
 
 #[test_case]
@@ -10,7 +8,7 @@ fn test_fdtable_create() {
 
     // FDTable 应该初始化为空
     let result = fd_table.get(0);
-    kassert!(result.is_err());
+    assert!(result.is_err());
 }
 #[test_case]
 fn test_fdtable_alloc() {
@@ -22,7 +20,7 @@ fn test_fdtable_alloc() {
 
     // 分配 FD
     let fd = fd_table.alloc(file).unwrap();
-    kassert!(fd >= 0);
+    assert!(fd >= 0);
 }
 #[test_case]
 fn test_fdtable_get() {
@@ -35,7 +33,7 @@ fn test_fdtable_get() {
     // 分配并获取 FD
     let fd = fd_table.alloc(file.clone()).unwrap();
     let retrieved = fd_table.get(fd);
-    kassert!(retrieved.is_ok());
+    assert!(retrieved.is_ok());
 }
 #[test_case]
 fn test_fdtable_close() {
@@ -50,11 +48,11 @@ fn test_fdtable_close() {
 
     // 关闭 FD
     let result = fd_table.close(fd);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 再次获取应该失败
     let retrieved = fd_table.get(fd);
-    kassert!(retrieved.is_err());
+    assert!(retrieved.is_err());
 }
 // P1 重要功能测试
 
@@ -71,12 +69,12 @@ fn test_fdtable_dup() {
 
     // 复制 FD
     let new_fd = fd_table.dup(fd).unwrap();
-    kassert!(new_fd != fd);
+    assert!(new_fd != fd);
 
     // 两个 FD 应该指向同一个文件对象
     let file1 = fd_table.get(fd).unwrap();
     let file2 = fd_table.get(new_fd).unwrap();
-    kassert!(Arc::ptr_eq(&file1, &file2));
+    assert!(Arc::ptr_eq(&file1, &file2));
 }
 #[test_case]
 fn test_fdtable_dup2() {
@@ -94,11 +92,11 @@ fn test_fdtable_dup2() {
 
     // dup2: 将 fd1 复制到 fd2
     let result = fd_table.dup2(fd1, fd2).unwrap();
-    kassert!(result == fd2);
+    assert!(result == fd2);
 
     // fd2 现在应该指向 file1
     let retrieved = fd_table.get(fd2).unwrap();
-    kassert!(Arc::ptr_eq(&retrieved, &file1));
+    assert!(Arc::ptr_eq(&retrieved, &file1));
 }
 #[test_case]
 fn test_fdtable_install_at() {
@@ -110,12 +108,12 @@ fn test_fdtable_install_at() {
 
     // 在指定位置安装文件
     let result = fd_table.install_at(5, file.clone());
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证
     let retrieved = fd_table.get(5);
-    kassert!(retrieved.is_ok());
-    kassert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
+    assert!(retrieved.is_ok());
+    assert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
 }
 #[test_case]
 fn test_fdtable_clone() {
@@ -133,8 +131,8 @@ fn test_fdtable_clone() {
 
     // 验证克隆的 FDTable 包含相同的文件
     let retrieved = cloned.get(fd);
-    kassert!(retrieved.is_ok());
-    kassert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
+    assert!(retrieved.is_ok());
+    assert!(Arc::ptr_eq(&retrieved.unwrap(), &file));
 }
 // P2 边界和错误处理测试
 
@@ -145,7 +143,7 @@ fn test_fdtable_get_invalid_fd() {
 
     // 获取无效的 FD
     let retrieved = fd_table.get(99);
-    kassert!(retrieved.is_err());
+    assert!(retrieved.is_err());
 }
 #[test_case]
 fn test_fdtable_close_invalid_fd() {
@@ -154,8 +152,8 @@ fn test_fdtable_close_invalid_fd() {
 
     // 关闭无效的 FD
     let result = fd_table.close(99);
-    kassert!(result.is_err());
-    kassert!(matches!(result, Err(FsError::BadFileDescriptor)));
+    assert!(result.is_err());
+    assert!(matches!(result, Err(FsError::BadFileDescriptor)));
 }
 #[test_case]
 fn test_fdtable_dup_invalid_fd() {
@@ -164,8 +162,8 @@ fn test_fdtable_dup_invalid_fd() {
 
     // 复制无效的 FD
     let result = fd_table.dup(99);
-    kassert!(result.is_err());
-    kassert!(matches!(result, Err(FsError::BadFileDescriptor)));
+    assert!(result.is_err());
+    assert!(matches!(result, Err(FsError::BadFileDescriptor)));
 }
 #[test_case]
 fn test_fdtable_alloc_multiple() {
@@ -179,6 +177,6 @@ fn test_fdtable_alloc_multiple() {
             create_test_file_with_content(&fs, &alloc::format!("test{}.txt", i), b"test").unwrap();
         let file = create_test_file(&alloc::format!("test{}.txt", i), inode, OpenFlags::O_RDONLY);
         let result = fd_table.alloc(file);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
     }
 }

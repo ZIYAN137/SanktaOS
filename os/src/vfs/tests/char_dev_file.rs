@@ -5,8 +5,6 @@
 
 use super::*;
 use crate::device::block::BlockDriver;
-use crate::kassert;
-
 // 字符设备文件测试需要完整的设备注册流程
 // 这里主要测试辅助函数和基本逻辑
 
@@ -15,7 +13,7 @@ fn test_char_dev_basic() {
     // 基本的字符设备测试
     // 字符设备文件需要通过系统调用和设备节点创建
     // 这里验证基本的测试框架
-    kassert!(true);
+    assert!(true);
 }
 
 #[test_case]
@@ -23,5 +21,5 @@ fn test_char_dev_helper_ramdisk() {
     // 使用 RamDisk 作为测试辅助
     let ramdisk = create_test_ramdisk(2);
     let driver: &dyn BlockDriver = &*ramdisk;
-    kassert!(driver.block_size() == 512);
+    assert!(driver.block_size() == 512);
 }
