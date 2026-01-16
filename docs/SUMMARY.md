@@ -24,16 +24,7 @@
 # 同步原语
 
 - [同步机制概述](sync/README.md)
-  - [自旋锁](sync/spin_lock.md)
-  - [读写锁](sync/rwlock.md)
-  - [票号锁](sync/ticket_lock.md)
-  - [睡眠锁](sync/sleep_lock.md)
-  - [中断保护](sync/intr_guard.md)
-  - [Per-CPU 变量](sync/per_cpu.md)
-  - [抢占控制](sync/preempt.md)
-  - [SMP 与中断](sync/smp_interrupts.md)
-  - [死锁检测](sync/deadlock.md)
-  - [API 参考](sync/api_reference.md)
+  - [设计要点](sync/design.md)
 
 # 内核子系统
 

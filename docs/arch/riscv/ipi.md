@@ -542,8 +542,8 @@ crate::pr_debug!("[IPI] CPU {} handling IPI: {:#x}", cpu, pending);
 ### 8.2 相关文档
 
 - [多核启动](./smp_boot.md) - SMP 系统的启动流程和 Per-CPU 数据结构
-- [SMP 与中断](../../sync/smp_interrupts.md) - SMP 系统中的中断和并发问题
-- [Per-CPU 变量](../../sync/per_cpu.md) - Per-CPU 数据结构的详细说明
+- [同步机制设计要点](../../sync/design.md) - SMP 并发与锁顺序等关键原则
+- `os/src/sync/per_cpu.rs` - Per-CPU 数据结构实现
 
 ### 8.3 外部参考资料
 

@@ -502,8 +502,8 @@ cd os && make test
 
 ## 9. 参考资料
 
-- [SMP 与中断](../sync/smp_interrupts.md) - SMP 系统中的中断和并发问题
-- [Per-CPU 变量](../sync/per_cpu.md) - Per-CPU 数据结构的详细说明
-- [抢占控制](../sync/preempt.md) - 访问 Per-CPU 数据时的抢占保护
+- [同步机制设计要点](../sync/design.md) - SMP 并发与锁顺序等关键原则
+- `os/src/sync/per_cpu.rs` - Per-CPU 数据结构实现
+- `crates/sync/src/preempt.rs` - 抢占控制实现
 - [RISC-V 寄存器](./riscv_register.md) - tp 寄存器的详细说明
 - [RISC-V SBI Specification](https://github.com/riscv-non-isa/riscv-sbi-doc) - SBI HSM 接口规范
