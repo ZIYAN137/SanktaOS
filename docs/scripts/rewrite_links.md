@@ -47,14 +47,14 @@ GITHUB_BRANCH = "main"
 ### 基本用法
 
 ```bash
-python3 scripts/rewrite_links.py document/
+python3 scripts/rewrite_links.py docs/
 ```
 
 ### 命令行参数
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `document_dir` | 位置参数（必需） | 文档目录路径，必须存在 |
+| `docs_dir` | 位置参数（必需） | 文档目录路径，必须存在 |
 
 ## 支持的链接格式
 
@@ -72,12 +72,12 @@ python3 scripts/rewrite_links.py document/
 ## 输出示例
 
 ```
-$ python3 scripts/rewrite_links.py document/
-Processing Markdown files in document/...
+$ python3 scripts/rewrite_links.py docs/
+Processing Markdown files in docs/...
 
-Modified: document/arch/memory.md (3 links)
-Modified: document/fs/simple_fs.md (5 links)
-Modified: document/process/scheduler.md (2 links)
+Modified: docs/arch/memory.md (3 links)
+Modified: docs/fs/simple_fs.md (5 links)
+Modified: docs/process/scheduler.md (2 links)
 
 Summary:
   Files processed: 15
@@ -97,7 +97,7 @@ Summary:
 
 ```yaml
 - name: Convert internal links to GitHub URLs
-  run: python3 scripts/rewrite_links.py document/
+  run: python3 scripts/rewrite_links.py docs/
 
 - name: Build mdBook documentation
   run: mdbook build
@@ -205,7 +205,7 @@ GITHUB_BRANCH = "your-branch"
 
 在部署文档前（通常由 CI 自动完成），运行转换脚本：
 ```bash
-python3 scripts/rewrite_links.py document/
+python3 scripts/rewrite_links.py docs/
 mdbook build
 ```
 

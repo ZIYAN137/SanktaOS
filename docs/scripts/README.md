@@ -16,7 +16,7 @@
 
 ```bash
 # 转换文档中的代码链接为 GitHub 链接
-python3 scripts/rewrite_links.py document/
+python3 scripts/rewrite_links.py docs/
 ```
 
 ### 代码质量检查

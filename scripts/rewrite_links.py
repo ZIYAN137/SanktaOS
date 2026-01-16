@@ -3,7 +3,7 @@
 mdBook 链接重写脚本：将 /os/src/... 路径转换为 GitHub URL
 
 使用方式：
-  python3 scripts/rewrite_links.py document/
+  python3 scripts/rewrite_links.py docs/
 """
 
 import re
@@ -67,7 +67,7 @@ def process_file(file_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python3 scripts/rewrite_links.py <document_dir>")
+        print("用法: python3 scripts/rewrite_links.py <docs_dir>")
         sys.exit(1)
 
     doc_dir = Path(sys.argv[1])

@@ -2,7 +2,7 @@
 authors = ["SanktaOS Contributors"]
 language = "zh-CN"
 multilingual = false
-src = "document"
+src = "docs"
 title = "SanktaOS 内核文档"
 description = "SanktaOS 是基于 Comix 重构的 Rust 操作系统内核，支持 RISC-V 和 LoongArch 架构"
 
