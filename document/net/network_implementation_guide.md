@@ -1078,7 +1078,7 @@ pub fn network_polling_thread() {
 
 **测试用户程序示例**:
 ```c
-// user/src/test_tcp_client.c
+// TCP 客户端测试示例
 int main() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {

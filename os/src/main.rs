@@ -11,6 +11,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
+extern crate uapi;
 
 mod arch;
 mod config;
@@ -23,7 +24,7 @@ mod mm;
 mod security;
 mod sync;
 mod test;
-mod uapi;
+pub mod time_ext;
 mod util;
 mod vfs;
 #[macro_use]

@@ -22,9 +22,9 @@
 //! | 62 | NX | Non-eXecutable (0=可执行，1=不可执行) |
 //! | 63 | RPLV | Restricted PLV |
 
-use crate::mm::address::{Ppn, UsizeConvert};
-use crate::mm::page_table::PageTableEntry as PageTableEntryTrait;
-use crate::mm::page_table::{UniversalConvertableFlag, UniversalPTEFlag};
+use mm::address::{Ppn, UsizeConvert};
+use mm::page_table::PageTableEntry as PageTableEntryTrait;
+use mm::page_table::{UniversalConvertableFlag, UniversalPTEFlag};
 
 bitflags::bitflags! {
     /// LoongArch 页表项标志位

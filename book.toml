@@ -1,17 +1,17 @@
 [book]
-authors = ["Comix Team"]
+authors = ["SanktaOS Contributors"]
 language = "zh-CN"
 multilingual = false
 src = "document"
-title = "Comix 内核文档"
-description = "Comix 是一个用 Rust 编写的类 Unix 内核，用于教育目的"
+title = "SanktaOS 内核文档"
+description = "SanktaOS 是基于 Comix 重构的 Rust 操作系统内核，支持 RISC-V 和 LoongArch 架构"
 
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "navy"
-git-repository-url = "https://github.com/comix-kernel/comix"
+git-repository-url = "https://github.com/ZIYAN137/SanktaOS"
 git-repository-icon = "fa-github"
-edit-url-template = "https://github.com/comix-kernel/comix/edit/main/{path}"
+edit-url-template = "https://github.com/ZIYAN137/SanktaOS/edit/main/{path}"
 
 [output.html.search]
 enable = true

@@ -23,6 +23,8 @@ mod page_table_entry; // 模块：页表项
 pub use page_table::{PageTableInner, TlbBatchContext}; // 导出：页表内部结构和TLB批处理上下文
 pub use page_table_entry::PageTableEntry; // 导出：页表项结构体
 
+use mm::{ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper};
+
 /// SV39 中虚拟地址空间的起始地址
 ///
 /// 此常量定义了内核高位虚拟地址空间的起始位置。
@@ -67,4 +69,51 @@ pub const unsafe fn vaddr_to_paddr(vaddr: usize) -> usize {
 /// 此函数必须在所有架构特定的内存管理模块中实现。
 pub const fn paddr_to_vaddr(paddr: usize) -> usize {
     paddr | VADDR_START
+}
+
+// ============ ArchMmOps trait 实现 ============
+
+/// RISC-V 架构的内存管理操作实现
+struct RiscvMmOps;
+
+impl ArchMmOps for RiscvMmOps {
+    unsafe fn vaddr_to_paddr(&self, vaddr: usize) -> usize {
+        vaddr & PADDR_MASK
+    }
+
+    fn paddr_to_vaddr(&self, paddr: usize) -> usize {
+        paddr | VADDR_START
+    }
+
+    fn sigreturn_trampoline_bytes(&self) -> &'static [u8] {
+        crate::arch::trap::kernel_sigreturn_trampoline_bytes()
+    }
+
+    fn num_cpus(&self) -> usize {
+        unsafe { crate::kernel::NUM_CPU }
+    }
+
+    fn send_tlb_flush_ipi_all(&self) {
+        crate::arch::ipi::send_tlb_flush_ipi_all();
+    }
+
+    fn create_tlb_batch_context(&self) -> TlbBatchContextWrapper {
+        unsafe { TlbBatchContextWrapper::new(TlbBatchContext::new()) }
+    }
+}
+
+impl TlbBatchContextTrait for TlbBatchContext {
+    fn flush(&mut self) {
+        TlbBatchContext::flush(self);
+    }
+}
+
+static RISCV_MM_OPS: RiscvMmOps = RiscvMmOps;
+
+/// 注册 RISC-V 架构的内存管理操作
+///
+/// # Safety
+/// 必须在单线程环境下调用，且只能调用一次
+pub unsafe fn register_mm_ops() {
+    mm::register_arch_ops(&RISCV_MM_OPS);
 }

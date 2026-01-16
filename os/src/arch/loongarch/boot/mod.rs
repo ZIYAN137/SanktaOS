@@ -68,7 +68,9 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -138,8 +140,8 @@ fn idle_loop() -> ! {
 /// 为指定 CPU 创建 idle 任务（LoongArch 版本）
 fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::arch::trap::TrapFrame;
-    use crate::mm::frame_allocator::alloc_contig_frames;
-    use crate::vfs::fd_table::FDTable;
+    use crate::vfs::FDTable;
+    use mm::frame_allocator::alloc_contig_frames;
 
     // idle 任务从 TID 分配器正常分配（从 2 开始）
     let tid = TASK_MANAGER.lock().allocate_tid();
@@ -160,7 +162,9 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(FDTable::new()),
         Arc::new(SpinLock::new(FsStruct::new(None, None))),
@@ -272,10 +276,19 @@ pub fn main(hartid: usize) {
     // instructions very early during startup.
     loongArch64::register::euen::set_fpe(true);
 
+    // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
+    unsafe { crate::arch::init_sync_arch_ops() };
+
     run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] LoongArch CPU {} is up!", hartid);
+
+    // 注册 mm crate 的配置和架构操作（必须在 mm::init() 之前）
+    unsafe {
+        crate::config::register_mm_config();
+        crate::arch::mm::register_mm_ops();
+    }
 
     let kernel_space = mm::init();
 
@@ -290,11 +303,21 @@ pub fn main(hartid: usize) {
 
     // 初始化工作
     trap::init_boot_trap();
+
+    // 初始化设备操作（必须在 platform::init() 之前，因为设备树初始化会注册中断）
+    crate::device::init_device_ops();
+
     platform::init();
     time::init();
     earlyprintln!("[Boot] time::init finished");
     timer::init();
     earlyprintln!("[Boot] timer::init finished");
+
+    // 初始化 VFS 操作（必须在使用 VFS 之前）
+    crate::vfs::init_vfs_ops();
+
+    // 初始化 FS 操作（必须在使用 fs crate 之前）
+    crate::fs::init_fs_ops();
 
     earlyprintln!("[Boot] entering rest_init");
     rest_init();

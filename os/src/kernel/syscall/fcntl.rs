@@ -2,10 +2,10 @@
 
 use crate::arch::trap::SumGuard;
 use crate::kernel::{current_cpu, current_task};
-use crate::uapi::errno::EINVAL;
-use crate::uapi::fcntl::{FcntlCmd, FdFlags, FileStatusFlags, Flock, LockType};
 use crate::vfs::{FsError, OpenFlags, file_lock_manager};
 use alloc::sync::Arc;
+use uapi::errno::EINVAL;
+use uapi::fcntl::{FcntlCmd, FdFlags, FileStatusFlags, Flock, LockType};
 
 /// fcntl - 文件描述符操作
 ///

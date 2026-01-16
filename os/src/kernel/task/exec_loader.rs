@@ -2,11 +2,11 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::mm::address::{PageNum, UsizeConvert, Vaddr, Vpn};
-use crate::mm::memory_space::MemorySpace;
-use crate::mm::memory_space::mapping_area::AreaType;
-use crate::mm::page_table::{PagingError, UniversalPTEFlag};
+use crate::mm::MemorySpace;
 use crate::vfs::{FsError, Inode, InodeType};
+use mm::address::{PageNum, UsizeConvert, Vaddr, Vpn};
+use mm::memory_space::mapping_area::AreaType;
+use mm::page_table::{PagingError, UniversalPTEFlag};
 
 #[derive(Debug)]
 pub enum ExecImageError {
@@ -267,7 +267,7 @@ fn load_segments_into_space(
             return Err(ExecImageError::Paging(PagingError::InvalidAddress));
         }
 
-        let vpn_range = crate::mm::address::VpnRange::new(
+        let vpn_range = mm::address::VpnRange::new(
             Vpn::from_addr_floor(Vaddr::from_usize(start_va)),
             Vpn::from_addr_ceil(Vaddr::from_usize(end_va)),
         );
@@ -498,7 +498,7 @@ pub fn prepare_exec_image_from_path(path: &str) -> Result<PreparedExecImage, Exe
     let user_stack_top = Vpn::from_addr_ceil(Vaddr::from_usize(crate::config::USER_STACK_TOP));
     space
         .insert_framed_area(
-            crate::mm::address::VpnRange::new(user_stack_bottom, user_stack_top),
+            mm::address::VpnRange::new(user_stack_bottom, user_stack_top),
             AreaType::UserStack,
             UniversalPTEFlag::user_rw(),
             None,

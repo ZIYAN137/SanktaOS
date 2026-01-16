@@ -1,6 +1,10 @@
 //! 时间相关功能
 
-use crate::{device::RTC_DRIVERS, pr_info, sync::RwLock, vfs::TimeSpec};
+use crate::device::RTC_DRIVERS;
+use crate::pr_info;
+use crate::sync::RwLock;
+use crate::time_ext::timespec_monotonic_now;
+use uapi::time::TimeSpec;
 
 lazy_static::lazy_static! {
     /// 墙上时钟，记录自 1970-01-01 00:00:00 UTC 以来的时间（以秒为单位）
@@ -18,7 +22,7 @@ pub fn init() {
         .first()
         .map(|rtc| rtc.read_epoch() as usize)
         .unwrap_or(0);
-    let mtime = TimeSpec::monotonic_now();
+    let mtime = timespec_monotonic_now();
     // 这里减去 mtime 是为简化后续的时间计算
     let time = TimeSpec::new(sec as i64, 0) - mtime;
     *realtime = time;
@@ -33,11 +37,11 @@ pub fn init() {
 /// - `time`: 新的墙上时钟时间
 pub fn update_realtime(time: &TimeSpec) {
     let mut realtime = REALTIME.write();
-    *realtime = *time - TimeSpec::monotonic_now();
+    *realtime = *time - timespec_monotonic_now();
 }
 
 /// 获取当前墙上时钟时间
 pub fn realtime_now() -> TimeSpec {
     let realtime = REALTIME.read();
-    *realtime + TimeSpec::monotonic_now()
+    *realtime + timespec_monotonic_now()
 }

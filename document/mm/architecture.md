@@ -2,7 +2,7 @@
 
 ## 概述
 
-Comix 内核的 MM（Memory Management）子系统采用分层架构设计，将架构无关的通用抽象与架构特定的实现清晰分离。这种设计使得内核能够在不修改核心逻辑的情况下支持多种硬件架构（RISC-V、LoongArch 等）。
+SanktaOS 内核的 MM（Memory Management）子系统采用分层架构设计，将架构无关的通用抽象与架构特定的实现清晰分离。这种设计使得内核能够在不修改核心逻辑的情况下支持多种硬件架构（RISC-V、LoongArch 等）。
 
 ## 分层架构
 

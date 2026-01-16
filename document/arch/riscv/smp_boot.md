@@ -1,12 +1,12 @@
 # RISC-V 多核启动 (SMP Boot)
 
-本文档详细描述 Comix 内核在 RISC-V 架构上的多核启动实现，包括启动流程、Per-CPU 数据结构、tp 寄存器处理以及当前的限制。
+本文档详细描述 SanktaOS 内核在 RISC-V 架构上的多核启动实现，包括启动流程、Per-CPU 数据结构、tp 寄存器处理以及当前的限制。
 
 ## 1. 概述
 
 ### 1.1 目标
 
-Comix 内核实现了基础的对称多处理（SMP）启动支持，能够在 QEMU RISC-V virt 平台上启动多个 CPU 核心。当前实现的主要目标是：
+SanktaOS 内核实现了基础的对称多处理（SMP）启动支持，能够在 QEMU RISC-V virt 平台上启动多个 CPU 核心。当前实现的主要目标是：
 
 - 使用 SBI HSM (Hart State Management) 接口启动从核心
 - 建立 Per-CPU 数据结构，为每个核心提供独立的运行环境
@@ -248,7 +248,7 @@ static CPUS: PerCpu<Cpu> = PerCpu::new();
 
 ### 3.3 tp 寄存器的使用
 
-RISC-V 的 tp (Thread Pointer) 寄存器在 Comix 内核中有双重用途：
+RISC-V 的 tp (Thread Pointer) 寄存器在 SanktaOS 内核中有双重用途：
 
 | 模式       | tp 指向的内容                | 用途                                      |
 |------------|------------------------------|-------------------------------------------|

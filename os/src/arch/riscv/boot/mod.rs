@@ -29,10 +29,10 @@ use crate::{
         signal::SignalFlags,
         uts_namespace::UtsNamespace,
     },
-    vfs::{create_stdio_files, fd_table, get_root_dentry},
+    vfs::{FDTable, create_stdio_files, get_root_dentry},
 };
 // Needed for Ppn::as_usize
-use crate::mm::address::UsizeConvert;
+use mm::address::UsizeConvert;
 
 /// 已上线 CPU 位掩码
 ///
@@ -61,7 +61,7 @@ pub fn rest_init() {
     let tid = 1;
     let kstack_tracker = alloc_contig_frames(4).expect("kthread_spawn: failed to alloc kstack");
     let trap_frame_tracker = alloc_frame().expect("kthread_spawn: failed to alloc trap_frame");
-    let fd_table = fd_table::FDTable::new();
+    let fd_table = FDTable::new();
     let (stdin, stdout, stderr) = create_stdio_files();
     fd_table
         .install_at(0, stdin)
@@ -85,7 +85,9 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -136,6 +138,9 @@ pub fn rest_init() {
 /// 并在一切结束后转化为第一个用户态任务
 fn init() {
     super::trap::init();
+
+    // 注册网络模块依赖（必须在使用网络功能之前）
+    crate::net::init_net_ops();
 
     // 启用中断（在设置好 trap 处理和 sscratch 之后）
     unsafe { intr::enable_interrupts() };
@@ -227,12 +232,24 @@ fn create_kthreadd() {
 pub fn main(hartid: usize) {
     clear_bss();
 
+    // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
+    unsafe { crate::arch::init_sync_arch_ops() };
+
+    // 初始化日志系统（必须在使用 pr_* 宏之前）
+    crate::log::init();
+
     run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] RISC-V Hart {} is up!", hartid);
 
-    let kernel_space = mm::init();
+    // 注册 mm crate 的配置和架构操作（必须在 mm::init() 之前）
+    unsafe {
+        crate::config::register_mm_config();
+        crate::arch::mm::register_mm_ops();
+    }
+
+    mm::init();
 
     // 初始化 CPUS 并设置 tp 指向 CPU 0
     // 必须在任何可能调用 cpu_id() 的代码之前完成
@@ -247,6 +264,7 @@ pub fn main(hartid: usize) {
 
     // 激活内核地址空间并设置 current_memory_space
     {
+        let kernel_space = crate::mm::get_global_kernel_space();
         let _guard = crate::sync::PreemptGuard::new();
         current_cpu().switch_space(kernel_space);
         earlyprintln!("[Boot] Activated kernel address space");
@@ -257,8 +275,18 @@ pub fn main(hartid: usize) {
 
     // 初始化工作
     trap::init_boot_trap();
+
+    // 初始化设备操作（必须在 platform::init() 之前，因为设备树初始化会注册中断）
+    crate::device::init_device_ops();
+
     platform::init(); // 完整的平台初始化 (包括 device_tree::init())
     time::init();
+
+    // 初始化 VFS 操作（必须在使用 VFS 之前）
+    crate::vfs::init_vfs_ops();
+
+    // 初始化 FS 操作（必须在使用 fs crate 之前）
+    crate::fs::init_fs_ops();
 
     // 启动从核（在启用定时器中断之前）
     let num_cpus = unsafe { NUM_CPU };
@@ -371,14 +399,14 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::ipc::{SignalHandlerTable, SignalPending};
     use crate::kernel::FsStruct;
     use crate::kernel::{TASK_MANAGER, TaskStruct};
-    use crate::mm::frame_allocator::alloc_contig_frames;
     use crate::sync::SpinLock;
-    use crate::uapi::resource::{INIT_RLIMITS, RlimitStruct};
-    use crate::uapi::signal::SignalFlags;
-    use crate::uapi::uts_namespace::UtsNamespace;
-    use crate::vfs::fd_table::FDTable;
+    use crate::vfs::FDTable;
     use alloc::sync::Arc;
     use core::sync::atomic::Ordering;
+    use mm::frame_allocator::alloc_contig_frames;
+    use uapi::resource::{INIT_RLIMITS, RlimitStruct};
+    use uapi::signal::SignalFlags;
+    use uapi::uts_namespace::UtsNamespace;
 
     // idle任务从TID分配器正常分配TID
     // TID分配器从2开始，所以idle任务会获得TID 2, 3, ...
@@ -401,7 +429,9 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::default())),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(FDTable::new()),
         Arc::new(SpinLock::new(FsStruct::new(None, None))),
@@ -486,23 +516,17 @@ pub extern "C" fn secondary_start(hartid: usize) -> ! {
     pr_info!("[SMP] CPU {} set idle task as current_task", hartid);
 
     // 切换到最终的内核页表（与 CPU0 共享），避免长期停留在 boot_pagetable
-    if let Some(kernel_space) = crate::mm::get_global_kernel_space() {
-        {
-            let _guard = crate::sync::PreemptGuard::new();
-            current_cpu().switch_space(kernel_space.clone());
-        }
-        let root_ppn = kernel_space.lock().root_ppn();
-        pr_info!(
-            "[SMP] CPU {} switched to global kernel space, root PPN: 0x{:x}",
-            hartid,
-            root_ppn.as_usize()
-        );
-    } else {
-        pr_warn!(
-            "[SMP] CPU {} could not get global kernel space; still on boot_pagetable",
-            hartid
-        );
+    let kernel_space = crate::mm::get_global_kernel_space();
+    {
+        let _guard = crate::sync::PreemptGuard::new();
+        current_cpu().switch_space(kernel_space.clone());
     }
+    let root_ppn = kernel_space.lock().root_ppn();
+    pr_info!(
+        "[SMP] CPU {} switched to global kernel space, root PPN: 0x{:x}",
+        hartid,
+        root_ppn.as_usize()
+    );
 
     // 初始化定时器
     timer::init();

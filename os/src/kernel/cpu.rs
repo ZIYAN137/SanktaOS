@@ -3,10 +3,10 @@
 //! 包含 CPU 结构体及其相关操作
 use alloc::sync::Arc;
 
+use crate::mm::MemorySpace;
 use crate::mm::activate;
 use crate::{
     kernel::task::SharedTask,
-    mm::memory_space::MemorySpace,
     sync::{PerCpu, SpinLock},
 };
 use lazy_static::lazy_static;

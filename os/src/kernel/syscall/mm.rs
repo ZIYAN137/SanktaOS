@@ -2,13 +2,16 @@ use core::ffi::c_void;
 
 use crate::config::PAGE_SIZE;
 use crate::kernel::{current_memory_space, current_task};
-use crate::mm::address::{PageNum, UsizeConvert, Vaddr, Vpn, VpnRange};
-use crate::mm::memory_space::MmapFile;
-use crate::mm::memory_space::mapping_area::AreaType;
-use crate::mm::page_table::UniversalPTEFlag;
-use crate::uapi::errno::{EACCES, EBADF, EEXIST, EINVAL, EIO, ENOMEM, EOPNOTSUPP};
-use crate::uapi::mm::{MAP_FAILED, MapFlags, ProtFlags};
+use crate::vfs::FileWrapper;
 use crate::{pr_err, pr_warn};
+use alloc::sync::Arc;
+use mm::MmFile;
+use mm::address::{PageNum, UsizeConvert, Vaddr, Vpn, VpnRange};
+use mm::memory_space::MmapFile;
+use mm::memory_space::mapping_area::AreaType;
+use mm::page_table::UniversalPTEFlag;
+use uapi::errno::{EACCES, EBADF, EEXIST, EINVAL, EIO, ENOMEM, EOPNOTSUPP};
+use uapi::mm::{MAP_FAILED, MapFlags, ProtFlags};
 
 /// brk - 改变数据段的结束地址（堆顶）
 ///
@@ -152,7 +155,7 @@ pub fn mmap(addr: *mut c_void, len: usize, prot: i32, flags: i32, fd: i32, offse
         }
 
         Some(MmapFile {
-            file,
+            file: Arc::new(FileWrapper(file)) as Arc<dyn MmFile>,
             offset: offset as usize,
             len,
             prot: prot_flags,

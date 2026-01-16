@@ -235,8 +235,8 @@ pub fn kernel_execve(path: &str, argv: &[&str], envp: &[&str]) -> ! {
     }
     #[cfg(target_arch = "loongarch64")]
     {
-        use crate::mm::address::PageNum;
-        use crate::mm::address::{UsizeConvert, Vaddr};
+        use mm::address::PageNum;
+        use mm::address::{UsizeConvert, Vaddr};
         let tlbrent: usize;
         let crmd: usize;
         let pgdl: usize;
@@ -318,8 +318,8 @@ pub fn kernel_execve(path: &str, argv: &[&str], envp: &[&str]) -> ! {
             space.translate(sp_va)
         );
         // 检查页表项内容
-        use crate::mm::address::Vpn;
-        use crate::mm::page_table::PageTableInner;
+        use mm::address::Vpn;
+        use mm::page_table::PageTableInner;
         let entry_vpn = Vpn::from_addr_floor(entry_va);
         if let Ok((ppn, _, flags)) = space.page_table().walk(entry_vpn) {
             crate::pr_debug!(

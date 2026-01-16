@@ -8,13 +8,15 @@ use crate::device::device_tree::{DEVICE_TREE_INTC, DEVICE_TREE_REGISTRY};
 use crate::device::irq::IntcDriver;
 use crate::device::{DeviceType, Driver, IRQ_MANAGER};
 use crate::kernel::current_memory_space;
-use crate::mm::address::{Paddr, UsizeConvert};
-use crate::{pr_info, pr_warn};
-use crate::{sync::SpinLock as Mutex, util::read, util::write};
+use crate::pr_info;
+use crate::pr_warn;
+use crate::sync::SpinLock as Mutex;
+use crate::util::{read, write};
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use fdt::node::FdtNode;
+use mm::address::{Paddr, UsizeConvert};
 
 /// Platform Level Interrupt Controller (PLIC) 结构体
 pub struct Plic {

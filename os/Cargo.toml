@@ -2,8 +2,22 @@
 name = "os"
 version = "0.1.0"
 edition = "2024"
+authors = ["SanktaOS Contributors"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ZIYAN137/SanktaOS"
+description = "SanktaOS kernel - A refactored and optimized OS kernel based on Comix"
+keywords = ["os", "kernel", "riscv", "loongarch", "rust"]
+categories = ["no-std", "embedded"]
 
 [dependencies]
+mm = { path = "../crates/mm" }
+uapi = { path = "../crates/uapi" }
+sync = { path = "../crates/sync" }
+klog = { path = "../crates/klog" }
+vfs = { path = "../crates/vfs" }
+device = { path = "../crates/device" }
+fs = { path = "../crates/fs" }
+net = { path = "../crates/net" }
 talc = { version = "4" }
 lock_api = "0.4"
 bitflags = { version = "2.10.0" }
@@ -17,7 +31,6 @@ paste = "1.0"
 ext4_rs = "1.3.2"
 virtio-drivers = "0.12.0"
 fdt = "0.1.5"
-smoltcp = { version = "0.12.0", default-features = false, features = ["alloc", "medium-ethernet", "proto-ipv4", "proto-ipv6", "socket-raw", "socket-tcp", "socket-udp"] }
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 uart_16550 = "0.4.0"
 hashbrown = "0.16.1"

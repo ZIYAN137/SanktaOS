@@ -1,5 +1,5 @@
 use crate::kernel::task::CapabilitySet;
-use crate::uapi::cred::{ROOT_GID, ROOT_UID};
+use uapi::cred::{ROOT_GID, ROOT_UID};
 
 /// 进程凭证结构
 #[derive(Clone, Copy, Debug)]

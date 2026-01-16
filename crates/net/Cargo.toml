@@ -1,0 +1,30 @@
+[package]
+name = "net"
+version = "0.1.0"
+edition = "2024"
+authors = ["SanktaOS Contributors"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ZIYAN137/SanktaOS"
+description = "Network stack for SanktaOS"
+
+[dependencies]
+vfs = { path = "../vfs" }
+device = { path = "../device" }
+sync = { path = "../sync" }
+uapi = { path = "../uapi" }
+smoltcp = { version = "0.12.0", default-features = false, features = ["alloc", "medium-ethernet", "proto-ipv4", "proto-ipv6", "socket-raw", "socket-tcp", "socket-udp"] }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+log = "0.4"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+private_intra_doc_links = "deny"
+
+[lints.clippy]
+todo = "warn"
+needless_borrow = "deny"
+redundant_clone = "deny"

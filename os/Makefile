@@ -10,14 +10,14 @@ LOG ?=
 # 根据架构设置变量
 ifeq ($(ARCH),loongarch)
     TARGET := loongarch64-unknown-none
-    TARGET_DIR := target/loongarch64-unknown-none/debug
+    TARGET_DIR := ../target/loongarch64-unknown-none/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-loongarch-run.sh
     GDB_BIN := loongarch64-unknown-elf-gdb
     GDB_ARCH_SETUP :=
 else
     TARGET := riscv64gc-unknown-none-elf
-    TARGET_DIR := target/riscv64gc-unknown-none-elf/debug
+    TARGET_DIR := ../target/riscv64gc-unknown-none-elf/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-run.sh
     GDB_BIN := riscv64-unknown-elf-gdb
@@ -30,8 +30,7 @@ endif
 # ===============================================
 # 注意：cargo build 会自动通过 build.rs 完成以下步骤：
 #   1. 编译 ../user 目录中的用户程序
-#   2. 打包 user/bin/ 到 simple_fs.img
-#   3. 嵌入镜像到内核二进制中
+#   2. 创建 ext4 文件系统镜像
 # 因此只需运行 cargo build 即可完成所有构建步骤
 
 # 目标 1: run (默认启动 QEMU)

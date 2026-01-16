@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::arch::trap::TrapFrame;
 use crate::kernel::syscall::*;
-use crate::uapi::errno::ENOSYS;
+use uapi::errno::ENOSYS;
 
 static UNKNOWN_SYSCALL_LOG_BUDGET: AtomicUsize = AtomicUsize::new(16);
 

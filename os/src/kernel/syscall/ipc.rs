@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use crate::{
     arch::trap::SumGuard,
     kernel::{current_cpu, current_task},
-    vfs::{FdFlags, File, FsError, OpenFlags, PipeFile},
+    vfs::{FdFlags, FdFlagsExt, File, FsError, OpenFlags, PipeFile},
 };
 
 pub fn dup(oldfd: usize) -> isize {

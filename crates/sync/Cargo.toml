@@ -1,0 +1,25 @@
+[package]
+name = "sync"
+version = "0.1.0"
+edition = "2024"
+authors = ["SanktaOS Contributors"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ZIYAN137/SanktaOS"
+description = "Synchronization primitives for SanktaOS"
+
+[dependencies]
+lock_api = "0.4"
+
+# sync 暂时放宽文档要求
+[lints.rust]
+missing_docs = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+private_intra_doc_links = "deny"
+
+[lints.clippy]
+todo = "warn"
+needless_borrow = "deny"
+redundant_clone = "deny"

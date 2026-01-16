@@ -22,9 +22,9 @@ use crate::{
         yield_task,
     },
     mm::{
+        MemorySpace,
         address::{UsizeConvert, Vaddr},
         frame_allocator::{alloc_contig_frames, alloc_frame},
-        memory_space::MemorySpace,
     },
     sync::SpinLock,
     uapi::{
@@ -631,7 +631,7 @@ pub fn get_ppid() -> c_int {
 /// - 成功: 返回进程组 ID
 /// - 失败: 返回 -ESRCH (进程不存在或 pid 为负数)
 pub fn get_pgid(pid: c_int) -> c_int {
-    use crate::uapi::errno::ESRCH;
+    use uapi::errno::ESRCH;
 
     if pid == 0 {
         return current_task().lock().pgid as c_int;
@@ -653,7 +653,7 @@ pub fn get_pgid(pid: c_int) -> c_int {
 
 /// 设置进程组 ID
 pub fn set_pgid(pid: c_int, pgid: c_int) -> c_int {
-    use crate::uapi::errno::{EACCES, EINVAL, EPERM, ESRCH};
+    use uapi::errno::{EACCES, EINVAL, EPERM, ESRCH};
 
     let current = current_task();
     let current_locked = current.lock();
@@ -1255,7 +1255,7 @@ fn do_execve_prepare(
         Err(crate::kernel::task::ExecImageError::Fs(FsError::IsDirectory)) => return Err(-EISDIR),
         Err(crate::kernel::task::ExecImageError::Fs(_)) => return Err(-EIO),
         Err(crate::kernel::task::ExecImageError::Paging(
-            crate::mm::page_table::PagingError::OutOfMemory,
+            mm::page_table::PagingError::OutOfMemory,
         )) => return Err(-ENOMEM),
         Err(_) => return Err(-ENOEXEC),
     };

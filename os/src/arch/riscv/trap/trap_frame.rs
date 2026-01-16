@@ -1,6 +1,6 @@
 use riscv::register::sstatus;
 
-use crate::uapi::signal::MContextT;
+use uapi::signal::MContextT;
 
 /// 陷阱帧结构体，保存寄存器状态
 #[repr(C)] // 确保 Rust 不会重新排列字段

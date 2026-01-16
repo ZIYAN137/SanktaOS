@@ -2,7 +2,8 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::{arch::intr::enable_timer_interrupt, earlyprintln};
+use crate::arch::intr::enable_timer_interrupt;
+use crate::earlyprintln;
 
 /// 定时器滴答计数
 pub static TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);

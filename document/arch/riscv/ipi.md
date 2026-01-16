@@ -1,6 +1,6 @@
 # RISC-V 核间中断 (IPI)
 
-本文档详细描述 Comix 内核在 RISC-V 架构上的核间中断（Inter-Processor Interrupt, IPI）实现，包括设计原理、API 接口、使用场景和性能考虑。
+本文档详细描述 SanktaOS 内核在 RISC-V 架构上的核间中断（Inter-Processor Interrupt, IPI）实现，包括设计原理、API 接口、使用场景和性能考虑。
 
 ## 1. 概述
 
@@ -10,7 +10,7 @@ IPI（Inter-Processor Interrupt，核间中断）是多核系统中 CPU 之间�
 
 ### 1.2 主要用途
 
-Comix 内核的 IPI 实现支持以下功能：
+SanktaOS 内核的 IPI 实现支持以下功能：
 
 - **任务调度唤醒**：通知目标 CPU 有新任务需要调度
 - **TLB 刷新同步**：页表更新后通知其他 CPU 刷新 TLB（TLB Shootdown）

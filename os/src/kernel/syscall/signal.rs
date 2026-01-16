@@ -417,11 +417,11 @@ fn wait_for_signal(
             }
         } else {
             // 带超时的阻塞等待
-            let start = TimeSpec::now();
+            let start = crate::time_ext::timespec_now();
             while !t.pending.has_deliverable_signal(signal)
                 && !t.shared_pending.lock().has_deliverable_signal(signal)
             {
-                let now = TimeSpec::now();
+                let now = crate::time_ext::timespec_now();
                 if now - start > timeout {
                     return Err(-EAGAIN); // 超时返回
                 }

@@ -1,6 +1,6 @@
 //! RISC-V 架构的系统调用分发模块
 use crate::kernel::syscall::*;
-use crate::uapi::errno::ENOSYS;
+use uapi::errno::ENOSYS;
 
 mod syscall_number;
 

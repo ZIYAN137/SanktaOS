@@ -2,7 +2,8 @@
 
 use hashbrown::HashMap;
 
-use crate::{kernel::WaitQueue, sync::SpinLock};
+use crate::kernel::WaitQueue;
+use crate::sync::SpinLock;
 
 lazy_static::lazy_static! {
     /// 全局 Futex 管理器实例
