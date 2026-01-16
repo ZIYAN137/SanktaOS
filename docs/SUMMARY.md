@@ -27,11 +27,7 @@
 ## 任务管理
 
 - [任务管理概述](kernel/task/README.md)
-  - [任务结构](kernel/task/task.md)
   - [调度器](kernel/task/scheduler.md)
-  - [上下文切换](kernel/task/context.md)
-  - [内存空间](kernel/task/memory_space.md)
-  - [等待队列](kernel/task/wait_queue.md)
 
 ## 中断与陷阱
 

@@ -1,7 +1,15 @@
-//! 任务模块
+//! 任务管理模块
 //!
-//! 包含任务的创建、调度、终止等功能
-//! 并由任务管理器维护所有任务的信息
+//! 该模块聚合了与任务（Task）生命周期相关的核心能力：
+//! - 任务/进程结构与资源聚合（`task_struct`）
+//! - 创建、退出、回收（`ktask` / `process`）
+//! - 任务管理器与任务表（`task_manager`）
+//! - TID 分配（`tid_allocator`）
+//! - Futex 与工作队列等辅助机制（`futex` / `work_queue`）
+//! - 凭证与能力（`cred` / `cap`）
+//!
+//! 调度与阻塞/唤醒逻辑主要位于 `os/src/kernel/scheduler/`；本模块会在合适的路径调用调度器
+//! 提供的接口完成状态迁移与上下文切换。
 use core::sync::atomic::Ordering;
 
 mod cap;
