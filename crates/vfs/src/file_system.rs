@@ -1,4 +1,10 @@
 //! 文件系统抽象
+//!
+//! [`FileSystem`] 用于将具体文件系统（如 tmpfs/ext4/procfs 等）接入 VFS：
+//!
+//! - 提供根 inode（挂载入口）
+//! - 提供同步与统计信息（`sync/statfs`）
+//! - 可选实现卸载（默认调用 `sync`）
 
 use alloc::sync::Arc;
 

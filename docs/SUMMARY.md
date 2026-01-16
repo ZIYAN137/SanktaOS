@@ -47,14 +47,6 @@
 
 - [VFS 概述](vfs/README.md)
   - [整体架构](vfs/architecture.md)
-  - [运行时接口（ops）](vfs/ops.md)
-  - [设备号与映射（devno）](vfs/devno.md)
-  - [Inode 与 Dentry](vfs/inode_and_dentry.md)
-  - [File 与 FDTable](vfs/file_and_fdtable.md)
-  - [路径解析与挂载](vfs/path_and_mount.md)
-  - [FileSystem 与错误处理](vfs/filesystem_and_errors.md)
-  - [文件锁与设备管理](vfs/filelock_and_devices.md)
-  - [使用指南](vfs/usage.md)
 
 # 文件系统实现
 

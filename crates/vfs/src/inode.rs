@@ -1,6 +1,9 @@
 //! Inode 抽象层 - VFS 存储层接口
 //!
 //! 该模块定义了文件系统的底层存储接口，提供无状态的文件和目录访问能力。
+//!
+//! `Inode` 侧接口通常以“显式 offset”的随机访问为主，因此可以被多个 [`crate::File`]
+//! 会话对象共享；而 `File` 会话层负责维护 offset、flags 等打开状态。
 
 use alloc::string::String;
 use alloc::sync::Arc;
