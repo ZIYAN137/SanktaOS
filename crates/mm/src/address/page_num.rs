@@ -293,3 +293,26 @@ where
 pub type PpnRange = PageNumRange<Ppn>;
 /// 虚拟页码范围的类型别名
 pub type VpnRange = PageNumRange<Vpn>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_page_num_start_end_addr() {
+        let vpn = Vpn::from_usize(1);
+        assert_eq!(vpn.start_addr().as_usize(), 4096);
+        assert_eq!(vpn.end_addr().as_usize(), 8192);
+    }
+
+    #[test]
+    fn test_page_num_from_addr_floor_ceil() {
+        let a = Vaddr::from_usize(4096);
+        assert_eq!(Vpn::from_addr_floor(a).as_usize(), 1);
+        assert_eq!(Vpn::from_addr_ceil(a).as_usize(), 1);
+
+        let b = Vaddr::from_usize(4097);
+        assert_eq!(Vpn::from_addr_floor(b).as_usize(), 1);
+        assert_eq!(Vpn::from_addr_ceil(b).as_usize(), 2);
+    }
+}
