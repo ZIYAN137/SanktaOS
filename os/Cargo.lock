@@ -263,6 +263,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "net"
+version = "0.1.0"
+dependencies = [
+ "device",
+ "lazy_static",
+ "log",
+ "smoltcp",
+ "sync",
+ "uapi",
+ "vfs",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -293,11 +306,11 @@ dependencies = [
  "lock_api",
  "loongArch64",
  "mm",
+ "net",
  "once_cell",
  "paste",
  "riscv",
  "sbi-rt",
- "smoltcp",
  "sync",
  "talc",
  "uapi",

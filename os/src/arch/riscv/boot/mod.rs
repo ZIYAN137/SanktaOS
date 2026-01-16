@@ -137,6 +137,9 @@ pub fn rest_init() {
 fn init() {
     super::trap::init();
 
+    // 注册网络模块依赖（必须在使用网络功能之前）
+    crate::net::init_net_ops();
+
     // 启用中断（在设置好 trap 处理和 sscratch 之后）
     unsafe { intr::enable_interrupts() };
 

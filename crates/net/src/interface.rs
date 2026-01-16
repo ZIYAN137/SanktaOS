@@ -1,6 +1,6 @@
-use crate::device::DeviceType;
-use crate::device::NetDevice;
-use crate::sync::SpinLock;
+use device::DeviceType;
+use device::NetDevice;
+use sync::SpinLock;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -57,7 +57,7 @@ impl SmoltcpInterface {
 
         let config =
             smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(mac_address));
-        let current_time = crate::arch::timer::get_time_ms() as i64;
+        let current_time = crate::ops::net_ops().get_time_ms() as i64;
         let iface = Interface::new(
             config,
             &mut device_adapter,
@@ -175,13 +175,13 @@ impl NetworkInterface {
     /// 启用中断
     pub fn enable_interrupt(&self) {
         *self.interrupt_enabled.lock() = true;
-        crate::pr_debug!("Interrupt enabled for interface {}", self.name());
+        log::debug!("Interrupt enabled for interface {}", self.name());
     }
 
     /// 禁用中断
     pub fn disable_interrupt(&self) {
         *self.interrupt_enabled.lock() = false;
-        crate::pr_debug!("Interrupt disabled for interface {}", self.name());
+        log::debug!("Interrupt disabled for interface {}", self.name());
     }
 
     /// 检查中断是否启用
@@ -378,7 +378,7 @@ impl smoltcp::phy::TxToken for NetTxToken<'_> {
 }
 
 /// 实现Driver trait
-impl crate::device::Driver for NetworkInterface {
+impl device::Driver for NetworkInterface {
     fn try_handle_interrupt(&self, irq: Option<usize>) -> bool {
         // 检查中断是否启用
         if !self.is_interrupt_enabled() {
@@ -387,13 +387,13 @@ impl crate::device::Driver for NetworkInterface {
 
         // 记录中断信息
         if let Some(irq_num) = irq {
-            crate::pr_debug!(
+            log::debug!(
                 "Network interface {} received interrupt on IRQ {}",
                 self.name(),
                 irq_num
             );
         } else {
-            crate::pr_debug!(
+            log::debug!(
                 "Network interface {} received interrupt without IRQ number",
                 self.name()
             );
@@ -406,17 +406,17 @@ impl crate::device::Driver for NetworkInterface {
         let mut buffer = [0u8; 2048];
         match self.device.receive(&mut buffer) {
             Ok(size) if size > 0 => {
-                crate::pr_debug!(
+                log::debug!(
                     "Received {} bytes of data on interface {}",
                     size,
                     self.name()
                 );
                 // Wake up tasks waiting in ppoll
-                crate::kernel::syscall::io::wake_poll_waiters();
+                crate::ops::net_ops().wake_poll_waiters();
                 true
             }
             Err(e) => {
-                crate::pr_debug!("Error receiving data: {:?}", e);
+                log::debug!("Error receiving data: {:?}", e);
                 true // 仍然返回true表示我们处理了这个中断
             }
             _ => {
@@ -434,19 +434,19 @@ impl crate::device::Driver for NetworkInterface {
         self.name.clone()
     }
 
-    fn as_net(&self) -> Option<&dyn crate::device::NetDevice> {
+    fn as_net(&self) -> Option<&dyn device::NetDevice> {
         Some(self.device.as_ref())
     }
 
-    fn as_net_arc(self: Arc<Self>) -> Option<Arc<dyn crate::device::NetDevice>> {
+    fn as_net_arc(self: Arc<Self>) -> Option<Arc<dyn device::NetDevice>> {
         Some(self.device.clone())
     }
 
-    fn as_block(&self) -> Option<&dyn crate::device::block::BlockDriver> {
+    fn as_block(&self) -> Option<&dyn device::block::BlockDriver> {
         None
     }
 
-    fn as_rtc(&self) -> Option<&dyn crate::device::rtc::RtcDriver> {
+    fn as_rtc(&self) -> Option<&dyn device::rtc::RtcDriver> {
         None
     }
 }

@@ -1,7 +1,7 @@
 //! Socket implementation using smoltcp
 
-use crate::sync::SpinLock;
-use crate::vfs::{File, FsError, InodeMetadata};
+use sync::SpinLock;
+use vfs::{File, FsError, InodeMetadata};
 use alloc::collections::VecDeque;
 use alloc::vec;
 use lazy_static::lazy_static;
@@ -19,28 +19,28 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 
 pub struct NetIfaceWrapper {
-    device: SpinLock<crate::net::interface::NetDeviceAdapter>,
+    device: SpinLock<crate::interface::NetDeviceAdapter>,
     interface: SpinLock<Interface>,
 }
 
 impl NetIfaceWrapper {
     pub fn poll(&self, sockets: &SpinLock<SocketSet<'static>>) -> bool {
         let timestamp =
-            smoltcp::time::Instant::from_millis(crate::arch::timer::get_time_ms() as i64);
+            smoltcp::time::Instant::from_millis(crate::ops::net_ops().get_time_ms() as i64);
         let mut dev = self.device.lock();
 
         // 检查队列长度
         let queue_len = dev.loopback_queue_len();
         if queue_len > 0 {
-            crate::pr_debug!("poll: loopback queue has {} packets", queue_len);
+            log::debug!("poll: loopback queue has {} packets", queue_len);
         }
 
         let mut iface = self.interface.lock();
         let mut sockets = sockets.lock();
 
-        crate::pr_debug!("poll: before iface.poll");
+        log::debug!("poll: before iface.poll");
         let result = iface.poll(timestamp, &mut *dev, &mut *sockets);
-        crate::pr_debug!("poll: result={:?}", result);
+        log::debug!("poll: result={:?}", result);
 
         // NOTE: For loopback traffic, frames produced by Tx are enqueued into `loopback_queue`
         // during this poll, and therefore won't be received until a subsequent poll. Do a small,
@@ -70,7 +70,7 @@ impl NetIfaceWrapper {
         pending.retain(|h| {
             let state = sockets.get::<tcp::Socket>(*h).state();
             if matches!(state, tcp::State::Closed | tcp::State::TimeWait) {
-                crate::pr_debug!(
+                log::debug!(
                     "[Socket] reap: removing closed tcp handle={:?}, state={:?}",
                     h,
                     state
@@ -84,7 +84,7 @@ impl NetIfaceWrapper {
 
         let changed = result != smoltcp::iface::PollResult::None || delivered_udp;
         if changed {
-            crate::kernel::syscall::io::wake_poll_waiters();
+            crate::ops::net_ops().wake_poll_waiters();
         }
         changed
     }
@@ -133,7 +133,7 @@ struct UdpDatagram {
 #[derive(Debug)]
 struct UdpPortEntry {
     handle: SmoltcpHandle,
-    sockets: alloc::vec::Vec<alloc::sync::Weak<dyn crate::vfs::File>>,
+    sockets: alloc::vec::Vec<alloc::sync::Weak<dyn vfs::File>>,
 }
 
 pub struct SocketFile {
@@ -333,7 +333,7 @@ impl Drop for SocketFile {
                 SocketHandle::Tcp(h) => {
                     let socket = sockets.get_mut::<tcp::Socket>(h);
                     let state = socket.state();
-                    crate::pr_debug!("[Socket] Drop: handle={:?}, state={:?}", h, state);
+                    log::debug!("[Socket] Drop: handle={:?}, state={:?}", h, state);
                     // Check if we need to close the socket.
                     //
                     // For active connections, do NOT remove from SocketSet immediately after close(),
@@ -347,7 +347,7 @@ impl Drop for SocketFile {
                         _ => {
                             // Initiate/continue graceful close, and defer removal until the stack
                             // transitions to Closed/TimeWait (requires polling).
-                            crate::pr_debug!("[Socket] Drop: closing socket handle={:?}", h);
+                            log::debug!("[Socket] Drop: closing socket handle={:?}", h);
                             socket.close();
                             PENDING_TCP_CLOSE.lock().push(h);
                         }
@@ -401,7 +401,7 @@ pub fn update_socket_handle(tid: usize, fd: usize, handle: SocketHandle) {
 
 /// Set local endpoint for a socket
 pub fn set_socket_local_endpoint(
-    file: &Arc<dyn crate::vfs::File>,
+    file: &Arc<dyn vfs::File>,
     endpoint: IpEndpoint,
 ) -> Result<(), ()> {
     let any = file.as_any();
@@ -414,7 +414,7 @@ pub fn set_socket_local_endpoint(
 }
 
 /// Get local endpoint from a socket
-pub fn get_socket_local_endpoint(file: &Arc<dyn crate::vfs::File>) -> Option<IpEndpoint> {
+pub fn get_socket_local_endpoint(file: &Arc<dyn vfs::File>) -> Option<IpEndpoint> {
     let any = file.as_any();
     any.downcast_ref::<SocketFile>()
         .and_then(|socket_file| socket_file.get_local_endpoint())
@@ -422,7 +422,7 @@ pub fn get_socket_local_endpoint(file: &Arc<dyn crate::vfs::File>) -> Option<IpE
 
 /// Set remote endpoint for a socket
 pub fn set_socket_remote_endpoint(
-    file: &Arc<dyn crate::vfs::File>,
+    file: &Arc<dyn vfs::File>,
     endpoint: IpEndpoint,
 ) -> Result<(), ()> {
     let any = file.as_any();
@@ -435,21 +435,21 @@ pub fn set_socket_remote_endpoint(
 }
 
 /// Get remote endpoint from a socket
-pub fn get_socket_remote_endpoint(file: &Arc<dyn crate::vfs::File>) -> Option<IpEndpoint> {
+pub fn get_socket_remote_endpoint(file: &Arc<dyn vfs::File>) -> Option<IpEndpoint> {
     let any = file.as_any();
     any.downcast_ref::<SocketFile>()
         .and_then(|socket_file| socket_file.get_remote_endpoint())
 }
 
 /// Shutdown socket read
-pub fn socket_shutdown_read(file: &Arc<dyn crate::vfs::File>) {
+pub fn socket_shutdown_read(file: &Arc<dyn vfs::File>) {
     if let Some(socket_file) = file.as_any().downcast_ref::<SocketFile>() {
         socket_file.shutdown_read();
     }
 }
 
 /// Shutdown socket write
-pub fn socket_shutdown_write(file: &Arc<dyn crate::vfs::File>) {
+pub fn socket_shutdown_write(file: &Arc<dyn vfs::File>) {
     if let Some(socket_file) = file.as_any().downcast_ref::<SocketFile>() {
         socket_file.shutdown_write();
     }
@@ -457,7 +457,7 @@ pub fn socket_shutdown_write(file: &Arc<dyn crate::vfs::File>) {
 
 /// Update socket handle in SocketFile (used in accept)
 pub fn update_socket_file_handle(
-    file: &Arc<dyn crate::vfs::File>,
+    file: &Arc<dyn vfs::File>,
     new_handle: SocketHandle,
 ) -> Result<(), ()> {
     let any = file.as_any();
@@ -490,7 +490,7 @@ pub fn socket_sendto(
     };
     if result.is_ok() {
         poll_network_interfaces();
-        crate::kernel::syscall::io::wake_poll_waiters();
+        crate::ops::net_ops().wake_poll_waiters();
     }
     result
 }
@@ -523,7 +523,7 @@ impl File for SocketFile {
                 let socket = sockets.get::<tcp::Socket>(*h);
                 let can_recv = socket.can_recv();
                 let state = socket.state();
-                crate::pr_debug!(
+                log::debug!(
                     "[Socket] readable: handle={:?}, state={:?}, can_recv={}",
                     h,
                     state,
@@ -547,7 +547,7 @@ impl File for SocketFile {
                 let socket = sockets.get::<tcp::Socket>(*h);
                 let can_send = socket.can_send();
                 let state = socket.state();
-                crate::pr_debug!(
+                log::debug!(
                     "[Socket] writable: handle={:?}, state={:?}, can_send={}",
                     h,
                     state,
@@ -575,7 +575,7 @@ impl File for SocketFile {
                 let socket = sockets.get_mut::<tcp::Socket>(*h);
                 let state = socket.state();
                 let recv_queue = socket.recv_queue();
-                crate::pr_debug!(
+                log::debug!(
                     "[Socket] read: handle={:?}, state={:?}, recv_queue={}, buf.len()={}",
                     h,
                     state,
@@ -603,7 +603,7 @@ impl File for SocketFile {
                 if let Ok(0) = result {
                     // CloseWait indicates FIN received. Treat 0-length read as EOF.
                     if state == tcp::State::CloseWait {
-                        crate::pr_debug!(
+                        log::debug!(
                             "[Socket] read: recv_slice returned 0 and state=CloseWait, returning EOF"
                         );
                         Ok(0)
@@ -612,20 +612,20 @@ impl File for SocketFile {
                     if socket.may_recv() {
                         // Socket can still receive data, so this is not EOF
                         // Return EAGAIN to indicate no data available
-                        crate::pr_debug!(
+                        log::debug!(
                             "[Socket] read: recv_slice returned 0 but may_recv=true, returning EAGAIN"
                         );
                         Err(FsError::WouldBlock)
                     } else {
                         // Socket cannot receive anymore, this is EOF
-                        crate::pr_debug!(
+                        log::debug!(
                             "[Socket] read: recv_slice returned 0 and may_recv=false, returning EOF"
                         );
                         Ok(0)
                     }
                 } else {
                     if let Ok(n) = result {
-                        crate::pr_debug!("[Socket] read: received {} bytes", n);
+                        log::debug!("[Socket] read: received {} bytes", n);
                     }
                     result
                 }
@@ -642,7 +642,7 @@ impl File for SocketFile {
             None => Err(FsError::InvalidArgument),
         };
         if result.is_ok() {
-            crate::kernel::syscall::io::wake_poll_waiters();
+            crate::ops::net_ops().wake_poll_waiters();
         }
         result
     }
@@ -689,7 +689,7 @@ impl File for SocketFile {
         };
         if result.is_ok() {
             poll_network_interfaces();
-            crate::kernel::syscall::io::wake_poll_waiters();
+            crate::ops::net_ops().wake_poll_waiters();
         }
         result
     }
@@ -895,7 +895,7 @@ pub fn write_sockaddr_in(addr: *mut u8, addrlen: *mut u32, endpoint: IpEndpoint)
 }
 
 /// Initialize network interface (should be called during network setup)
-pub fn init_network(mut smoltcp_iface: crate::net::interface::SmoltcpInterface) {
+pub fn init_network(mut smoltcp_iface: crate::interface::SmoltcpInterface) {
     let wrapper = NetIfaceWrapper {
         device: SpinLock::new(smoltcp_iface.device_adapter_mut().clone()),
         interface: SpinLock::new(smoltcp_iface.into_interface()),
@@ -905,42 +905,42 @@ pub fn init_network(mut smoltcp_iface: crate::net::interface::SmoltcpInterface) 
 
 /// Perform TCP connect with Context
 pub fn tcp_connect(handle: SmoltcpHandle, remote: IpEndpoint, local: IpEndpoint) -> Result<(), ()> {
-    crate::pr_debug!("tcp_connect: start, handle={:?}", handle);
+    log::debug!("tcp_connect: start, handle={:?}", handle);
 
     let iface_guard = NET_IFACE.lock();
-    crate::pr_debug!("tcp_connect: got NET_IFACE lock");
+    log::debug!("tcp_connect: got NET_IFACE lock");
 
     let wrapper = iface_guard.as_ref().ok_or(())?;
 
     let result = wrapper.with_context(|context| {
-        crate::pr_debug!("tcp_connect: in with_context");
+        log::debug!("tcp_connect: in with_context");
         let mut sockets = SOCKET_SET.lock();
-        crate::pr_debug!("tcp_connect: got SOCKET_SET lock");
+        log::debug!("tcp_connect: got SOCKET_SET lock");
         let socket = sockets.get_mut::<tcp::Socket>(handle);
-        crate::pr_debug!("tcp_connect: calling socket.connect");
+        log::debug!("tcp_connect: calling socket.connect");
         let r = socket.connect(context, remote, local).map_err(|e| {
-            crate::pr_debug!("tcp_connect error: {:?}", e);
+            log::debug!("tcp_connect error: {:?}", e);
             ()
         });
-        crate::pr_debug!("tcp_connect: socket.connect returned {:?}", r);
+        log::debug!("tcp_connect: socket.connect returned {:?}", r);
         r
     });
 
     // Poll immediately after connect to trigger SYN packet
     if result.is_ok() {
-        crate::pr_debug!("tcp_connect: polling to send SYN");
+        log::debug!("tcp_connect: polling to send SYN");
         wrapper.poll(&SOCKET_SET);
     }
 
     drop(iface_guard);
-    crate::pr_debug!("tcp_connect: done, result={:?}", result);
+    log::debug!("tcp_connect: done, result={:?}", result);
     result
 }
 
 /// Poll network interfaces to process packets
 pub fn poll_network_interfaces() {
     if let Some(ref wrapper) = *NET_IFACE.lock() {
-        crate::pr_debug!("poll_network_interfaces: calling poll");
+        log::debug!("poll_network_interfaces: calling poll");
         wrapper.poll(&SOCKET_SET);
     }
 }
@@ -952,7 +952,7 @@ pub fn poll_network_interfaces() {
 pub fn poll_network_and_dispatch() {
     poll_network_interfaces();
     if udp_dispatch() {
-        crate::kernel::syscall::io::wake_poll_waiters();
+        crate::ops::net_ops().wake_poll_waiters();
     }
 }
 
@@ -971,7 +971,7 @@ pub fn udp_dispatch() -> bool {
 pub fn udp_attach_fd_to_port(
     tid: usize,
     fd: usize,
-    file: &Arc<dyn crate::vfs::File>,
+    file: &Arc<dyn vfs::File>,
     old_handle: SmoltcpHandle,
     port: u16,
     bind_addr: Option<IpAddress>,
@@ -1070,8 +1070,8 @@ fn udp_dispatch_drain_locked(sockets: &mut SocketSet<'static>) -> bool {
 
             // Prefer a connected socket that matches the remote endpoint. Otherwise, deliver to the
             // first unconnected socket registered for this port.
-            let mut target: Option<alloc::sync::Arc<dyn crate::vfs::File>> = None;
-            let mut fallback: Option<alloc::sync::Arc<dyn crate::vfs::File>> = None;
+            let mut target: Option<alloc::sync::Arc<dyn vfs::File>> = None;
+            let mut fallback: Option<alloc::sync::Arc<dyn vfs::File>> = None;
 
             entry.sockets.retain(|w| w.strong_count() > 0);
 

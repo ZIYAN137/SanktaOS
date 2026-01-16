@@ -1,7 +1,4 @@
-use crate::{
-    earlyprintln,
-    net::interface::{NETWORK_INTERFACE_MANAGER, NetworkInterface},
-};
+use crate::interface::{NETWORK_INTERFACE_MANAGER, NetworkInterface};
 use alloc::string::String;
 use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
 
@@ -88,7 +85,7 @@ impl NetworkConfigManager {
 
     /// 初始化默认网络接口配置
     pub fn init_default_interface() -> Result<(), NetworkConfigError> {
-        earlyprintln!("Initializing default network configuration...");
+        log::info!("Initializing default network configuration...");
 
         // 先获取接口的Arc，然后释放全局锁
         // 避免在持有 NETWORK_INTERFACE_MANAGER 锁时操作接口字段锁
@@ -102,10 +99,10 @@ impl NetworkConfigManager {
         } else {
             // 没有任何真实网卡（例如 QEMU 没挂 virtio-net）时，创建一个“空设备接口”，
             // 让 smoltcp/套接字栈至少能在 loopback(127.0.0.1) 场景工作。
-            use crate::device::NullNetDevice;
+            use device::NullNetDevice;
             use alloc::sync::Arc;
 
-            earlyprintln!("No net interfaces found; creating null loopback-only interface");
+            log::info!("No net interfaces found; creating null loopback-only interface");
 
             let dev = NullNetDevice::new(0);
             let iface = Arc::new(NetworkInterface::new(String::from("lo0"), dev));
@@ -116,31 +113,31 @@ impl NetworkConfigManager {
         };
 
         {
-            earlyprintln!("Configuring interface: {}", interface.name());
+            log::info!("Configuring interface: {}", interface.name());
 
             if is_null_loopback_only {
                 // NullNetDevice 只有 loopback 场景可用：不要配置非 127/8 的地址和网关，
                 // 否则 smoltcp 可能会为 127.0.0.1 选择错误的源地址/路由，导致 UDP/TCP 行为异常。
                 let loopback_cidr = IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8);
                 interface.add_ip_address(loopback_cidr);
-                earlyprintln!("Set loopback address: 127.0.0.1/8");
+                log::info!("Set loopback address: 127.0.0.1/8");
                 interface.set_ipv4_gateway(None);
-                earlyprintln!("No default gateway (loopback-only)");
+                log::info!("No default gateway (loopback-only)");
             } else {
                 // 设置默认IP地址
                 let ip_cidr = IpCidr::new(IpAddress::v4(192, 168, 1, 100), 24);
                 interface.add_ip_address(ip_cidr);
-                earlyprintln!("Set IP address: 192.168.1.100/24");
+                log::info!("Set IP address: 192.168.1.100/24");
 
                 // 添加loopback地址到同一接口
                 let loopback_cidr = IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8);
                 interface.add_ip_address(loopback_cidr);
-                earlyprintln!("Set loopback address: 127.0.0.1/8");
+                log::info!("Set loopback address: 127.0.0.1/8");
 
                 // 设置默认网关
                 let gateway = Ipv4Address::new(192, 168, 1, 1);
                 interface.set_ipv4_gateway(Some(gateway));
-                earlyprintln!("Set default gateway: 192.168.1.1");
+                log::info!("Set default gateway: 192.168.1.1");
             }
 
             // Initialize global interface for socket operations
@@ -148,16 +145,16 @@ impl NetworkConfigManager {
             {
                 use smoltcp::phy::Device as _;
                 let caps = smoltcp_iface.device_adapter_mut().capabilities();
-                earlyprintln!(
+                log::info!(
                     "smoltcp caps: medium={:?}, max_transmission_unit={}, ip_mtu={}",
                     caps.medium,
                     caps.max_transmission_unit,
                     caps.ip_mtu()
                 );
             }
-            use crate::net::socket::init_network;
+            use crate::socket::init_network;
             init_network(smoltcp_iface);
-            earlyprintln!("Initialized global network interface");
+            log::info!("Initialized global network interface");
 
             Ok(())
         }
@@ -181,7 +178,7 @@ impl NetworkConfigManager {
                 Ok(ipv4) => {
                     let ip_cidr = IpCidr::new(IpAddress::Ipv4(ipv4), prefix);
                     interface.add_ip_address(ip_cidr);
-                    earlyprintln!("Set IP address for {}: {}/{}", interface_name, ip, prefix);
+                    log::info!("Set IP address for {}: {}/{}", interface_name, ip, prefix);
                     Ok(())
                 }
                 Err(_) => Err(NetworkConfigError::InvalidAddress),
@@ -207,7 +204,7 @@ impl NetworkConfigManager {
             match gateway.parse::<Ipv4Address>() {
                 Ok(gateway_ipv4) => {
                     interface.set_ipv4_gateway(Some(gateway_ipv4));
-                    earlyprintln!("Set default gateway for {}: {}", interface_name, gateway);
+                    log::info!("Set default gateway for {}: {}", interface_name, gateway);
                     Ok(())
                 }
                 Err(_) => Err(NetworkConfigError::InvalidGateway),
@@ -292,7 +289,7 @@ impl NetworkConfigManager {
             // 设置网关
             interface.set_ipv4_gateway(Some(gateway_address));
 
-            earlyprintln!(
+            log::info!(
                 "Set interface config for {}: IP={}/{}, Gateway={}",
                 interface_name,
                 ip,
