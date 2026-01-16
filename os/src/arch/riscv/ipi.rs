@@ -48,7 +48,7 @@ static IPI_PENDING: [AtomicU32; MAX_CPU_COUNT] = [const { AtomicU32::new(0) }; M
 /// 如果 target_cpu >= NUM_CPU，会 panic
 pub fn send_ipi(target_cpu: usize, ipi_type: IpiType) {
     let num_cpu = unsafe { crate::kernel::NUM_CPU };
-    assert!(target_cpu < num_cpu, "Invalid target CPU: {}", target_cpu);
+    core::assert!(target_cpu < num_cpu, "Invalid target CPU: {}", target_cpu);
 
     // 1. 设置目标 CPU 的待处理标志
     IPI_PENDING[target_cpu].fetch_or(ipi_type as u32, Ordering::Release);

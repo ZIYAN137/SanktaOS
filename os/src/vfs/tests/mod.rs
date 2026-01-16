@@ -4,50 +4,6 @@ use crate::vfs::*;
 use alloc::string::String;
 use alloc::sync::Arc;
 
-// ========== Test Assertions ==========
-//
-// These tests run inside the kernel test framework, where we prefer "record a failure and keep
-// running" semantics (instead of panicking). Map familiar `assert!*` names to `kassert!` here,
-// scoped only to `os::vfs::tests::*`.
-#[cfg(test)]
-macro_rules! assert {
-    ($cond:expr $(,)?) => {
-        $crate::kassert!($cond)
-    };
-    ($cond:expr, $($arg:tt)+) => {
-        // Keep the failure recording behavior; ignore the message for now.
-        $crate::kassert!($cond)
-    };
-}
-
-#[cfg(test)]
-macro_rules! assert_eq {
-    ($left:expr, $right:expr $(,)?) => {{
-        let left = &$left;
-        let right = &$right;
-        $crate::kassert!(left == right);
-    }};
-    ($left:expr, $right:expr, $($arg:tt)+) => {{
-        let left = &$left;
-        let right = &$right;
-        $crate::kassert!(left == right);
-    }};
-}
-
-#[cfg(test)]
-macro_rules! assert_ne {
-    ($left:expr, $right:expr $(,)?) => {{
-        let left = &$left;
-        let right = &$right;
-        $crate::kassert!(left != right);
-    }};
-    ($left:expr, $right:expr, $($arg:tt)+) => {{
-        let left = &$left;
-        let right = &$right;
-        $crate::kassert!(left != right);
-    }};
-}
-
 // 测试辅助函数 (fixtures)
 
 /// 创建一个测试用文件系统实例

@@ -1,6 +1,5 @@
-pub mod guard;
-pub mod macros;
 pub mod net_test;
+pub mod assert;
 use crate::arch::intr::{are_interrupts_enabled, disable_interrupts, enable_interrupts};
 
 /// 可运行的测试用例。
@@ -22,7 +21,7 @@ where
         use core::any::type_name;
         use core::sync::atomic::Ordering;
 
-        use crate::test::macros::{FAILED_LIST_CAPACITY, TEST_FAILED};
+        use crate::test::assert::{FAILED_LIST_CAPACITY, TEST_FAILED};
 
         crate::println!("\x1b[33m=======================================\x1b[0m");
         crate::println!("\x1b[33mRunning test: {}\x1b[0m", type_name::<T>());
@@ -38,8 +37,8 @@ where
                     break;
                 }
                 // 避免创建对 `static mut` 的引用（Rust 2024 `static_mut_refs`）
-                let base = core::ptr::addr_of!(crate::test::macros::FAILED_LIST)
-                    as *const Option<crate::test::macros::FailedAssertion>;
+                let base = core::ptr::addr_of!(crate::test::assert::FAILED_LIST)
+                    as *const Option<crate::test::assert::FailedAssertion>;
                 if let Some(fail) = base.add(i).read() {
                     crate::println!(
                         "\x1b[31mFailed assertion: {} at {}:{}\x1b[0m",
@@ -70,8 +69,8 @@ where
 pub fn test_runner(tests: &[&dyn Testable]) {
     use crate::arch::lib::sbi::shutdown;
     use crate::println;
-    use crate::test::macros::TEST_FAILED;
-    use crate::test::macros::{FAILED_INDEX, FAILED_LIST, FAILED_LIST_CAPACITY};
+    use crate::test::assert::TEST_FAILED;
+    use crate::test::assert::{FAILED_INDEX, FAILED_LIST, FAILED_LIST_CAPACITY};
     use core::sync::atomic::Ordering;
 
     println!("\n\x1b[33m--- Running {} tests ---\x1b[0m", tests.len());
@@ -82,7 +81,8 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     unsafe {
         FAILED_INDEX = 0;
         // 避免创建对 `static mut` 的引用（Rust 2024 `static_mut_refs`）
-        let base = core::ptr::addr_of_mut!(FAILED_LIST) as *mut Option<crate::test::macros::FailedAssertion>;
+        let base = core::ptr::addr_of_mut!(FAILED_LIST)
+            as *mut Option<crate::test::assert::FailedAssertion>;
         for i in 0..FAILED_LIST_CAPACITY {
             base.add(i).write(None);
         }

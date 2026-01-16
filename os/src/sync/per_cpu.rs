@@ -43,7 +43,7 @@ impl<T> PerCpu<T> {
     /// 如果 NUM_CPU 未设置或为 0，会 panic
     pub fn new<F: Fn() -> T>(init: F) -> Self {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
+        core::assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
 
         let mut data = Vec::with_capacity(num_cpu);
         for _ in 0..num_cpu {
@@ -61,7 +61,7 @@ impl<T> PerCpu<T> {
     /// 如果 NUM_CPU 未设置或为 0，会 panic
     pub fn new_with_id<F: Fn(usize) -> T>(init: F) -> Self {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
+        core::assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
 
         let mut data = Vec::with_capacity(num_cpu);
         for i in 0..num_cpu {
@@ -77,7 +77,7 @@ impl<T> PerCpu<T> {
     ///
     /// 用于在 NUM_CPU 设置之前创建 PerCpu 实例（例如 CPUS 的 lazy_static 初始化）
     pub fn new_with_id_and_count<F: Fn(usize) -> T>(count: usize, init: F) -> Self {
-        assert!(count > 0, "CPU count must be greater than 0");
+        core::assert!(count > 0, "CPU count must be greater than 0");
 
         let mut data = Vec::with_capacity(count);
         for i in 0..count {
@@ -128,7 +128,7 @@ impl<T> PerCpu<T> {
     /// 用于跨核访问，例如负载均衡时查看其他 CPU 的队列长度。
     #[inline]
     pub fn get_of(&self, cpu_id: usize) -> &T {
-        assert!(cpu_id < self.data.len(), "Invalid CPU ID");
+        core::assert!(cpu_id < self.data.len(), "Invalid CPU ID");
         // SAFETY: cpu_id 已检查有效性
         unsafe { &*self.data[cpu_id].get() }
     }

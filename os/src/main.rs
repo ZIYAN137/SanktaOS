@@ -13,6 +13,90 @@
 extern crate alloc;
 extern crate uapi;
 
+// ========== Kernel Test Assertions ==========
+//
+// In `cfg(test)` builds, map `assert!*` to the kernel test assertion recorder instead of panicking.
+// Keep production assertions explicit via `core::assert!` where needed.
+#[cfg(test)]
+#[macro_export]
+/// Test-only `assert!` that records a failure instead of panicking.
+macro_rules! assert {
+    ($cond:expr $(,)?) => {{
+        if !$cond {
+            let fa =
+                $crate::test::assert::FailedAssertion::new(stringify!($cond), file!(), line!());
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+    ($cond:expr, $($arg:tt)+) => {{
+        if !$cond {
+            let fa =
+                $crate::test::assert::FailedAssertion::new(stringify!($cond), file!(), line!());
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+}
+
+#[cfg(test)]
+#[macro_export]
+/// Test-only `assert_eq!` that records a failure instead of panicking.
+macro_rules! assert_eq {
+    ($left:expr, $right:expr $(,)?) => {{
+        let left = &$left;
+        let right = &$right;
+        if !(left == right) {
+            let fa = $crate::test::assert::FailedAssertion::new(
+                stringify!($left == $right),
+                file!(),
+                line!(),
+            );
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+    ($left:expr, $right:expr, $($arg:tt)+) => {{
+        let left = &$left;
+        let right = &$right;
+        if !(left == right) {
+            let fa = $crate::test::assert::FailedAssertion::new(
+                stringify!($left == $right),
+                file!(),
+                line!(),
+            );
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+}
+
+#[cfg(test)]
+#[macro_export]
+/// Test-only `assert_ne!` that records a failure instead of panicking.
+macro_rules! assert_ne {
+    ($left:expr, $right:expr $(,)?) => {{
+        let left = &$left;
+        let right = &$right;
+        if !(left != right) {
+            let fa = $crate::test::assert::FailedAssertion::new(
+                stringify!($left != $right),
+                file!(),
+                line!(),
+            );
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+    ($left:expr, $right:expr, $($arg:tt)+) => {{
+        let left = &$left;
+        let right = &$right;
+        if !(left != right) {
+            let fa = $crate::test::assert::FailedAssertion::new(
+                stringify!($left != $right),
+                file!(),
+                line!(),
+            );
+            $crate::test::assert::record_failed_assertion(fa);
+        }
+    }};
+}
+
 mod arch;
 mod config;
 mod console;
