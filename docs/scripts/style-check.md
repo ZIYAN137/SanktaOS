@@ -344,7 +344,7 @@ cd os && cargo clippy --target riscv64gc-unknown-none-elf
 ## 相关文档
 
 - [Scripts 工具总览](./README.md)
-- [CI 配置](/.github/workflows/ci.yml)
+- `.github/workflows/ci.yml`（CI 配置）
 - [Rust 代码规范](https://doc.rust-lang.org/nightly/style-guide/)
 - [Clippy Lints](https://rust-lang.github.io/rust-clippy/master/)
 

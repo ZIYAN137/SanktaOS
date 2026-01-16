@@ -53,6 +53,6 @@ A: 根据失败的检查项采取不同措施：
 
 ## 相关资源
 
-- [项目根目录 Makefile](/Makefile) - 查看可用的构建命令
-- [CI 配置](/.github/workflows/ci.yml) - 查看 CI 检查流程
-- [文档部署配置](/.github/workflows/docs-deployment.yml) - 查看文档发布流程
+- `Makefile` - 查看可用的构建命令
+- `.github/workflows/ci.yml` - 查看 CI 检查流程
+- `.github/workflows/docs-deployment.yml` - 查看文档发布流程

@@ -244,7 +244,7 @@ else:
 ## 相关文档
 
 - [Scripts 工具总览](./README.md)
-- [文档部署流程](/.github/workflows/docs-deployment.yml)
+- `.github/workflows/docs-deployment.yml`（文档部署流程）
 - [mdBook 配置](../book.toml)
 
 ## 参考资源
