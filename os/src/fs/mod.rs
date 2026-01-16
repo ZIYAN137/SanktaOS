@@ -11,8 +11,8 @@ use alloc::string::String;
 
 use crate::device::BLK_DRIVERS;
 use crate::pr_info;
+use crate::vfs::{FileMode, FsError, MOUNT_TABLE, MountFlags, vfs_lookup};
 use crate::vfs::{blkdev_major, chrdev_major, makedev};
-use crate::vfs::{FileMode, FsError, MountFlags, MOUNT_TABLE, vfs_lookup};
 
 /// 初始化 FS 操作实现
 pub fn init_fs_ops() {

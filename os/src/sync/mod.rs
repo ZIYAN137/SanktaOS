@@ -11,7 +11,7 @@ pub use per_cpu::PerCpu;
 
 // 从 sync crate re-export
 pub use sync::{
-    preempt_disable, preempt_enable, preempt_disabled, IntrGuard, PreemptGuard, RawSpinLock,
-    RawSpinLockGuard, RawSpinLockWithoutGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    SpinLock, SpinLockGuard, TicketLock, TicketLockGuard,
+    IntrGuard, PreemptGuard, RawSpinLock, RawSpinLockGuard, RawSpinLockWithoutGuard, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, SpinLock, SpinLockGuard, TicketLock, TicketLockGuard,
+    preempt_disable, preempt_disabled, preempt_enable,
 };

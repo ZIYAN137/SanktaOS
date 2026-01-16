@@ -7,14 +7,14 @@ use crate::config::{
 };
 use mm::address::{Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn, VpnRange};
 // 从 mm crate 导入类型
-use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
-use mm::page_table::{PageTableInner, PagingError, UniversalPTEFlag};
 use crate::arch::mm::PageTableInner as ActivePageTableInner;
 use crate::sync::SpinLock;
 use crate::{pr_err, pr_warn};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
+use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
+use mm::page_table::{PageTableInner, PagingError, UniversalPTEFlag};
 
 // 内核链接器符号
 unsafe extern "C" {
@@ -1910,9 +1910,9 @@ mod memory_space_tests {
     // 16. 测试 mmap 文件映射基本功能
     test_case!(test_mmap_file_basic, {
         use crate::fs::tmpfs::TmpFs;
-        use uapi::mm::{MapFlags, ProtFlags};
         use crate::vfs::{File, FileMode, FileSystem};
         use alloc::sync::Arc;
+        use uapi::mm::{MapFlags, ProtFlags};
 
         println!("Testing mmap file mapping basic functionality");
 

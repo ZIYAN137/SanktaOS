@@ -6,10 +6,10 @@
 
 // 重新导出 klog crate 的所有公共 API
 pub use klog::{
-    format_log_entry, get_console_level, get_global_level, is_level_enabled, log_dropped_count,
-    log_impl, log_len, log_reader_index, log_unread_bytes, log_writer_index, peek_log, read_log,
-    set_console_level, set_global_level, LogContextProvider, LogEntry, LogLevel, LogOutput,
-    DEFAULT_CONSOLE_LEVEL, DEFAULT_LOG_LEVEL, GLOBAL_LOG_BUFFER_SIZE, MAX_LOG_MESSAGE_LENGTH,
+    DEFAULT_CONSOLE_LEVEL, DEFAULT_LOG_LEVEL, GLOBAL_LOG_BUFFER_SIZE, LogContextProvider, LogEntry,
+    LogLevel, LogOutput, MAX_LOG_MESSAGE_LENGTH, format_log_entry, get_console_level,
+    get_global_level, is_level_enabled, log_dropped_count, log_impl, log_len, log_reader_index,
+    log_unread_bytes, log_writer_index, peek_log, read_log, set_console_level, set_global_level,
 };
 
 use crate::arch::{kernel::cpu::cpu_id, timer};

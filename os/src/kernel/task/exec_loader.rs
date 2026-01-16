@@ -2,11 +2,11 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use mm::address::{PageNum, UsizeConvert, Vaddr, Vpn};
 use crate::mm::MemorySpace;
+use crate::vfs::{FsError, Inode, InodeType};
+use mm::address::{PageNum, UsizeConvert, Vaddr, Vpn};
 use mm::memory_space::mapping_area::AreaType;
 use mm::page_table::{PagingError, UniversalPTEFlag};
-use crate::vfs::{FsError, Inode, InodeType};
 
 #[derive(Debug)]
 pub enum ExecImageError {

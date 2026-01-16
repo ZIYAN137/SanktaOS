@@ -146,7 +146,9 @@ pub fn sysinfo(info: *mut SysInfo) -> c_int {
 pub fn clock_gettime(clk_id: c_int, tp: *mut TimeSpec) -> c_int {
     let ts = match clk_id {
         CLOCK_REALTIME | CLOCK_REALTIME_COARSE => crate::time_ext::timespec_now(),
-        CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW => crate::time_ext::timespec_monotonic_now(),
+        CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW => {
+            crate::time_ext::timespec_monotonic_now()
+        }
         id if id < MAX_CLOCKS as c_int && id >= 0 => {
             return -ENOSYS;
         }

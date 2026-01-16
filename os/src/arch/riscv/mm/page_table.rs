@@ -1,14 +1,14 @@
 // TODO: 这个模块的安全性论证没有完成
 use super::PageTableEntry;
 use crate::arch::ipi::send_tlb_flush_ipi_all;
+use alloc::vec::Vec;
+use mm::TlbBatchContextWrapper;
 use mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
 use mm::frame_allocator::{FrameTracker, alloc_frame};
 use mm::page_table::{
     PageSize, PageTableEntry as PageTableEntryTrait, PageTableInner as PageTableInnerTrait,
     PagingError, PagingResult, UniversalPTEFlag,
 };
-use mm::TlbBatchContextWrapper;
-use alloc::vec::Vec;
 
 #[derive(Debug)]
 pub struct PageTableInner {
@@ -559,8 +559,8 @@ fn ppn_to_satp(ppn: Ppn) -> usize {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use mm::page_table::PageTableInner as PageTableInnerTrait;
     use crate::{kassert, test_case};
+    use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
     test_case!(test_pt_create, {

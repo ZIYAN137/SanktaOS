@@ -2,11 +2,11 @@
 
 use crate::arch::trap::SumGuard;
 use crate::kernel::current_task;
+use crate::util::user_buffer::{validate_user_ptr, validate_user_ptr_mut};
+use crate::vfs::File;
 use uapi::errno::EFAULT;
 use uapi::errno::EINVAL;
 use uapi::iovec::IoVec;
-use crate::util::user_buffer::{validate_user_ptr, validate_user_ptr_mut};
-use crate::vfs::File;
 
 /// 向文件描述符写入数据
 /// # 参数
@@ -528,11 +528,7 @@ pub fn wake_poll_waiters() {
     POLL_WAIT_QUEUE.lock().wake_up_all();
 }
 
-fn poll_with_timeout(
-    fds: usize,
-    nfds: usize,
-    timeout: Option<uapi::time::TimeSpec>,
-) -> isize {
+fn poll_with_timeout(fds: usize, nfds: usize, timeout: Option<uapi::time::TimeSpec>) -> isize {
     use crate::arch::timer::{clock_freq, get_time};
     use crate::arch::trap::SumGuard;
     use uapi::errno::{EINTR, EINVAL};

@@ -12,14 +12,14 @@
 //! 每级页表有 512 个条目（2^9），每个条目 8 字节。
 
 use super::PageTableEntry;
+use alloc::vec::Vec;
+use mm::TlbBatchContextWrapper;
 use mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
 use mm::frame_allocator::{FrameTracker, alloc_frame};
 use mm::page_table::{
     PageSize, PageTableEntry as PageTableEntryTrait, PageTableInner as PageTableInnerTrait,
     PagingError, PagingResult, UniversalPTEFlag,
 };
-use mm::TlbBatchContextWrapper;
-use alloc::vec::Vec;
 
 /// 页表内部结构
 #[derive(Debug)]
@@ -532,8 +532,8 @@ impl PageTableInner {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use mm::page_table::PageTableInner as PageTableInnerTrait;
     use crate::{kassert, test_case};
+    use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
     test_case!(test_pt_create, {

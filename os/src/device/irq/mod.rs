@@ -5,4 +5,4 @@
 pub mod plic;
 
 // Re-export device crate 的 IrqManager 和 IntcDriver
-pub use device::irq::{IntcDriver, IrqManager, IRQ_MANAGER};
+pub use device::irq::{IRQ_MANAGER, IntcDriver, IrqManager};

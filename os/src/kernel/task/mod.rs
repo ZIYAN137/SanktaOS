@@ -33,12 +33,12 @@ use alloc::sync::Arc;
 
 use crate::mm::MemorySpace;
 use crate::sync::SpinLock;
-use uapi::signal::NUM_SIGCHLD;
 use crate::{
     arch::trap::restore,
     kernel::{cpu::current_cpu, schedule},
     vfs::{FDTable, File, FsError},
 };
+use uapi::signal::NUM_SIGCHLD;
 
 #[cfg(not(target_arch = "loongarch64"))]
 use crate::arch::trap::TrapFrame;

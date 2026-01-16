@@ -92,6 +92,8 @@ macro_rules! get_sockopt_int {
     };
 }
 
+use crate::net::{IpAddress, IpEndpoint, Ipv4Address};
+use crate::net::{tcp, udp};
 use crate::vfs::File;
 use crate::{
     arch::trap::SumGuard,
@@ -112,8 +114,6 @@ use crate::{
     },
 };
 use alloc::sync::Arc;
-use crate::net::{tcp, udp};
-use crate::net::{IpAddress, IpEndpoint, Ipv4Address};
 
 /// 获取网络接口列表
 pub fn get_network_interfaces() -> isize {
@@ -624,9 +624,7 @@ pub fn connect(sockfd: i32, addr: *const u8, addrlen: u32) -> isize {
     use crate::net::socket::set_socket_remote_endpoint;
     set_socket_remote_endpoint(&file, endpoint).unwrap();
 
-    let is_nonblock = file
-        .flags()
-        .contains(uapi::fcntl::OpenFlags::O_NONBLOCK);
+    let is_nonblock = file.flags().contains(uapi::fcntl::OpenFlags::O_NONBLOCK);
 
     match handle {
         SocketHandle::Tcp(h) => {

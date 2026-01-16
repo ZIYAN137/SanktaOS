@@ -21,7 +21,7 @@ pub use global_allocator::init_heap;
 
 // Re-export memory_space 中的常用类型
 pub use memory_space::{
-    get_global_kernel_space, kernel_root_ppn, kernel_token, with_kernel_space, MemorySpace,
+    MemorySpace, get_global_kernel_space, kernel_root_ppn, kernel_token, with_kernel_space,
 };
 // 从 mm crate 重新导出 mapping_area 类型
 pub use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};

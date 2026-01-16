@@ -7,8 +7,8 @@ pub mod virtio_net;
 
 // Re-export device crate 的网络设备类型
 pub use device::net::{
-    add_network_device, format_mac_address, get_net_devices, NetDevice, NetDeviceError,
-    NullNetDevice, NETWORK_DEVICES,
+    NETWORK_DEVICES, NetDevice, NetDeviceError, NullNetDevice, add_network_device,
+    format_mac_address, get_net_devices,
 };
 
 // Re-export VirtioNetDevice

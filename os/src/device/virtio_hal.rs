@@ -1,12 +1,12 @@
 //! HAL (硬件抽象层) 实现，用于适配 virtio-drivers 0.12.0 库
 
 use crate::arch::mm::{paddr_to_vaddr, vaddr_to_paddr};
-use mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
-use mm::frame_allocator::FrameRangeTracker;
 use crate::sync::SpinLock;
 use alloc::collections::btree_map::BTreeMap;
 use core::ptr::NonNull;
 use lazy_static::lazy_static;
+use mm::address::{ConvertablePaddr, PageNum, UsizeConvert};
+use mm::frame_allocator::FrameRangeTracker;
 use virtio_drivers::{BufferDirection, Hal, PhysAddr};
 
 // 全局映射表，用于跟踪物理地址到分配的帧范围的映射

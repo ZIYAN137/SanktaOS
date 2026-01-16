@@ -10,11 +10,11 @@ use ::fs::{FsOps, MemoryAreaInfo, MountInfo, TaskInfo, TaskState, VmStats};
 use uapi::time::TimeSpec;
 
 use crate::config::{EXT4_BLOCK_SIZE, FS_IMAGE_SIZE, PAGE_SIZE, VIRTIO_BLK_SECTOR_SIZE};
-use crate::kernel::{TaskManagerTrait, TASK_MANAGER};
-use crate::mm::frame_allocator::{get_free_frames, get_total_frames};
+use crate::kernel::{TASK_MANAGER, TaskManagerTrait};
 use crate::mm::AreaType;
+use crate::mm::frame_allocator::{get_free_frames, get_total_frames};
 use crate::time_ext::timespec_now;
-use crate::vfs::{MountFlags, MOUNT_TABLE};
+use crate::vfs::{MOUNT_TABLE, MountFlags};
 
 /// FsOps 实现
 struct FsOpsImpl;

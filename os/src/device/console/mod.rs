@@ -4,7 +4,7 @@ pub mod frame_console;
 pub mod uart_console;
 
 // Re-export device crate 的 Console 类型
-pub use device::console::{Console, CONSOLES, MAIN_CONSOLE};
+pub use device::console::{CONSOLES, Console, MAIN_CONSOLE};
 
 /// 初始化控制台设备
 pub fn init() {

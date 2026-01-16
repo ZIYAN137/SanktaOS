@@ -333,8 +333,8 @@ pub fn flush_all_block_devices() -> Result<(), isize> {
 /// - Err(-EINVAL): fd 不支持同步(如 pipe、socket)
 /// - Err(-EIO): 块设备刷新失败
 pub fn flush_block_device_by_fd(fd: usize) -> Result<(), isize> {
-    use uapi::errno::EIO;
     use crate::vfs::MOUNT_TABLE;
+    use uapi::errno::EIO;
 
     // 1. 获取文件对象
     let task = current_task();

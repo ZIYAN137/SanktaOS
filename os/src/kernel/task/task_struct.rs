@@ -17,9 +17,9 @@ use crate::{
         task::{forkret, task_state::TaskState},
     },
     mm::{
+        MemorySpace,
         address::{ConvertablePaddr, PageNum, UsizeConvert},
         frame_allocator::{FrameRangeTracker, FrameTracker},
-        MemorySpace,
     },
     pr_debug,
     sync::SpinLock,
@@ -474,7 +474,9 @@ impl Task {
             Arc::new(SpinLock::new(SignalPending::empty())),
             Arc::new(SpinLock::new(SignalStack::default())),
             0,
-            Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
+            Arc::new(SpinLock::new(UtsNamespace::with_arch(
+                crate::arch::constant::ARCH,
+            ))),
             Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
             Arc::new(FDTable::new()),
             Arc::new(SpinLock::new(FsStruct::new(None, None))),

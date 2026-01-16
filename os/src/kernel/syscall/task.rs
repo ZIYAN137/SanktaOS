@@ -22,9 +22,9 @@ use crate::{
         yield_task,
     },
     mm::{
+        MemorySpace,
         address::{UsizeConvert, Vaddr},
         frame_allocator::{alloc_contig_frames, alloc_frame},
-        MemorySpace,
     },
     sync::SpinLock,
     uapi::{

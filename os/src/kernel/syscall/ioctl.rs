@@ -4,10 +4,10 @@
 
 use crate::arch::trap::SumGuard;
 use crate::kernel::current_task;
-use uapi::errno::{EBADF, EINVAL, ENOTTY, EOPNOTSUPP};
-use uapi::ioctl::*;
 use crate::vfs::FsError;
 use crate::{pr_debug, pr_err, pr_warn};
+use uapi::errno::{EBADF, EINVAL, ENOTTY, EOPNOTSUPP};
+use uapi::ioctl::*;
 
 /// ioctl - 设备特定的输入/输出控制
 ///

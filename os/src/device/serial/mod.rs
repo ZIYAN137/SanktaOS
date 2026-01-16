@@ -7,4 +7,4 @@ pub mod uart16550;
 pub mod virtio_console;
 
 // Re-export device crate 的 SerialDriver trait
-pub use device::serial::{SerialDriver, SERIAL_DRIVERS};
+pub use device::serial::{SERIAL_DRIVERS, SerialDriver};

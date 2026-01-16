@@ -29,7 +29,7 @@ use crate::{
         signal::SignalFlags,
         uts_namespace::UtsNamespace,
     },
-    vfs::{create_stdio_files, FDTable, get_root_dentry},
+    vfs::{FDTable, create_stdio_files, get_root_dentry},
 };
 // Needed for Ppn::as_usize
 use mm::address::UsizeConvert;
@@ -85,7 +85,9 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -397,14 +399,14 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::ipc::{SignalHandlerTable, SignalPending};
     use crate::kernel::FsStruct;
     use crate::kernel::{TASK_MANAGER, TaskStruct};
-    use mm::frame_allocator::alloc_contig_frames;
     use crate::sync::SpinLock;
-    use uapi::resource::{INIT_RLIMITS, RlimitStruct};
-    use uapi::signal::SignalFlags;
-    use uapi::uts_namespace::UtsNamespace;
     use crate::vfs::FDTable;
     use alloc::sync::Arc;
     use core::sync::atomic::Ordering;
+    use mm::frame_allocator::alloc_contig_frames;
+    use uapi::resource::{INIT_RLIMITS, RlimitStruct};
+    use uapi::signal::SignalFlags;
+    use uapi::uts_namespace::UtsNamespace;
 
     // idle任务从TID分配器正常分配TID
     // TID分配器从2开始，所以idle任务会获得TID 2, 3, ...
@@ -427,7 +429,9 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(FDTable::new()),
         Arc::new(SpinLock::new(FsStruct::new(None, None))),

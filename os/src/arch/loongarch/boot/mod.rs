@@ -68,7 +68,9 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -138,8 +140,8 @@ fn idle_loop() -> ! {
 /// 为指定 CPU 创建 idle 任务（LoongArch 版本）
 fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
     use crate::arch::trap::TrapFrame;
-    use mm::frame_allocator::alloc_contig_frames;
     use crate::vfs::FDTable;
+    use mm::frame_allocator::alloc_contig_frames;
 
     // idle 任务从 TID 分配器正常分配（从 2 开始）
     let tid = TASK_MANAGER.lock().allocate_tid();
@@ -160,7 +162,9 @@ fn create_idle_task(cpu_id: usize) -> crate::kernel::SharedTask {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::with_arch(crate::arch::constant::ARCH))),
+        Arc::new(SpinLock::new(UtsNamespace::with_arch(
+            crate::arch::constant::ARCH,
+        ))),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(FDTable::new()),
         Arc::new(SpinLock::new(FsStruct::new(None, None))),

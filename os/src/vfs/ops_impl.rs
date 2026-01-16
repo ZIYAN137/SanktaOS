@@ -4,7 +4,7 @@
 
 use alloc::sync::Arc;
 use uapi::time::TimeSpec;
-use vfs::{chrdev_major, CharDriver, Dentry, DeviceOps, VfsOps};
+use vfs::{CharDriver, Dentry, DeviceOps, VfsOps, chrdev_major};
 
 use crate::config::DEFAULT_MAX_FDS;
 use crate::device::serial::SerialDriver;
@@ -16,21 +16,11 @@ struct VfsOpsImpl;
 
 impl VfsOps for VfsOpsImpl {
     fn current_cwd(&self) -> Option<Arc<Dentry>> {
-        crate::kernel::current_task()
-            .lock()
-            .fs
-            .lock()
-            .cwd
-            .clone()
+        crate::kernel::current_task().lock().fs.lock().cwd.clone()
     }
 
     fn current_root(&self) -> Option<Arc<Dentry>> {
-        crate::kernel::current_task()
-            .lock()
-            .fs
-            .lock()
-            .root
-            .clone()
+        crate::kernel::current_task().lock().fs.lock().root.clone()
     }
 
     fn default_max_fds(&self) -> usize {
