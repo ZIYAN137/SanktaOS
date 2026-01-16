@@ -1,0 +1,117 @@
+name: Run tests & Code Quality Checks
+
+on:
+  push:
+    branches:
+      - main  # 在代码合并到 main 分支后，仍然运行一次完整的 CI
+      - epic/smp  # 在 epic/smp 分支上运行 CI
+  pull_request:
+    branches:
+      - main  # 在针对 main 分支的 PR 提出/更新时运行 CI
+      - epic/smp  # 在针对 epic/smp 分支的 PR 提出/更新时运行 CI
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: nightly-2025-10-28
+  
+  QEMU_VERSION: qemu-9.2.1
+  QEMU_BUILD_PATH: ${{ github.workspace }}/qemu-build-cache
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      # --- 1. 缓存 Cargo 依赖项 (使用 Swatinem/rust-cache) ---
+      # ⚠️ 替换了原有的 actions/cache@v4，更高效地管理 Cargo 缓存
+      - name: 📦 Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # 仅需传递 key 相关的变量，该 Action 会自动处理路径
+          key: ${{ runner.os }}-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('**/Cargo.lock') }}
+
+      # --- 2. 安装 Rust Toolchain 和 Target ---
+      - name: 🛠️ Setup Rust Toolchain and Target
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: riscv64gc-unknown-none-elf
+          # 确保安装了 rustfmt 和 clippy
+          components: rust-src, rustfmt, clippy, llvm-tools-preview
+      
+      # --- 2.1 代码质量检查 (优先执行) ---
+
+      - name: 🔍 Cargo Check (快速验证编译)
+        working-directory: os
+        run: cargo check --target riscv64gc-unknown-none-elf
+
+      - name: 📏 Run Code Formatting Check
+        working-directory: os
+        # 使用 --check 模式，如果代码未格式化，则 CI 失败
+        run: cargo fmt --all -- --check
+
+      - name: 🔬 Run Clippy Lint Check
+        working-directory: os
+        # 不需要强制 warning，在 Cargo.toml 中已将大部分有问题的东西配置为 deny
+        run: cargo clippy --target riscv64gc-unknown-none-elf
+        
+      # --- 2.2 安装辅助工具 ---
+
+      - name: Install cargo-binutils
+        run: cargo install cargo-binutils
+
+      # --- 2.5 缓存 Apt 包 (优化 QEMU 依赖安装时间) ---
+      - name: 📦 Cache APT Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: ${{ runner.os }}-apt-qemu-deps-v1
+          restore-keys: |
+            ${{ runner.os }}-apt-qemu-deps-
+            
+      # --- 3. QEMU 编译和缓存 ---
+      - name: 🧱 Install QEMU Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake autotools-dev curl libmpc-dev libmpfr-dev libgmp-dev \
+            gawk build-essential bison flex texinfo gperf libtool patchutils bc \
+            zlib1g-dev libexpat1-dev pkg-config libglib2.0-dev libpixman-1-dev libsdl2-dev libslirp-dev \
+            python3 python3-pip ninja-build
+
+      - name: 📥 Cache QEMU Build and Installation
+        uses: actions/cache@v4
+        id: qemu-cache
+        with:
+          path: ${{ env.QEMU_BUILD_PATH }}
+          key: ${{ runner.os }}-qemu-${{ env.QEMU_VERSION }}-riscv64
+          restore-keys: |
+            ${{ runner.os }}-qemu-${{ env.QEMU_VERSION }}-
+
+      - name: ⚙️ Compile and Install QEMU (if cache miss)
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://download.qemu.org/${{ env.QEMU_VERSION }}.tar.xz
+          tar -xf ${{ env.QEMU_VERSION }}.tar.xz
+          
+          mkdir -p ${{ env.QEMU_BUILD_PATH }}
+          
+          cd ${{ env.QEMU_VERSION }}
+          # 配置 QEMU 目标列表
+          ./configure --target-list=riscv64-softmmu --prefix=${{ env.QEMU_BUILD_PATH }} --disable-sdl
+          make -j$(nproc)
+          make install
+          
+          echo "${{ env.QEMU_BUILD_PATH }}/bin" >> $GITHUB_PATH
+
+      - name: ➕ Add QEMU to PATH
+        if: steps.qemu-cache.outputs.cache-hit == 'true'
+        run: echo "${{ env.QEMU_BUILD_PATH }}/bin" >> $GITHUB_PATH
+
+      - name: 🏃 Run usertests
+        run: cd os && make run TEST=1
+        timeout-minutes: 10

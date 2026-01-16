@@ -1,0 +1,52 @@
+[package]
+name = "os"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+talc = { version = "4" }
+lock_api = "0.4"
+bitflags = { version = "2.10.0" }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+once_cell = { version = "1.21.3", default-features = false, features = [
+    "alloc",
+    "race",
+] }
+xmas-elf = "0.9"
+paste = "1.0"
+ext4_rs = "1.3.2"
+virtio-drivers = "0.12.0"
+fdt = "0.1.5"
+smoltcp = { version = "0.12.0", default-features = false, features = ["alloc", "medium-ethernet", "proto-ipv4", "proto-ipv6", "socket-raw", "socket-tcp", "socket-udp"] }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+uart_16550 = "0.4.0"
+hashbrown = "0.16.1"
+
+# RISC-V 架构特定依赖
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+sbi-rt = { version = "0.0.2", features = ["legacy"] }
+riscv = "0.15.0"
+
+# LoongArch 架构特定依赖
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = { git = "https://github.com/comix-kernel/loongArch64" }
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+bare_urls = "deny"
+private_intra_doc_links = "deny"
+
+[lints.rust]
+missing_docs = "deny"
+single_use_lifetimes = "warn"
+
+[lints.clippy]
+todo = "warn"
+needless_borrow = "deny"
+redundant_clone = "deny"
+
+[profile.dev]
+opt-level = 1  # 启用基本优化以减小代码体积
+
+[profile.test]
+opt-level = 1  # 测试模式也启用基本优化
