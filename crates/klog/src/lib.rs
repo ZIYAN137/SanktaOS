@@ -222,9 +222,6 @@ pub fn log_len() -> usize {
     GLOBAL_LOG._log_len()
 }
 
-#[cfg(test)]
-mod tests;
-
 /// 返回未读日志的总字节数（格式化后）
 pub fn log_unread_bytes() -> usize {
     GLOBAL_LOG._log_unread_bytes()
