@@ -23,7 +23,6 @@ use crate::{
     },
     pr_debug, pr_err, pr_info, pr_warn,
     sync::SpinLock,
-    test::run_early_tests,
     uapi::{
         resource::{INIT_RLIMITS, RlimitStruct},
         signal::SignalFlags,
@@ -237,8 +236,6 @@ pub fn main(hartid: usize) {
 
     // 初始化日志系统（必须在使用 pr_* 宏之前）
     crate::log::init();
-
-    run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] RISC-V Hart {} is up!", hartid);

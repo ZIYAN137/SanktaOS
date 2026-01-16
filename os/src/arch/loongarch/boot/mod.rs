@@ -25,7 +25,6 @@ use crate::{
     },
     pr_err, pr_info, println,
     sync::SpinLock,
-    test::run_early_tests,
     uapi::{
         resource::{INIT_RLIMITS, RlimitStruct},
         signal::SignalFlags,
@@ -278,8 +277,6 @@ pub fn main(hartid: usize) {
 
     // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
     unsafe { crate::arch::init_sync_arch_ops() };
-
-    run_early_tests();
 
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] LoongArch CPU {} is up!", hartid);

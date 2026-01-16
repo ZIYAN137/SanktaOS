@@ -88,22 +88,29 @@ debug:
 # 目标 1: 运行测试
 test: clean-test
 	@echo "Building tests with 'cargo test --no-run'..."
-	@TEST=1 cargo test --target $(TARGET) --no-run
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@TEST=1 cargo test --target $(TARGET) --no-run --message-format=json 2>&1 | tee /tmp/test-build.log > /dev/null
+	@TEST_ELF=$$(grep '"executable"' /tmp/test-build.log | grep '"os-' | tail -1 | sed 's/.*"executable":"\([^"]*\)".*/\1/'); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find any test executable after build."; \
 		exit 1; \
 	fi; \
-	echo "Found latest test executable: $$TEST_ELF"; \
+	echo "Found test executable: $$TEST_ELF"; \
 	echo "Running tests in QEMU..."; \
 	$(QEMU_RUNNER) $$TEST_ELF run
 
 # 目标 2: 调试测试 (第一步)
 test-qemu: clean-test
 	@echo "Building tests with 'cargo test --no-run'..."
-	@TEST=1 cargo test --target $(TARGET) --no-run
-	@# 关键修复：把所有逻辑都放在一个 shell 进程中执行
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@TEST=1 cargo test --target $(TARGET) --no-run --message-format=json 2>&1 | tee /tmp/test-build.log > /dev/null
+	@TEST_ELF=$$(grep '"executable"' /tmp/test-build.log | grep '"os-' | tail -1 | sed 's/.*"executable":"\([^"]*\)".*/\1/'); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find test executable after build."; \
 		exit 1; \
@@ -117,7 +124,11 @@ test-qemu: clean-test
 
 # 目标 3: 调试测试 (第二步)
 test-gdb:
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@TEST_ELF=$$(grep '"executable"' /tmp/test-build.log | grep '"os-' | tail -1 | sed 's/.*"executable":"\([^"]*\)".*/\1/' 2>/dev/null); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find test executable. Did you run 'make test-qemu' first?"; \
 		exit 1; \
