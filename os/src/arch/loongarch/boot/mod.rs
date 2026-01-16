@@ -295,8 +295,34 @@ pub fn main(hartid: usize) {
         current_cpu().switch_space(kernel_space);
     }
 
+    // 测试模式下：
+    // - 提前注册 FsOps，避免 tests/ 中的 TmpFs/Ext4 等依赖 fs_ops() 时 panic。
+    // - 提前创建并切换到一个可用的 current_task，避免 /proc/self 等依赖 current_task() 的用例直接 panic。
     #[cfg(test)]
-    crate::test_main();
+    {
+        crate::fs::init_fs_ops();
+        crate::vfs::init_vfs_ops();
+
+        let _guard = crate::sync::PreemptGuard::new();
+        if current_cpu().current_task.is_none() {
+            let idle0 = create_idle_task(0);
+            let tf_ptr = idle0.lock().trap_frame_ptr.load(Ordering::SeqCst);
+            unsafe {
+                // KScratch0 <- TrapFrame 指针（trap/restore 路径会使用）
+                asm!(
+                    "csrwr {0}, 0x30",
+                    in(reg) tf_ptr as usize,
+                    options(nostack, preserves_flags)
+                );
+            }
+
+            let cpu = current_cpu();
+            cpu.idle_task = Some(idle0.clone());
+            cpu.switch_task(idle0);
+        }
+
+        crate::test_main();
+    }
 
     // 初始化工作
     trap::init_boot_trap();
@@ -314,6 +340,7 @@ pub fn main(hartid: usize) {
     crate::vfs::init_vfs_ops();
 
     // 初始化 FS 操作（必须在使用 fs crate 之前）
+    #[cfg(not(test))]
     crate::fs::init_fs_ops();
 
     earlyprintln!("[Boot] entering rest_init");

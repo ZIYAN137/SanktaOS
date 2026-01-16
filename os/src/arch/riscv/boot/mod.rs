@@ -267,8 +267,31 @@ pub fn main(hartid: usize) {
         earlyprintln!("[Boot] Activated kernel address space");
     }
 
+    // 测试模式下：
+    // - 提前注册 FsOps，避免 tests/ 中的 TmpFs/Ext4 等依赖 fs_ops() 时 panic。
+    // - 提前创建并切换到一个可用的 current_task，避免 /proc/self 等依赖 current_task() 的用例直接 panic。
     #[cfg(test)]
-    crate::test_main();
+    {
+        use core::sync::atomic::Ordering;
+
+        crate::fs::init_fs_ops();
+        crate::vfs::init_vfs_ops();
+
+        let _guard = crate::sync::PreemptGuard::new();
+        if current_cpu().current_task.is_none() {
+            let idle0 = create_idle_task(0);
+
+            // trap/scheduler 相关路径会依赖 sscratch 指向当前任务的 TrapFrame。
+            let tf_ptr = idle0.lock().trap_frame_ptr.load(Ordering::SeqCst);
+            unsafe { riscv::register::sscratch::write(tf_ptr as usize) };
+
+            let cpu = current_cpu();
+            cpu.idle_task = Some(idle0.clone());
+            cpu.switch_task(idle0);
+        }
+
+        crate::test_main();
+    }
 
     // 初始化工作
     trap::init_boot_trap();
@@ -283,6 +306,7 @@ pub fn main(hartid: usize) {
     crate::vfs::init_vfs_ops();
 
     // 初始化 FS 操作（必须在使用 fs crate 之前）
+    #[cfg(not(test))]
     crate::fs::init_fs_ops();
 
     // 启动从核（在启用定时器中断之前）
