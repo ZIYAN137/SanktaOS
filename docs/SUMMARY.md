@@ -71,7 +71,6 @@
 ---
 
 - [脚本工具](scripts/README.md)
-  - [SimpleFS 镜像打包](scripts/make_init_simple_fs.md)
   - [文档链接转换](scripts/rewrite_links.md)
   - [代码质量检查](scripts/style-check.md)
 

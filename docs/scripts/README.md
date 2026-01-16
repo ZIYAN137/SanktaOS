@@ -6,7 +6,6 @@
 
 | 脚本 | 类型 | 说明 | 文档 |
 |------|------|------|------|
-| `make_init_simple_fs.py` | Python | SimpleFS 镜像打包工具 | [详细文档](./make_init_simple_fs.md) |
 | `rewrite_links.py` | Python | 文档链接转换工具 | [详细文档](./rewrite_links.md) |
 | `style-check.sh` | Bash | 本地代码质量检查工具 | [详细文档](./style-check.md) |
 
@@ -30,7 +29,6 @@ python3 scripts/rewrite_links.py docs/
 
 这些脚本在项目中各司其职：
 
-- **make_init_simple_fs.py**：负责构建时的文件系统打包（已弃用，现使用 ext4 镜像）
 - **rewrite_links.py**：负责文档发布时的链接处理，确保在线文档的可用性
 - **style-check.sh**：负责本地代码质量检查，确保代码符合项目规范，减少 CI 失败
 
