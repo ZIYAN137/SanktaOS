@@ -91,7 +91,7 @@ MM 子系统使用 trait 系统实现架构抽象，架构特定代码必须实�
 
 ### 内存布局
 
-Comix 采用**高半核（Higher Half Kernel）**设计，虚拟地址空间分为两个主要区域：
+SanktaOS 源自 Comix，并沿用其**高半核（Higher Half Kernel）**设计，虚拟地址空间分为两个主要区域：
 
 ```
 虚拟地址空间布局（从高地址到低地址）:

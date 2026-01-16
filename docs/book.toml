@@ -4,7 +4,7 @@ language = "zh-CN"
 multilingual = false
 src = "."
 title = "SanktaOS 设计文档"
-description = "SanktaOS 是基于 Comix 重构的 Rust 操作系统内核，支持 RISC-V 和 LoongArch 架构"
+description = "SanktaOS 源自 Comix，并在其基础上重构演进；支持 RISC-V 与 LoongArch 架构"
 
 [output.html]
 default-theme = "rust"
