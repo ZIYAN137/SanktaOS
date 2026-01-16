@@ -1,11 +1,12 @@
 use super::*;
 use crate::vfs::file_system::FileSystem;
-use crate::{kassert, test_case};
+use crate::kassert;
 use alloc::string::String;
 
 // P1 重要功能测试
 
-test_case!(test_mount_fs, {
+#[test_case]
+fn test_mount_fs() {
     // 创建文件系统
     let fs = create_test_simplefs();
 
@@ -21,9 +22,10 @@ test_case!(test_mount_fs, {
     // 查找挂载点
     let mount = MOUNT_TABLE.find_mount("/test");
     kassert!(mount.is_some());
-});
+}
 
-test_case!(test_mount_list, {
+#[test_case]
+fn test_mount_list() {
     // 挂载文件系统
     let fs1 = create_test_simplefs();
 
@@ -35,11 +37,12 @@ test_case!(test_mount_list, {
     let mounts = MOUNT_TABLE.list_mounts();
     // 至少应该有根文件系统
     kassert!(mounts.len() >= 1);
-});
+}
 
 // P2 边界和错误处理测试
 
-test_case!(test_umount_fs, {
+#[test_case]
+fn test_umount_fs() {
     // 创建文件系统并挂载
     let fs = create_test_simplefs();
     MOUNT_TABLE
@@ -57,11 +60,12 @@ test_case!(test_umount_fs, {
     }
     // 如果没有根挂载点，应该返回 None
     // 如果有根挂载点，应该返回根而不是 /test_umount2
-});
+}
 
 // P3 Overmount 测试
 
-test_case!(test_overmount, {
+#[test_case]
+fn test_overmount() {
     // 创建两个文件系统
     let fs1 = create_test_simplefs();
     let fs2 = create_test_simplefs();
@@ -92,10 +96,11 @@ test_case!(test_overmount, {
     if let Some(m) = mount_final {
         kassert!(m.mount_path != "/overmount_test");
     }
-});
+}
 
-test_case!(test_umount_root_should_fail, {
+#[test_case]
+fn test_umount_root_should_fail() {
     // 尝试卸载根文件系统应该失败
     let result = MOUNT_TABLE.umount("/");
     kassert!(result.is_err());
-});
+}

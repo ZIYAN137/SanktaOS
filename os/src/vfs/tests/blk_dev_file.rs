@@ -5,21 +5,23 @@
 
 use super::*;
 use crate::device::block::BlockDriver;
-use crate::{kassert, test_case};
+use crate::kassert;
 
 // 由于 BlockDeviceFile 需要完整的设备注册流程，
 // 这里主要测试辅助函数和基本逻辑
 
-test_case!(test_blk_dev_helper_create_ramdisk, {
+#[test_case]
+fn test_blk_dev_helper_create_ramdisk() {
     // 测试创建测试用 RamDisk
     let ramdisk = create_test_ramdisk(10); // 10 blocks
     let driver: &dyn BlockDriver = &*ramdisk;
 
     kassert!(driver.block_size() == 512);
     kassert!(driver.total_blocks() == 10);
-});
+}
 
-test_case!(test_blk_dev_helper_ramdisk_operations, {
+#[test_case]
+fn test_blk_dev_helper_ramdisk_operations() {
     let ramdisk = create_test_ramdisk(4);
     let driver: &dyn BlockDriver = &*ramdisk;
 
@@ -34,9 +36,10 @@ test_case!(test_blk_dev_helper_ramdisk_operations, {
     kassert!(result);
     kassert!(read_data[0] == 0xAA);
     kassert!(read_data[511] == 0xAA);
-});
+}
 
-test_case!(test_blk_dev_helper_multiple_blocks, {
+#[test_case]
+fn test_blk_dev_helper_multiple_blocks() {
     let ramdisk = create_test_ramdisk(10);
     let driver: &dyn BlockDriver = &*ramdisk;
 
@@ -52,9 +55,10 @@ test_case!(test_blk_dev_helper_multiple_blocks, {
         kassert!(driver.read_block(i as usize, &mut buf));
         kassert!(buf[0] == i as u8);
     }
-});
+}
 
-test_case!(test_blk_dev_boundary_check, {
+#[test_case]
+fn test_blk_dev_boundary_check() {
     let ramdisk = create_test_ramdisk(2);
     let driver: &dyn BlockDriver = &*ramdisk;
 
@@ -67,4 +71,4 @@ test_case!(test_blk_dev_boundary_check, {
     let data = [0xBB; 512];
     let result = driver.write_block(10, &data);
     kassert!(!result);
-});
+}

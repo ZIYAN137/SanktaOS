@@ -1,12 +1,13 @@
 use super::*;
 use crate::vfs::{PipeFile, RegFile};
-use crate::{kassert, test_case};
+use crate::kassert;
 
 /// 测试 File trait 的多态行为
 
 // P0 核心功能测试
 
-test_case!(test_trait_polymorphism, {
+#[test_case]
+fn test_trait_polymorphism() {
     // 创建不同类型的 File 实现
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"disk file").unwrap();
@@ -24,9 +25,10 @@ test_case!(test_trait_polymorphism, {
     kassert!(disk_file.readable());
     kassert!(pipe_file_r.readable());
     kassert!(!pipe_file_w.readable());
-});
+}
 
-test_case!(test_disk_file_vs_pipe_file_lseek, {
+#[test_case]
+fn test_disk_file_vs_pipe_file_lseek() {
     // RegFile 支持 lseek
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"0123456789").unwrap();
@@ -43,9 +45,10 @@ test_case!(test_disk_file_vs_pipe_file_lseek, {
     let result = pipe_file.lseek(0, SeekWhence::Set);
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::NotSupported)));
-});
+}
 
-test_case!(test_disk_file_vs_pipe_file_offset, {
+#[test_case]
+fn test_disk_file_vs_pipe_file_offset() {
     // RegFile 有 offset
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -61,9 +64,10 @@ test_case!(test_disk_file_vs_pipe_file_offset, {
     let pipe_file: Arc<dyn File> = Arc::new(pipe_read);
 
     kassert!(pipe_file.offset() == 0);
-});
+}
 
-test_case!(test_disk_file_vs_pipe_file_flags, {
+#[test_case]
+fn test_disk_file_vs_pipe_file_flags() {
     // RegFile 有真实的 flags
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -78,11 +82,12 @@ test_case!(test_disk_file_vs_pipe_file_flags, {
 
     let flags = pipe_file.flags();
     kassert!(flags.is_empty());
-});
+}
 
 // P1 重要功能测试
 
-test_case!(test_fdtable_with_mixed_files, {
+#[test_case]
+fn test_fdtable_with_mixed_files() {
     // 在 FDTable 中混合存储不同类型的文件
     let fd_table = FDTable::new();
 
@@ -108,9 +113,10 @@ test_case!(test_fdtable_with_mixed_files, {
 
     // 验证不同的 fd
     kassert!(fd1 != fd2 && fd2 != fd3 && fd1 != fd3);
-});
+}
 
-test_case!(test_read_write_through_fdtable, {
+#[test_case]
+fn test_read_write_through_fdtable() {
     // 通过 FDTable 读写不同类型的文件
     let fd_table = FDTable::new();
 
@@ -133,11 +139,12 @@ test_case!(test_read_write_through_fdtable, {
     let nread = read_file.read(&mut buf).unwrap();
     kassert!(nread == 11);
     kassert!(&buf[..] == b"via fdtable");
-});
+}
 
 // P2 边界和错误处理测试
 
-test_case!(test_metadata_consistency, {
+#[test_case]
+fn test_metadata_consistency() {
     // 不同类型的文件返回正确的 metadata
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -154,4 +161,4 @@ test_case!(test_metadata_consistency, {
     let meta = pipe_file.metadata().unwrap();
     kassert!(meta.inode_type == InodeType::Fifo);
     kassert!(meta.size == 0);
-});
+}

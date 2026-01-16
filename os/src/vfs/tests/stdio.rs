@@ -1,9 +1,10 @@
 use super::*;
-use crate::{kassert, test_case};
+use crate::kassert;
 
 // P1 重要功能测试
 
-test_case!(test_create_stdio_files, {
+#[test_case]
+fn test_create_stdio_files() {
     // 创建标准 I/O 文件
     let (stdin, stdout, stderr) = create_stdio_files();
 
@@ -18,4 +19,4 @@ test_case!(test_create_stdio_files, {
     // 验证 stderr
     kassert!(!stderr.readable());
     kassert!(stderr.writable());
-});
+}

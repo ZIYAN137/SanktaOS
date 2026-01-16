@@ -1,9 +1,10 @@
 use super::*;
-use crate::{kassert, test_case};
+use crate::kassert;
 
 // P0 核心功能测试
 
-test_case!(test_file_read, {
+#[test_case]
+fn test_file_read() {
     // 创建文件系统和文件
     let fs = create_test_simplefs();
     let content = b"Hello, World!";
@@ -17,9 +18,10 @@ test_case!(test_file_read, {
     let bytes_read = file.read(&mut buf).unwrap();
     kassert!(bytes_read == 13);
     kassert!(&buf[..] == content);
-});
+}
 
-test_case!(test_file_write, {
+#[test_case]
+fn test_file_write() {
     // 创建文件系统和文件
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"").unwrap();
@@ -36,9 +38,10 @@ test_case!(test_file_write, {
     let mut buf = [0u8; 12];
     inode.read_at(0, &mut buf).unwrap();
     kassert!(&buf[..] == content);
-});
+}
 
-test_case!(test_file_lseek_set, {
+#[test_case]
+fn test_file_lseek_set() {
     // 创建文件
     let fs = create_test_simplefs();
     let content = b"0123456789";
@@ -54,9 +57,10 @@ test_case!(test_file_lseek_set, {
     let mut buf = [0u8; 5];
     file.read(&mut buf).unwrap();
     kassert!(&buf[..] == b"56789");
-});
+}
 
-test_case!(test_file_lseek_cur, {
+#[test_case]
+fn test_file_lseek_cur() {
     // 创建文件
     let fs = create_test_simplefs();
     let content = b"0123456789";
@@ -76,9 +80,10 @@ test_case!(test_file_lseek_cur, {
     let mut buf2 = [0u8; 2];
     file.read(&mut buf2).unwrap();
     kassert!(&buf2[..] == b"56");
-});
+}
 
-test_case!(test_file_lseek_end, {
+#[test_case]
+fn test_file_lseek_end() {
     // 创建文件
     let fs = create_test_simplefs();
     let content = b"0123456789";
@@ -94,11 +99,12 @@ test_case!(test_file_lseek_end, {
     let mut buf = [0u8; 5];
     file.read(&mut buf).unwrap();
     kassert!(&buf[..] == b"56789");
-});
+}
 
 // P1 重要功能测试
 
-test_case!(test_file_append_mode, {
+#[test_case]
+fn test_file_append_mode() {
     // 创建文件
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"Hello").unwrap();
@@ -117,9 +123,10 @@ test_case!(test_file_append_mode, {
     let mut buf = [0u8; 13];
     inode.read_at(0, &mut buf).unwrap();
     kassert!(&buf[..] == b"Hello, World!");
-});
+}
 
-test_case!(test_file_readable_check, {
+#[test_case]
+fn test_file_readable_check() {
     // 创建文件
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -135,9 +142,10 @@ test_case!(test_file_readable_check, {
     // 读写模式
     let file_rw = create_test_file("test.txt", inode, OpenFlags::O_RDWR);
     kassert!(file_rw.readable());
-});
+}
 
-test_case!(test_file_writable_check, {
+#[test_case]
+fn test_file_writable_check() {
     // 创建文件
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -153,11 +161,12 @@ test_case!(test_file_writable_check, {
     // 读写模式
     let file_rw = create_test_file("test.txt", inode, OpenFlags::O_RDWR);
     kassert!(file_rw.writable());
-});
+}
 
 // P2 边界和错误处理测试
 
-test_case!(test_file_read_permission_denied, {
+#[test_case]
+fn test_file_read_permission_denied() {
     // 创建文件（只写）
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -168,9 +177,10 @@ test_case!(test_file_read_permission_denied, {
     let result = file.read(&mut buf);
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::PermissionDenied)));
-});
+}
 
-test_case!(test_file_write_permission_denied, {
+#[test_case]
+fn test_file_write_permission_denied() {
     // 创建文件（只读）
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -180,9 +190,10 @@ test_case!(test_file_write_permission_denied, {
     let result = file.write(b"data");
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::PermissionDenied)));
-});
+}
 
-test_case!(test_file_lseek_negative_set, {
+#[test_case]
+fn test_file_lseek_negative_set() {
     // 创建文件
     let fs = create_test_simplefs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"test").unwrap();
@@ -192,4 +203,4 @@ test_case!(test_file_lseek_negative_set, {
     let result = file.lseek(-5, SeekWhence::Set);
     kassert!(result.is_err());
     kassert!(matches!(result, Err(FsError::InvalidArgument)));
-});
+}
