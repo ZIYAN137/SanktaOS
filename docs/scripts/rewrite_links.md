@@ -100,7 +100,7 @@ Summary:
   run: python3 scripts/rewrite_links.py docs/
 
 - name: Build mdBook documentation
-  run: mdbook build
+  run: cd docs && mdbook build
 ```
 
 ## 正则表达式模式
@@ -206,7 +206,7 @@ GITHUB_BRANCH = "your-branch"
 在部署文档前（通常由 CI 自动完成），运行转换脚本：
 ```bash
 python3 scripts/rewrite_links.py docs/
-mdbook build
+cd docs && mdbook build
 ```
 
 ### 版本控制
@@ -246,7 +246,7 @@ else:
 
 - [Scripts 工具总览](./README.md)
 - [文档部署流程](/.github/workflows/docs-deployment.yml)
-- [mdBook 配置](/book.toml)
+- [mdBook 配置](../book.toml)
 
 ## 参考资源
 

@@ -9,7 +9,7 @@
   1. 安装 mdBook（一次性）
      - 使用 Rust 工具链：`cargo install mdbook`
      - 或从发行包获取，参考 mdBook 官方说明
-  2. 在仓库根目录执行（假定 book.toml 位于仓库根）：
+  2. 在 `docs/` 目录执行（book.toml 位于 `docs/book.toml`）：
      - 预览：`mdbook serve -n 0.0.0.0 -p 4000`
      - 构建：`mdbook build`
   3. 浏览器打开预览

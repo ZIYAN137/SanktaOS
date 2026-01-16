@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'document/**'
+      - 'docs/**'
       - 'os/src/**'
-      - 'book.toml'
+      - 'docs/book.toml'
       - '.github/workflows/docs-deployment.yml'
   workflow_dispatch:
 
@@ -42,7 +42,8 @@ jobs:
 
       - name: 构建 mdBook 文档
         run: |
-          python3 scripts/rewrite_links.py document/
+          python3 scripts/rewrite_links.py docs/
+          cd docs
           mdbook build
 
       - name: 构建 Rust API 文档
@@ -54,7 +55,7 @@ jobs:
         run: |
           mkdir -p site
           # 复制 mdBook 输出
-          cp -r book/* site/
+          cp -r docs/book/* site/
           # 删除 mdBook 生成的 api 目录（如果存在），避免与 cargo doc 输出冲突
           rm -rf site/api
           # 复制 cargo doc 输出到 api 子目录
