@@ -124,8 +124,54 @@ pub fn arch_ops() -> &'static dyn ArchMmOps {
     let data = ARCH_OPS_DATA.load(Ordering::Acquire);
     let vtable = ARCH_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::mm::MOCK_MM_OPS;
+        }
+        #[cfg(not(test))]
         panic!("mm: ArchMmOps not registered");
     }
     // SAFETY: 重组 fat pointer
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn ArchMmOps>((data, vtable)) }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::{ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper};
+
+    struct MockTlbBatchContext;
+
+    impl TlbBatchContextTrait for MockTlbBatchContext {
+        fn flush(&mut self) {}
+    }
+
+    impl ArchMmOps for test_support::mock::mm::MockMmOps {
+        unsafe fn vaddr_to_paddr(&self, vaddr: usize) -> usize {
+            unsafe { self.vaddr_to_paddr(vaddr) }
+        }
+
+        fn paddr_to_vaddr(&self, paddr: usize) -> usize {
+            self.paddr_to_vaddr(paddr)
+        }
+
+        fn sigreturn_trampoline_bytes(&self) -> &'static [u8] {
+            self.sigreturn_trampoline_bytes()
+        }
+
+        fn num_cpus(&self) -> usize {
+            self.num_cpus()
+        }
+
+        fn send_tlb_flush_ipi_all(&self) {
+            self.send_tlb_flush_ipi_all()
+        }
+
+        fn create_tlb_batch_context(&self) -> TlbBatchContextWrapper {
+            // SAFETY: 测试使用的 context 为 'static 且大小 <= 64 字节。
+            unsafe { TlbBatchContextWrapper::new(MockTlbBatchContext) }
+        }
+    }
 }
