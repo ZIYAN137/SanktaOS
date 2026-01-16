@@ -559,20 +559,22 @@ fn ppn_to_satp(ppn: Ppn) -> usize {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::{kassert, test_case};
+    use crate::kassert;
     use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
-    test_case!(test_pt_create, {
+    #[test_case]
+    fn test_pt_create() {
         let pt = PageTableInner::new();
         // 根 PPN 应该有效 (大于 0)
         kassert!(pt.root_ppn().as_usize() > 0);
         // 默认创建为用户页表
         kassert!(pt.is_user_table());
-    });
+    }
 
     // 2. 映射与转换测试
-    test_case!(test_pt_map_translate, {
+    #[test_case]
+    fn test_pt_map_translate() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -588,10 +590,11 @@ mod page_table_tests {
         let paddr = translated.unwrap();
         // 验证转换后的物理页号是否正确
         kassert!(paddr.as_usize() >> 12 == ppn.as_usize());
-    });
+    }
 
     // 3. 解除映射测试
-    test_case!(test_pt_unmap, {
+    #[test_case]
+    fn test_pt_unmap() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -608,10 +611,11 @@ mod page_table_tests {
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
         kassert!(translated.is_none());
-    });
+    }
 
     // 4. 错误测试：已映射
-    test_case!(test_pt_error_already_mapped, {
+    #[test_case]
+    fn test_pt_error_already_mapped() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
 
@@ -632,10 +636,11 @@ mod page_table_tests {
             UniversalPTEFlag::kernel_rw(),
         );
         kassert!(result2.is_err());
-    });
+    }
 
     // 5. 页表遍历 (Walk) 测试
-    test_case!(test_pt_walk, {
+    #[test_case]
+    fn test_pt_walk() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -653,10 +658,11 @@ mod page_table_tests {
         // 创建新的flags实例用于比较，避免所有权问题
         let expected_flags = UniversalPTEFlag::kernel_rw();
         kassert!(mapped_flags.bits() == expected_flags.bits());
-    });
+    }
 
     // 6. 更新标志位测试
-    test_case!(test_pt_update_flags, {
+    #[test_case]
+    fn test_pt_update_flags() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -675,10 +681,11 @@ mod page_table_tests {
         // 创建新的flags实例用于比较，避免所有权问题
         let expected_flags = UniversalPTEFlag::kernel_r();
         kassert!(flags.bits() == expected_flags.bits());
-    });
+    }
 
     // 7. 多重映射测试
-    test_case!(test_pt_multiple_mappings, {
+    #[test_case]
+    fn test_pt_multiple_mappings() {
         let mut pt = PageTableInner::new();
 
         // 映射多个 VPN
@@ -696,19 +703,21 @@ mod page_table_tests {
             let (mapped_ppn, _, _) = pt.walk(vpn).unwrap();
             kassert!(mapped_ppn == expected_ppn);
         }
-    });
+    }
 
     // TLB Shootdown 测试
 
     /// 测试 TLB flush IPI 发送（基础功能）
-    test_case!(test_tlb_flush_ipi_basic, {
+    #[test_case]
+    fn test_tlb_flush_ipi_basic() {
         // 调用 send_tlb_flush_ipi_all 不应该 panic
         crate::arch::ipi::send_tlb_flush_ipi_all();
         kassert!(true);
-    });
+    }
 
     /// 测试页表映射触发 TLB shootdown
-    test_case!(test_page_table_map_with_tlb_flush, {
+    #[test_case]
+    fn test_page_table_map_with_tlb_flush() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x10000);
         let ppn = Ppn::from_usize(0x80000);
@@ -720,10 +729,11 @@ mod page_table_tests {
         // 验证映射生效
         let translated = pt.translate(vpn.start_addr());
         kassert!(translated.is_some());
-    });
+    }
 
     /// 测试页表解除映射触发 TLB shootdown
-    test_case!(test_page_table_unmap_with_tlb_flush, {
+    #[test_case]
+    fn test_page_table_unmap_with_tlb_flush() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x20000);
         let ppn = Ppn::from_usize(0x81000);
@@ -739,10 +749,11 @@ mod page_table_tests {
         // 验证解除映射生效
         let translated = pt.translate(vpn.start_addr());
         kassert!(translated.is_none());
-    });
+    }
 
     /// 测试页表权限更新触发 TLB shootdown
-    test_case!(test_page_table_update_flags_with_tlb_flush, {
+    #[test_case]
+    fn test_page_table_update_flags_with_tlb_flush() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x30000);
         let ppn = Ppn::from_usize(0x82000);
@@ -754,5 +765,5 @@ mod page_table_tests {
         // 更新权限为读写（应该触发 TLB shootdown）
         let result = pt.update_flags(vpn, UniversalPTEFlag::kernel_rw());
         kassert!(result.is_ok());
-    });
+    }
 }

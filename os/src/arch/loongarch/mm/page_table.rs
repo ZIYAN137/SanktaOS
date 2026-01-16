@@ -532,20 +532,22 @@ impl PageTableInner {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::{kassert, test_case};
+    use crate::kassert;
     use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
-    test_case!(test_pt_create, {
+    #[test_case]
+    fn test_pt_create() {
         let pt = PageTableInner::new();
         // 根 PPN 应该有效 (大于 0)
         kassert!(pt.root_ppn().as_usize() > 0);
         // 默认创建为用户页表
         kassert!(pt.is_user_table());
-    });
+    }
 
     // 2. 映射与转换测试
-    test_case!(test_pt_map_translate, {
+    #[test_case]
+    fn test_pt_map_translate() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -561,10 +563,11 @@ mod page_table_tests {
         let paddr = translated.unwrap();
         // 验证转换后的物理页号是否正确
         kassert!(paddr.as_usize() >> 12 == ppn.as_usize());
-    });
+    }
 
     // 3. 解除映射测试
-    test_case!(test_pt_unmap, {
+    #[test_case]
+    fn test_pt_unmap() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -581,10 +584,11 @@ mod page_table_tests {
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
         kassert!(translated.is_none());
-    });
+    }
 
     // 4. 错误测试：已映射
-    test_case!(test_pt_error_already_mapped, {
+    #[test_case]
+    fn test_pt_error_already_mapped() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
 
@@ -605,10 +609,11 @@ mod page_table_tests {
             UniversalPTEFlag::kernel_rw(),
         );
         kassert!(result2.is_err());
-    });
+    }
 
     // 5. 页表遍历 (Walk) 测试
-    test_case!(test_pt_walk, {
+    #[test_case]
+    fn test_pt_walk() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -630,10 +635,11 @@ mod page_table_tests {
         kassert!(mapped_flags.contains(UniversalPTEFlag::VALID));
         kassert!(mapped_flags.contains(UniversalPTEFlag::READABLE));
         kassert!(mapped_flags.contains(UniversalPTEFlag::WRITEABLE));
-    });
+    }
 
     // 6. 更新标志位测试
-    test_case!(test_pt_update_flags, {
+    #[test_case]
+    fn test_pt_update_flags() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -653,10 +659,11 @@ mod page_table_tests {
         kassert!(flags.contains(UniversalPTEFlag::READABLE));
         // kernel_r 不应包含 WRITEABLE
         kassert!(!flags.contains(UniversalPTEFlag::WRITEABLE));
-    });
+    }
 
     // 7. 多重映射测试
-    test_case!(test_pt_multiple_mappings, {
+    #[test_case]
+    fn test_pt_multiple_mappings() {
         let mut pt = PageTableInner::new();
 
         // 映射多个 VPN
@@ -674,5 +681,5 @@ mod page_table_tests {
             let (mapped_ppn, _, _) = pt.walk(vpn).unwrap();
             kassert!(mapped_ppn == expected_ppn);
         }
-    });
+    }
 }
