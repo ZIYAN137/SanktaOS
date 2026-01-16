@@ -28,6 +28,9 @@ pub use ticket_lock::*;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(test)]
+extern crate test_support;
+
 /// 架构相关操作的 trait
 ///
 /// 由 os crate 实现并注册，提供中断控制和 CPU 信息
@@ -88,16 +91,20 @@ pub(crate) fn arch_ops() -> &'static dyn ArchOps {
 #[cfg(test)]
 pub(crate) fn arch_ops() -> &'static dyn ArchOps {
     // 在测试模式下返回 mock 实现
-    extern crate test_support;
+    &test_support::mock::arch::MOCK_ARCH_OPS
+}
 
-    // 为 MockArchOps 实现 ArchOps trait（仅在测试模式）
+#[cfg(test)]
+mod test_mock {
+    use super::ArchOps;
+
     impl ArchOps for test_support::mock::arch::MockArchOps {
         unsafe fn read_and_disable_interrupts(&self) -> usize {
-            self.read_and_disable_interrupts()
+            unsafe { self.read_and_disable_interrupts() }
         }
 
         unsafe fn restore_interrupts(&self, flags: usize) {
-            self.restore_interrupts(flags)
+            unsafe { self.restore_interrupts(flags) }
         }
 
         fn sstatus_sie(&self) -> usize {
@@ -112,6 +119,4 @@ pub(crate) fn arch_ops() -> &'static dyn ArchOps {
             self.max_cpu_count()
         }
     }
-
-    &test_support::mock::arch::MOCK_ARCH_OPS
 }
