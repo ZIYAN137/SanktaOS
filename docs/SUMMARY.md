@@ -11,10 +11,6 @@
 
 - [日志系统概述](log/README.md)
   - [架构设计](log/architecture.md)
-  - [日志级别](log/level.md)
-  - [缓冲区和条目](log/buffer_and_entry.md)
-  - [使用方法](log/usage.md)
-  - [API 参考](log/api_reference.md)
 
 # 网络
 
