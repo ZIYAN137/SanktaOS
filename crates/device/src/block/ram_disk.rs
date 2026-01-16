@@ -116,3 +116,92 @@ impl BlockDriver for RamDisk {
         self.data.lock().len() / self.block_size
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use sync::ArchOps;
+
+    struct DummyArchOps;
+
+    impl ArchOps for DummyArchOps {
+        unsafe fn read_and_disable_interrupts(&self) -> usize {
+            0
+        }
+
+        unsafe fn restore_interrupts(&self, _flags: usize) {}
+
+        fn sstatus_sie(&self) -> usize {
+            0
+        }
+
+        fn cpu_id(&self) -> usize {
+            0
+        }
+
+        fn max_cpu_count(&self) -> usize {
+            1
+        }
+    }
+
+    static DUMMY_ARCH_OPS: DummyArchOps = DummyArchOps;
+    // 0 = uninit, 1 = initializing, 2 = ready
+    static SYNC_INIT: AtomicUsize = AtomicUsize::new(0);
+
+    fn init_sync_arch_ops() {
+        match SYNC_INIT.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => {
+                // Safety: tests use a single global dummy ArchOps.
+                unsafe { sync::register_arch_ops(&DUMMY_ARCH_OPS) };
+                SYNC_INIT.store(2, Ordering::Release);
+            }
+            Err(_) => {
+                while SYNC_INIT.load(Ordering::Acquire) != 2 {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ramdisk_read_write_roundtrip() {
+        init_sync_arch_ops();
+        let rd = RamDisk::new(4096, 512, 1);
+        assert_eq!(rd.block_size(), 512);
+        assert_eq!(rd.total_blocks(), 8);
+
+        let mut wbuf = [0u8; 512];
+        wbuf[0] = 0xAA;
+        wbuf[511] = 0x55;
+        assert!(rd.write_block(3, &wbuf));
+
+        let mut rbuf = [0u8; 512];
+        assert!(rd.read_block(3, &mut rbuf));
+        assert_eq!(rbuf, wbuf);
+
+        // Other blocks remain zero.
+        let mut rbuf2 = [0u8; 512];
+        assert!(rd.read_block(2, &mut rbuf2));
+        assert_eq!(rbuf2, [0u8; 512]);
+    }
+
+    #[test]
+    fn test_ramdisk_bounds_and_wrong_buf_size() {
+        init_sync_arch_ops();
+        let rd = RamDisk::new(1024, 512, 1);
+        assert_eq!(rd.total_blocks(), 2);
+
+        let mut bad_read = [0u8; 16];
+        assert!(!rd.read_block(0, &mut bad_read));
+
+        let bad_write = [0u8; 16];
+        assert!(!rd.write_block(0, &bad_write));
+
+        let mut ok_read = [0u8; 512];
+        assert!(!rd.read_block(2, &mut ok_read)); // out of range
+
+        let ok_write = [0u8; 512];
+        assert!(!rd.write_block(2, &ok_write)); // out of range
+    }
+}

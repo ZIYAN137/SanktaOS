@@ -38,6 +38,121 @@ impl NetworkInterfaceManager {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use device::NullNetDevice;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use sync::ArchOps;
+    use smoltcp::wire::Ipv4Cidr;
+
+    struct DummyArchOps;
+
+    impl ArchOps for DummyArchOps {
+        unsafe fn read_and_disable_interrupts(&self) -> usize {
+            0
+        }
+
+        unsafe fn restore_interrupts(&self, _flags: usize) {}
+
+        fn sstatus_sie(&self) -> usize {
+            0
+        }
+
+        fn cpu_id(&self) -> usize {
+            0
+        }
+
+        fn max_cpu_count(&self) -> usize {
+            1
+        }
+    }
+
+    static DUMMY_ARCH_OPS: DummyArchOps = DummyArchOps;
+    static SYNC_INIT: AtomicUsize = AtomicUsize::new(0);
+
+    fn init_sync_arch_ops() {
+        match SYNC_INIT.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => {
+                // Safety: tests use a single global dummy ArchOps.
+                unsafe { sync::register_arch_ops(&DUMMY_ARCH_OPS) };
+                SYNC_INIT.store(2, Ordering::Release);
+            }
+            Err(_) => {
+                while SYNC_INIT.load(Ordering::Acquire) != 2 {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_network_interface_manager_add_and_find() {
+        init_sync_arch_ops();
+        let dev0 = NullNetDevice::new(0);
+        let iface0 = Arc::new(NetworkInterface::new(String::from("eth0"), dev0));
+
+        let dev1 = NullNetDevice::new(1);
+        let iface1 = Arc::new(NetworkInterface::new(String::from("eth1"), dev1));
+
+        let mut mgr = NetworkInterfaceManager::new();
+        mgr.add_interface(iface0.clone());
+        mgr.add_interface(iface1.clone());
+
+        assert_eq!(mgr.get_interfaces().len(), 2);
+        assert_eq!(mgr.find_interface_by_name("eth0").unwrap().name(), "eth0");
+        assert_eq!(mgr.find_interface_by_name("eth1").unwrap().name(), "eth1");
+        assert!(mgr.find_interface_by_name("nope").is_none());
+    }
+
+    #[test]
+    fn test_network_interface_ip_dedup_and_gateway() {
+        init_sync_arch_ops();
+        let dev = NullNetDevice::new(0);
+        let iface = NetworkInterface::new(String::from("eth0"), dev);
+
+        let ip = IpCidr::Ipv4(Ipv4Cidr::new(Ipv4Address::new(10, 0, 2, 15), 24));
+        iface.add_ip_address(ip);
+        iface.add_ip_address(ip);
+        assert_eq!(iface.ip_addresses().len(), 1);
+
+        assert_eq!(iface.ipv4_gateway(), None);
+        iface.set_ipv4_gateway(Some(Ipv4Address::new(10, 0, 2, 2)));
+        assert_eq!(iface.ipv4_gateway(), Some(Ipv4Address::new(10, 0, 2, 2)));
+    }
+
+    #[test]
+    fn test_network_interface_interrupt_toggle() {
+        init_sync_arch_ops();
+        let dev = NullNetDevice::new(0);
+        let iface = NetworkInterface::new(String::from("eth0"), dev);
+
+        assert!(iface.is_interrupt_enabled());
+        iface.disable_interrupt();
+        assert!(!iface.is_interrupt_enabled());
+        iface.enable_interrupt();
+        assert!(iface.is_interrupt_enabled());
+    }
+
+    #[test]
+    fn test_create_smoltcp_interface_sets_ip_addrs() {
+        init_sync_arch_ops();
+        let dev = NullNetDevice::new(0);
+        let iface = NetworkInterface::new(String::from("eth0"), dev);
+
+        let ip1 = IpCidr::Ipv4(Ipv4Cidr::new(Ipv4Address::new(192, 168, 0, 2), 24));
+        let ip2 = IpCidr::Ipv4(Ipv4Cidr::new(Ipv4Address::new(10, 0, 2, 15), 24));
+        iface.add_ip_address(ip1);
+        iface.add_ip_address(ip2);
+
+        let sm = iface.create_smoltcp_interface();
+        let addrs = sm.interface().ip_addrs();
+        assert_eq!(addrs.len(), 2);
+        assert!(addrs.iter().any(|a| *a == ip1));
+        assert!(addrs.iter().any(|a| *a == ip2));
+    }
+}
+
 lazy_static! {
     /// 全局网络接口管理器
     pub static ref NETWORK_INTERFACE_MANAGER: SpinLock<NetworkInterfaceManager> =
