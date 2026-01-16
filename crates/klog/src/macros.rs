@@ -5,10 +5,12 @@
 //! # 用法
 //!
 //! ```rust
-//! use klog::pr_info;
-//! use klog::pr_err;
+//! use klog::{pr_debug, pr_err, pr_info, pr_warn};
 //!
 //! pr_info!("系统已初始化");
+//! let size = 4096usize;
+//! let percent = 42u32;
+//! let x = 7u32;
 //! pr_err!("分配 {} 字节失败", size);
 //! pr_warn!("内存使用率为 {}%", percent);
 //! pr_debug!("变量 x = {}", x);
@@ -49,6 +51,9 @@ macro_rules! __klog_impl_filtered {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_emerg;
+///
+/// let reason = "oops";
 /// pr_emerg!("内核恐慌: {}", reason);
 /// pr_emerg!("系统中止");
 /// ```
@@ -69,6 +74,7 @@ format_args!($($arg)*)
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_alert;
 /// pr_alert!("检测到关键硬件故障");
 /// ```
 #[macro_export]
@@ -88,6 +94,7 @@ macro_rules! pr_alert {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_crit;
 /// pr_crit!("温度阈值已超出");
 /// ```
 #[macro_export]
@@ -107,6 +114,10 @@ macro_rules! pr_crit {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_err;
+///
+/// let size = 4096usize;
+/// let error = "EIO";
 /// pr_err!("分配 {} 字节失败", size);
 /// pr_err!("设备初始化失败: {}", error);
 /// ```
@@ -127,6 +138,9 @@ macro_rules! pr_err {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_warn;
+///
+/// let percent = 42u32;
 /// pr_warn!("内存使用率为 {}%", percent);
 /// pr_warn!("使用了已弃用的功能");
 /// ```
@@ -147,6 +161,9 @@ macro_rules! pr_warn {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_notice;
+///
+/// let device_name = "eth0";
 /// pr_notice!("设备 {} 已连接", device_name);
 /// ```
 #[macro_export]
@@ -166,7 +183,10 @@ macro_rules! pr_notice {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_info;
+///
 /// pr_info!("内核已初始化");
+/// let name = "vfs";
 /// pr_info!("正在启动子系统 {}", name);
 /// ```
 #[macro_export]
@@ -187,6 +207,11 @@ macro_rules! pr_info {
 /// # 示例
 ///
 /// ```rust
+/// use klog::pr_debug;
+///
+/// let x = 1u32;
+/// let old_state = "A";
+/// let new_state = "B";
 /// pr_debug!("调用函数时 x = {}", x);
 /// pr_debug!("状态转换: {} -> {}", old_state, new_state);
 /// ```

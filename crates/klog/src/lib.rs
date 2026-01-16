@@ -40,6 +40,10 @@
 #![no_std]
 #![allow(unused)]
 
+// `no_std` crates still run unit tests with the standard test harness.
+#[cfg(test)]
+extern crate std;
+
 extern crate alloc;
 
 mod buffer;
@@ -54,7 +58,7 @@ pub use config::{
 };
 pub use entry::LogEntry;
 pub use level::LogLevel;
-pub use log_core::format_log_entry;
+pub use log_core::{format_log_entry, LogCore};
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 
@@ -217,6 +221,9 @@ pub fn log_writer_index() -> usize {
 pub fn log_len() -> usize {
     GLOBAL_LOG._log_len()
 }
+
+#[cfg(test)]
+mod tests;
 
 /// 返回未读日志的总字节数（格式化后）
 pub fn log_unread_bytes() -> usize {

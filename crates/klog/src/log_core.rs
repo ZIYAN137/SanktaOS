@@ -43,8 +43,11 @@ impl LogCore {
     /// # 示例
     ///
     /// ```rust
-    /// // 全局单例 (编译时初始化)
+    /// use klog::LogCore;
+    ///
+    /// // Global singleton (const-initialized)
     /// static GLOBAL_LOG: LogCore = LogCore::default();
+    /// let _ = &GLOBAL_LOG;
     /// ```
     pub const fn default() -> Self {
         Self {
@@ -67,11 +70,13 @@ impl LogCore {
     /// # 示例
     ///
     /// ```rust
-    /// // 启用 Debug 级别的测试实例
-    /// let test_log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+    /// use klog::{LogCore, LogLevel};
     ///
-    /// // 使用自定义级别的生产实例
-    /// let log = LogCore::new(LogLevel::Info, LogLevel::Error);
+    /// // Test instance (enable Debug)
+    /// let _test_log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+    ///
+    /// // Production instance (custom levels)
+    /// let _log = LogCore::new(LogLevel::Info, LogLevel::Error);
     /// ```
     pub fn new(global_level: LogLevel, console_level: LogLevel) -> Self {
         Self {
@@ -257,12 +262,12 @@ unsafe impl Sync for LogCore {}
 /// - `buffer::calculate_formatted_length` - 用于精确字节计数
 ///
 /// # 格式
-/// ```
+/// ```text
 /// <color_code>[LEVEL] [timestamp] [CPU<id>/T<tid>] message<reset>
 /// ```
 ///
 /// # 示例
-/// ```
+/// ```text
 /// \x1b[37m[INFO] [      123456] [CPU0/T  1] Kernel initialized\x1b[0m
 /// \x1b[31m[ERR] [      789012] [CPU0/T  5] Failed to mount /dev/sda1\x1b[0m
 /// ```
