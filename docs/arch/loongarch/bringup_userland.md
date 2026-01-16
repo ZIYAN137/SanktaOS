@@ -1,6 +1,6 @@
-# LoongArch64 启动与用户态运行修复总结（comix-1 当前分支）
+# LoongArch64 启动与用户态运行修复总结（当前分支）
 
-本文档总结当前分支中，为了让 comix 在 LoongArch64 架构下能够**稳定完成启动、进入并持续运行用户态程序（busybox init / shell）**而做的一组修复与对齐工作。重点目标是：让 LoongArch 的整体启动语义尽可能与 RISC-V 路径一致（尤其是 `/dev` 等挂载点由 rcS 负责挂载），并且把“卡在 trap / 无法进入用户态 / 用户态一运行就异常”的问题收敛到可解释、可复现、可继续演进的状态。
+本文档总结当前分支中，为了让 SanktaOS 在 LoongArch64 架构下能够**稳定完成启动、进入并持续运行用户态程序（busybox init / shell）**而做的一组修复与对齐工作。重点目标是：让 LoongArch 的整体启动语义尽可能与 RISC-V 路径一致（尤其是 `/dev` 等挂载点由 rcS 负责挂载），并且把“卡在 trap / 无法进入用户态 / 用户态一运行就异常”的问题收敛到可解释、可复现、可继续演进的状态。
 
 ---
 
@@ -199,4 +199,3 @@ LoongArch64 上曾出现以下典型现象（可单独出现或互相叠加）�
 1) **rootfs 内容对齐**：建议让 `data/loongarch_musl` 也包含 `/dev /proc /sys` 等空目录，使镜像结构更接近 `data/risc-v_musl`，减少对内核“兜底创建目录”的依赖。
 2) **减少调试噪声**：目前 LoongArch trap/syscall 输出较多（用于 bringup）；在稳定后可逐步降级为 `pr_debug` 或加开关。
 3) **设备/网络完善**：virtio-net 可能仍会报 `DeviceNotReady`，这属于设备初始化/驱动完善方向，与“能进用户态”已解耦。
-

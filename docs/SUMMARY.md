@@ -65,7 +65,7 @@
 ## LoongArch64
 
 - [LoongArch64](arch/loongarch/README.md)
-  - [启动与用户态运行修复总结（comix-1 当前分支）](arch/loongarch/bringup_userland.md)
+  - [启动与用户态运行修复总结（当前分支）](arch/loongarch/bringup_userland.md)
 
 
 ---
