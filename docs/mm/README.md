@@ -11,24 +11,17 @@ MM（Memory Management，内存管理）子系统是 SanktaOS 内核的核心组
 - **内核堆分配**：支持动态内存分配的全局分配器
 - **架构抽象**：统一的接口支持多种硬件架构
 
-## 模块结构
+## 模块结构（代码位置）
 
 ```
-os/src/mm/                          # 架构无关的内存管理层
-│
-├── mod.rs ........................ MM 子系统初始化入口
+crates/mm/src/                      # 架构无关的内存管理层（mm crate）
 │
 ├── address/ ...................... 地址抽象层
 │   ├── address.rs ............... 物理/虚拟地址类型 (Paddr/Vaddr)
 │   ├── page_num.rs .............. 物理/虚拟页号类型 (Ppn/Vpn)
 │   └── operations.rs ............ 地址运算 trait 定义
 │
-├── frame_allocator/ .............. 物理帧分配器
-│   └── frame_allocator.rs ....... 核心分配器及 RAII 包装器
-│
-├── global_allocator/ ............. 内核堆分配器
-│   ├── global_allocator.rs ...... talc 全局分配器实现
-│   └── heap.rs .................. C 风格 kmalloc 接口（未实现）
+├── frame_allocator.rs ............ 物理帧分配器（RAII + 连续/对齐分配）
 │
 ├── page_table/ ................... 页表抽象层
 │   ├── page_table.rs ............ PageTableInner trait 定义
@@ -38,7 +31,13 @@ os/src/mm/                          # 架构无关的内存管理层
     ├── memory_space.rs .......... MemorySpace 结构及空间创建
     └── mapping_area.rs .......... MappingArea 映射区域管理
 
-os/src/arch/{riscv,loongarch}/mm/  # 架构特定实现层
+os/src/mm/                          # os crate 中的 mm 相关实现（os-specific）
+│
+├── mod.rs ........................ MM 初始化入口（组装 crates/mm 提供的基础能力）
+├── global_allocator.rs ........... 内核堆分配器（talc）
+└── memory_space.rs ............... 进程/内核地址空间创建与管理（os-specific）
+
+os/src/arch/{riscv,loongarch}/mm/   # 架构特定实现层
 │
 ├── mod.rs ........................ 地址转换函数
 ├── page_table.rs ................. PageTableInner 实现
@@ -51,20 +50,12 @@ os/src/arch/{riscv,loongarch}/mm/  # 架构特定实现层
 
 - **[整体架构](architecture.md)** - MM 子系统的分层设计、模块依赖关系和初始化流程
 
-### 子模块详解
+### API 与实现细节
 
-- **[地址抽象层](address.md)** - Paddr/Vaddr/Ppn/Vpn 类型、地址运算和范围操作（**左闭右开区间**）
-- **[物理帧分配器](frame_allocator.md)** - 水位线 + 回收栈分配策略、FrameTracker RAII 机制
-- **[全局堆分配器](global_allocator.md)** - talc 全局分配器实现和动态内存分配
-- **[页表抽象层](page_table.md)** - PageTableInner trait、RISC-V SV39 实现、UniversalPTEFlag
+从阶段 2 开始，MM 的 API 参考与实现细节以“代码注释（rustdoc）”为主：
 
-### 地址空间管理
-
-- **[地址空间管理](memory_space.md)** - 地址空间管理、MemorySpace 结构、MappingArea 映射区域及系统调用支持
-
-### API 参考
-
-- **[API 索引](api_reference.md)** - 完整的公共 API 列表及文件位置
+- `crates/mm/src/`：mm crate 的公共 API 与核心实现说明（推荐通过 `cargo doc` 查看）
+- `os/src/mm/`：与内核启动/进程管理强相关的地址空间创建、全局分配器等实现
 
 ## 设计原则
 

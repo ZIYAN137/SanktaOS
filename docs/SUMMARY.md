@@ -6,12 +6,6 @@
 
 - [内存管理概述](mm/README.md)
   - [架构设计](mm/architecture.md)
-  - [地址抽象](mm/address.md)
-  - [物理帧分配器](mm/frame_allocator.md)
-  - [页表管理](mm/page_table.md)
-  - [内存空间](mm/memory_space.md)
-  - [全局分配器](mm/global_allocator.md)
-  - [API 参考](mm/api_reference.md)
 
 # 日志系统
 

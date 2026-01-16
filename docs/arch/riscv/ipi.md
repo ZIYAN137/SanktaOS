@@ -388,7 +388,7 @@ page_table.update_flags(vpn, UniversalPTEFlag::kernel_r())?;
 
 - 源码位置：`os/src/arch/riscv/mm/page_table.rs`
 - IPI 发送：`os/src/arch/riscv/ipi.rs` 中的 `send_tlb_flush_ipi_all()`
-- 详细说明：参见 [页表文档](../../mm/page_table.md#多核-tlb-shootdown)
+- 详细说明：参见 [MM 架构文档](../../mm/architecture.md)
 
 ### 5.3 系统关机
 
