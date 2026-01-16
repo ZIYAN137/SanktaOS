@@ -252,6 +252,7 @@ impl NetDeviceAdapter {
         }
     }
 
+    /// 获取 loopback 队列当前缓存的帧数量
     pub fn loopback_queue_len(&self) -> usize {
         self.loopback_queue.lock().len()
     }

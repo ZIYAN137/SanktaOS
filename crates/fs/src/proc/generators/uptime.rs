@@ -7,6 +7,7 @@ use crate::ops::fs_ops;
 use crate::proc::inode::ContentGenerator;
 use vfs::FsError;
 
+/// `/proc/uptime` 内容生成器。
 pub struct UptimeGenerator;
 
 impl ContentGenerator for UptimeGenerator {

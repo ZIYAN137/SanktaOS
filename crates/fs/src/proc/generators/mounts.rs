@@ -8,6 +8,7 @@ use crate::ops::fs_ops;
 use crate::proc::inode::ContentGenerator;
 use vfs::FsError;
 
+/// `/proc/mounts` 内容生成器。
 pub struct MountsGenerator;
 
 impl ContentGenerator for MountsGenerator {

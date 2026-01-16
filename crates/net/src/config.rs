@@ -13,10 +13,15 @@ use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
 /// 网络配置错误
 #[derive(Debug)]
 pub enum NetworkConfigError {
+    /// 指定的网络接口不存在
     InterfaceNotFound,
+    /// IP 地址格式或取值无效
     InvalidAddress,
+    /// 子网掩码/前缀无效
     InvalidSubnet,
+    /// 网关地址无效
     InvalidGateway,
+    /// 应用配置时失败（底层接口/协议栈拒绝或出错）
     ConfigFailed,
 }
 

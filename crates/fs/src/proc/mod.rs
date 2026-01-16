@@ -11,6 +11,7 @@
 //!
 //! 生成器通常通过 [`crate::ops::fs_ops`] 获取任务/内存/挂载信息，并序列化为 Linux 风格文本。
 
+/// procfs 文件内容生成器集合。
 pub mod generators;
 pub mod inode;
 pub mod proc;

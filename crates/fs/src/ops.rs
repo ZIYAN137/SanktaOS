@@ -156,7 +156,7 @@ pub trait TaskInfo: Send + Sync {
     /// 获取虚拟内存统计信息
     fn vm_stats(&self) -> Option<VmStats>;
 
-    /// 获取内存区域信息（用于 /proc/[pid]/maps）
+    /// 获取内存区域信息（用于 `/proc/[pid]/maps`）
     fn memory_areas(&self) -> Vec<MemoryAreaInfo>;
 
     /// 获取用户态 CPU 时间（时钟滴答数）
@@ -212,7 +212,7 @@ impl VmStats {
     }
 }
 
-/// 内存区域信息（用于 procfs /proc/[pid]/maps）
+/// 内存区域信息（用于 procfs `/proc/[pid]/maps`）
 #[derive(Clone)]
 pub struct MemoryAreaInfo {
     /// 起始地址

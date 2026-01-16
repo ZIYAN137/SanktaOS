@@ -17,20 +17,34 @@ use sync::SpinLock;
 use vfs::{File, FsError, InodeMetadata};
 
 #[derive(Clone, Copy, Debug)]
+/// 指向全局 [`SOCKET_SET`] 中某个 socket 的句柄。
+///
+/// 由于 `smoltcp` 的不同 socket 类型共享同一套 `SocketHandle`，这里用枚举区分 TCP/UDP。
 pub enum SocketHandle {
+    /// TCP socket
     Tcp(SmoltcpHandle),
+    /// UDP socket
     Udp(SmoltcpHandle),
 }
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 
+/// 对 `smoltcp::iface::Interface` 与底层网卡设备的封装。
+///
+/// 主要职责：
+/// - 在持锁的情况下推进 `iface.poll()`；
+/// - 处理 loopback 的二次轮询；
+/// - 在全局轮询路径中分发 UDP 数据报并唤醒等待者。
 pub struct NetIfaceWrapper {
     device: SpinLock<crate::interface::NetDeviceAdapter>,
     interface: SpinLock<Interface>,
 }
 
 impl NetIfaceWrapper {
+    /// 推进一次网络轮询。
+    ///
+    /// 返回值表示是否发生了可观察的状态变化（用于决定是否唤醒 `poll/select` 等等待者）。
     pub fn poll(&self, sockets: &SpinLock<SocketSet<'static>>) -> bool {
         let timestamp =
             smoltcp::time::Instant::from_millis(crate::ops::net_ops().get_time_ms() as i64);
@@ -96,10 +110,12 @@ impl NetIfaceWrapper {
         changed
     }
 
+    /// 获取 loopback 队列当前缓存的帧数量。
     pub fn loopback_queue_len(&self) -> usize {
         self.device.lock().loopback_queue_len()
     }
 
+    /// 在持有接口锁的情况下访问 `smoltcp::iface::Context`。
     pub fn with_context<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut smoltcp::iface::Context) -> R,
@@ -110,8 +126,11 @@ impl NetIfaceWrapper {
 }
 
 lazy_static! {
+    /// 全局 `smoltcp::iface::SocketSet`（存放并管理协议栈 socket）。
     pub static ref SOCKET_SET: SpinLock<SocketSet<'static>> = SpinLock::new(SocketSet::new(vec![]));
+    /// 以 (tid, fd) 为键的 socket 句柄映射表。
     pub static ref FD_SOCKET_MAP: SpinLock<BTreeMap<(usize, usize), SocketHandle>> = SpinLock::new(BTreeMap::new());
+    /// 全局网络接口（通常在 `init_network` 时初始化）。
     pub static ref NET_IFACE: SpinLock<Option<NetIfaceWrapper>> = SpinLock::new(None);
     // UDP port dispatcher: one smoltcp UDP socket per local port, plus multiple "logical" sockets
     // (per fd) that receive datagrams based on their connected remote endpoint.
@@ -143,6 +162,12 @@ struct UdpPortEntry {
     sockets: alloc::vec::Vec<alloc::sync::Weak<dyn vfs::File>>,
 }
 
+/// 将 `smoltcp` socket 暴露为可被 VFS/FD 表操作的“文件对象”。
+///
+/// 该类型实现 [`vfs::File`]，并在内部维护：
+/// - `smoltcp` 的 socket 句柄；
+/// - 监听/accept 所需的最小队列状态；
+/// - UDP 数据报的 per-fd 接收队列（由全局轮询路径分发填充）。
 pub struct SocketFile {
     handle: SpinLock<Option<SocketHandle>>,
     listen_sockets: SpinLock<alloc::vec::Vec<SocketHandle>>,
@@ -158,6 +183,7 @@ pub struct SocketFile {
 }
 
 impl SocketFile {
+    /// 以已有的 [`SocketHandle`] 创建一个 `SocketFile`。
     pub fn new(handle: SocketHandle) -> Self {
         Self {
             handle: SpinLock::new(Some(handle)),
@@ -174,14 +200,17 @@ impl SocketFile {
         }
     }
 
+    /// 标记该 socket 是否作为监听 socket 使用。
     pub fn set_listener(&self, is_listener: bool) {
         *self.is_listener.lock() = is_listener;
     }
 
+    /// 返回该 socket 是否为监听 socket。
     pub fn is_listener(&self) -> bool {
         *self.is_listener.lock()
     }
 
+    /// 以指定打开标志创建一个 `SocketFile`。
     pub fn new_with_flags(handle: SocketHandle, flags: OpenFlags) -> Self {
         Self {
             handle: SpinLock::new(Some(handle)),
@@ -198,38 +227,49 @@ impl SocketFile {
         }
     }
 
+    /// 设置监听 backlog（用于 `listen`/`accept` 的简单队列语义）。
     pub fn set_listen_backlog(&self, backlog: usize) {
         *self.listen_backlog.lock() = backlog;
     }
 
+    /// 读取当前 backlog 设置。
     pub fn listen_backlog(&self) -> usize {
         *self.listen_backlog.lock()
     }
 
+    /// 获取 socket 选项快照。
     pub fn get_socket_options(&self) -> SocketOptions {
         *self.options.lock()
     }
 
+    /// 覆盖 socket 选项。
     pub fn set_socket_options(&self, opts: SocketOptions) {
         *self.options.lock() = opts;
     }
 
+    /// 获取当前持有的 socket 句柄。
+    ///
+    /// 若句柄已被移除（理论上仅发生于销毁流程），该函数会 panic。
     pub fn handle(&self) -> SocketHandle {
         self.handle.lock().expect("SocketFile has no handle")
     }
 
+    /// 向监听队列追加一个 socket（用于实现 accept/backlog）。
     pub fn add_listen_socket(&self, handle: SocketHandle) {
         self.listen_sockets.lock().push(handle);
     }
 
+    /// 获取监听队列中当前所有 socket（快照）。
     pub fn get_listen_sockets(&self) -> alloc::vec::Vec<SocketHandle> {
         self.listen_sockets.lock().clone()
     }
 
+    /// 清空监听队列。
     pub fn clear_listen_sockets(&self) {
         self.listen_sockets.lock().clear();
     }
 
+    /// 获取监听队列长度。
     pub fn listen_sockets_len(&self) -> usize {
         self.listen_sockets.lock().len()
     }
@@ -267,22 +307,27 @@ impl SocketFile {
         None
     }
 
+    /// 更新内部持有的 socket 句柄（例如 accept 后将 listener 替换为已建立连接）。
     pub fn set_handle(&self, new_handle: SocketHandle) {
         *self.handle.lock() = Some(new_handle);
     }
 
+    /// 设置本地端点（地址/端口）。
     pub fn set_local_endpoint(&self, endpoint: IpEndpoint) {
         *self.local_endpoint.lock() = Some(endpoint);
     }
 
+    /// 获取本地端点（地址/端口）。
     pub fn get_local_endpoint(&self) -> Option<IpEndpoint> {
         *self.local_endpoint.lock()
     }
 
+    /// 设置远端端点（地址/端口）。
     pub fn set_remote_endpoint(&self, endpoint: IpEndpoint) {
         *self.remote_endpoint.lock() = Some(endpoint);
     }
 
+    /// 获取远端端点（地址/端口）。
     pub fn get_remote_endpoint(&self) -> Option<IpEndpoint> {
         *self.remote_endpoint.lock()
     }
@@ -304,22 +349,27 @@ impl SocketFile {
         self.udp_rx_queue.lock().pop_front()
     }
 
+    /// 标记读方向关闭（对应 `shutdown(SHUT_RD)`）。
     pub fn shutdown_read(&self) {
         *self.shutdown_rd.lock() = true;
     }
 
+    /// 标记写方向关闭（对应 `shutdown(SHUT_WR)`）。
     pub fn shutdown_write(&self) {
         *self.shutdown_wr.lock() = true;
     }
 
+    /// 返回读方向是否已关闭。
     pub fn is_shutdown_read(&self) -> bool {
         *self.shutdown_rd.lock()
     }
 
+    /// 返回写方向是否已关闭。
     pub fn is_shutdown_write(&self) -> bool {
         *self.shutdown_wr.lock()
     }
 
+    /// 判断底层 TCP socket 是否已进入 `Closed` 状态。
     pub fn is_closed(&self) -> bool {
         let sockets = SOCKET_SET.lock();
         match self.handle.lock().as_ref() {
@@ -795,6 +845,7 @@ fn create_udp_socket_in_set(sockets: &mut SocketSet<'static>) -> Result<SmoltcpH
     Ok(sockets.add(socket))
 }
 
+/// 创建一个 TCP socket 并加入全局 [`SOCKET_SET`]。
 pub fn create_tcp_socket() -> Result<SocketHandle, ()> {
     let mut rx_vec = alloc::vec::Vec::new();
     rx_vec.try_reserve(4096).map_err(|_| ())?;
@@ -812,6 +863,7 @@ pub fn create_tcp_socket() -> Result<SocketHandle, ()> {
     Ok(SocketHandle::Tcp(handle))
 }
 
+/// 创建一个 UDP socket 并加入全局 [`SOCKET_SET`]。
 pub fn create_udp_socket() -> Result<SocketHandle, ()> {
     let mut sockets = SOCKET_SET.lock();
     let handle = create_udp_socket_in_set(&mut *sockets)?;
