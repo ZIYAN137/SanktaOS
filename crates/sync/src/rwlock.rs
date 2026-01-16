@@ -247,3 +247,34 @@ unsafe impl<T: Send> Send for RwLock<T> {}
 
 // SAFETY: RwLock 可以在线程间共享，只要 T 是 Send + Sync
 unsafe impl<T: Send + Sync> Sync for RwLock<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rwlock_read() {
+        let lock = RwLock::new(42);
+        let guard = lock.read();
+        assert_eq!(*guard, 42);
+    }
+
+    #[test]
+    fn test_rwlock_write() {
+        let lock = RwLock::new(0);
+        {
+            let mut guard = lock.write();
+            *guard = 10;
+        }
+        assert_eq!(*lock.read(), 10);
+    }
+
+    #[test]
+    fn test_rwlock_multiple_readers() {
+        let lock = RwLock::new(5);
+        let _guard1 = lock.read();
+        let _guard2 = lock.read();
+        assert_eq!(lock.reader_count(), 2);
+    }
+}
+
