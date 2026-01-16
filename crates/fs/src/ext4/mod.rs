@@ -48,11 +48,11 @@ pub use adapters::BlockDeviceAdapter;
 pub use inode::Ext4Inode;
 
 use crate::ops::fs_ops;
+use alloc::sync::Arc;
 use device::block::BlockDriver;
+use ext4_rs::BlockDevice;
 use sync::SpinLock;
 use vfs::{FileSystem, FsError, Inode, StatFs};
-use alloc::sync::Arc;
-use ext4_rs::BlockDevice;
 
 /// Ext4 文件系统
 pub struct Ext4FileSystem {

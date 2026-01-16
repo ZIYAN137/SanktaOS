@@ -38,10 +38,10 @@
 //! - [`UsizeConvert`] - 在类型和 usize 之间进行转换
 //! - CalcOps - 算术和位操作
 //! - AlignOps - 地址对齐操作
-pub mod types;
 pub mod operations;
 pub mod page_num;
+pub mod types;
 
-pub use types::{ConvertablePaddr, Paddr, Vaddr};
 pub use operations::{AlignOps, UsizeConvert};
 pub use page_num::{PageNum, Ppn, PpnRange, Vpn, VpnRange};
+pub use types::{ConvertablePaddr, Paddr, Vaddr};

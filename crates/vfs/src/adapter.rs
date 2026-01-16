@@ -3,7 +3,7 @@
 //! 用于处理数据结构之间的转换
 
 use crate::{InodeMetadata, InodeType};
-use uapi::fs::{Stat, Statx, StatxTimestamp, STATX_BASIC_STATS};
+use uapi::fs::{STATX_BASIC_STATS, Stat, Statx, StatxTimestamp};
 
 /// Stat 结构扩展 trait
 pub trait StatExt {

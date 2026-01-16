@@ -18,9 +18,7 @@ pub fn build_kernel_info(root: &Arc<SysfsInode>) -> Result<(), FsError> {
     let version_attr = SysfsAttr {
         name: "version".to_string(),
         mode: FileMode::from_bits_truncate(0o444),
-        show: Arc::new(|| {
-            Ok("#1 SMP Mon Jan 1 00:00:00 UTC 2025\n".to_string())
-        }),
+        show: Arc::new(|| Ok("#1 SMP Mon Jan 1 00:00:00 UTC 2025\n".to_string())),
         store: None,
     };
     kernel_dir.add_child("version", SysfsInode::new_attribute(version_attr))?;
@@ -29,9 +27,7 @@ pub fn build_kernel_info(root: &Arc<SysfsInode>) -> Result<(), FsError> {
     let osrelease_attr = SysfsAttr {
         name: "osrelease".to_string(),
         mode: FileMode::from_bits_truncate(0o444),
-        show: Arc::new(|| {
-            Ok("0.1.0\n".to_string())
-        }),
+        show: Arc::new(|| Ok("0.1.0\n".to_string())),
         store: None,
     };
     kernel_dir.add_child("osrelease", SysfsInode::new_attribute(osrelease_attr))?;

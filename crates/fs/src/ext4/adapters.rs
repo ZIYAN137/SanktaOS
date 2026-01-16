@@ -3,9 +3,9 @@
 //! 负责在 Ext4 文件系统块大小 (4096 字节) 和 VirtIO 块设备扇区大小 (512 字节) 之间转换
 
 use crate::ops::fs_ops;
-use device::block::BlockDriver;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use device::block::BlockDriver;
 
 /// 块设备适配器
 pub struct BlockDeviceAdapter {

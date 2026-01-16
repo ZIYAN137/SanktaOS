@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use sync::SpinLock;
 
 use crate::devno::get_blkdev_index;
-use crate::{device_ops, Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence};
+use crate::{Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence, device_ops};
 
 /// 块设备文件
 pub struct BlkDeviceFile {

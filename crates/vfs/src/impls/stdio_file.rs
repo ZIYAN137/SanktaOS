@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use sync::SpinLock;
 use uapi::ioctl::Termios;
 
-use crate::{vfs_ops, File, FileMode, FsError, InodeMetadata, InodeType, UserAccessGuard};
+use crate::{File, FileMode, FsError, InodeMetadata, InodeType, UserAccessGuard, vfs_ops};
 
 /// 全局终端设置（所有标准I/O文件共享）
 static STDIO_TERMIOS: SpinLock<Termios> = SpinLock::new(Termios::DEFAULT);

@@ -21,7 +21,9 @@ pub mod sysfs;
 pub mod tmpfs;
 
 pub use ext4::{BlockDeviceAdapter, Ext4FileSystem, Ext4Inode};
-pub use ops::{fs_ops, register_fs_ops, FsOps, MemoryAreaInfo, MountInfo, TaskInfo, TaskState, VmStats};
+pub use ops::{
+    FsOps, MemoryAreaInfo, MountInfo, TaskInfo, TaskState, VmStats, fs_ops, register_fs_ops,
+};
 pub use proc::{ContentGenerator, ProcFS, ProcInode, ProcInodeContent};
-pub use sysfs::{find_block_device, find_net_device, SysFS};
+pub use sysfs::{SysFS, find_block_device, find_net_device};
 pub use tmpfs::{TmpFs, TmpfsInode};

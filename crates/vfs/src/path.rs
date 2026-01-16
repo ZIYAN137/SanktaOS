@@ -6,7 +6,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crate::{get_root_dentry, vfs_ops, Dentry, FsError, InodeType, DENTRY_CACHE, MOUNT_TABLE};
+use crate::{DENTRY_CACHE, Dentry, FsError, InodeType, MOUNT_TABLE, get_root_dentry, vfs_ops};
 
 const MAX_SYMLINK_DEPTH: usize = 8;
 
@@ -155,12 +155,8 @@ pub fn vfs_lookup_from(base: Arc<Dentry>, path: &str) -> Result<Arc<Dentry>, FsE
 /// 解析单个路径组件
 fn resolve_component(base: Arc<Dentry>, component: PathComponent) -> Result<Arc<Dentry>, FsError> {
     match component {
-        PathComponent::Root => {
-            get_root_dentry()
-        }
-        PathComponent::Current => {
-            Ok(base)
-        }
+        PathComponent::Root => get_root_dentry(),
+        PathComponent::Current => Ok(base),
         PathComponent::Parent => {
             match base.parent() {
                 Some(parent) => check_mount_point(parent),
@@ -258,9 +254,7 @@ fn check_mount_point(dentry: Arc<Dentry>) -> Result<Arc<Dentry>, FsError> {
 
 /// 获取当前任务的工作目录
 fn get_cur_dir() -> Result<Arc<Dentry>, FsError> {
-    vfs_ops()
-        .current_cwd()
-        .ok_or(FsError::NotSupported)
+    vfs_ops().current_cwd().ok_or(FsError::NotSupported)
 }
 
 /// 查找路径但不跟随最后一个符号链接

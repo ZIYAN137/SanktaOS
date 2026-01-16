@@ -24,14 +24,16 @@ pub mod frame_allocator;
 pub mod memory_space;
 pub mod page_table;
 
-pub use arch_ops::{arch_ops, register_arch_ops, ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper};
-pub use config::{mm_config, register_config, MmConfig};
+pub use arch_ops::{
+    ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper, arch_ops, register_arch_ops,
+};
+pub use config::{MmConfig, mm_config, register_config};
 pub use file::{MmFile, MmInode};
 
 // Re-export 常用类型
-pub use address::{AlignOps, PageNum, Paddr, Ppn, PpnRange, UsizeConvert, Vaddr, Vpn, VpnRange};
+pub use address::{AlignOps, Paddr, PageNum, Ppn, PpnRange, UsizeConvert, Vaddr, Vpn, VpnRange};
 pub use frame_allocator::{
-    alloc_contig_frames, alloc_frame, alloc_frames, FrameRangeTracker, FrameTracker, TrackedFrames,
+    FrameRangeTracker, FrameTracker, TrackedFrames, alloc_contig_frames, alloc_frame, alloc_frames,
 };
 pub use memory_space::{AreaType, MapType, MappingArea, MemorySpace, MmapFile};
 pub use page_table::{

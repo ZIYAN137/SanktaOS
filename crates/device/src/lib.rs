@@ -22,38 +22,38 @@
 
 extern crate alloc;
 
-pub mod ops;
+pub mod block;
+pub mod console;
 pub mod driver;
 pub mod irq;
-pub mod block;
 pub mod net;
-pub mod serial;
+pub mod ops;
 pub mod rtc;
-pub mod console;
+pub mod serial;
 
 // Re-export ops
-pub use ops::{register_irq_ops, irq_ops, IrqOps};
+pub use ops::{IrqOps, irq_ops, register_irq_ops};
 
 // Re-export driver
 pub use driver::{DeviceType, Driver};
 
 // Re-export irq
-pub use irq::{IrqManager, IntcDriver, IRQ_MANAGER};
+pub use irq::{IRQ_MANAGER, IntcDriver, IrqManager};
 
 // Re-export block
-pub use block::{BlockDriver, RamDisk, BLK_DRIVERS};
+pub use block::{BLK_DRIVERS, BlockDriver, RamDisk};
 
 // Re-export net
-pub use net::{NetDevice, NetDeviceError, NullNetDevice, NETWORK_DEVICES};
+pub use net::{NETWORK_DEVICES, NetDevice, NetDeviceError, NullNetDevice};
 
 // Re-export serial
-pub use serial::{SerialDriver, SERIAL_DRIVERS};
+pub use serial::{SERIAL_DRIVERS, SerialDriver};
 
 // Re-export rtc
-pub use rtc::{RtcDriver, DateTime, RTC_DRIVERS};
+pub use rtc::{DateTime, RTC_DRIVERS, RtcDriver};
 
 // Re-export console
-pub use console::{Console, CONSOLES, MAIN_CONSOLE};
+pub use console::{CONSOLES, Console, MAIN_CONSOLE};
 
 // Re-export 全局驱动列表
-pub use driver::{DRIVERS, register_driver, CMDLINE};
+pub use driver::{CMDLINE, DRIVERS, register_driver};

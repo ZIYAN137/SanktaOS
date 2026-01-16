@@ -3,12 +3,12 @@
 //! 将 ext4_rs 的 inode 操作包装为 VFS Inode trait
 
 use crate::ops::fs_ops;
-use sync::SpinLock;
-use uapi::time::TimeSpec;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use ext4_rs::InodeFileType;
+use sync::SpinLock;
+use uapi::time::TimeSpec;
 
 use vfs::{Dentry, DirEntry, FileMode, FsError, Inode, InodeMetadata, InodeType};
 

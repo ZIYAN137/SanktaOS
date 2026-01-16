@@ -153,7 +153,9 @@ pub(crate) fn get_context_provider() -> Option<&'static dyn LogContextProvider> 
         return None;
     }
     // Safety: 指针由 register_context_provider 设置，保证有效
-    Some(unsafe { core::mem::transmute::<(*mut (), *mut ()), &'static dyn LogContextProvider>((data, vtable)) })
+    Some(unsafe {
+        core::mem::transmute::<(*mut (), *mut ()), &'static dyn LogContextProvider>((data, vtable))
+    })
 }
 
 /// 获取已注册的日志输出
@@ -164,7 +166,9 @@ pub(crate) fn get_log_output() -> Option<&'static dyn LogOutput> {
         return None;
     }
     // Safety: 指针由 register_log_output 设置，保证有效
-    Some(unsafe { core::mem::transmute::<(*mut (), *mut ()), &'static dyn LogOutput>((data, vtable)) })
+    Some(unsafe {
+        core::mem::transmute::<(*mut (), *mut ()), &'static dyn LogOutput>((data, vtable))
+    })
 }
 
 // ========== 全局单例 ==========

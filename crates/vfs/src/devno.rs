@@ -5,7 +5,7 @@
 use alloc::sync::Arc;
 
 use crate::dev::{major, minor};
-use crate::{device_ops, CharDriver};
+use crate::{CharDriver, device_ops};
 
 /// 标准字符设备 major 号
 pub mod chrdev_major {

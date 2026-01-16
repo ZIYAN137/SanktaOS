@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 use device::block::BlockDriver;
 use device::rtc::RtcDriver;
-use device::{NetDevice, BLK_DRIVERS, DRIVERS, DeviceType};
+use device::{BLK_DRIVERS, DRIVERS, DeviceType, NetDevice};
 
 /// 块设备信息 (用于 sysfs)
 #[derive(Clone)]
@@ -78,13 +78,13 @@ pub fn list_net_devices() -> Vec<NetworkDeviceInfo> {
         .filter(|driver| driver.device_type() == DeviceType::Net)
         .enumerate()
         .filter_map(|(idx, driver)| {
-            Arc::clone(driver).as_net_arc().map(|net_dev| {
-                NetworkDeviceInfo {
+            Arc::clone(driver)
+                .as_net_arc()
+                .map(|net_dev| NetworkDeviceInfo {
                     name: net_dev.name().to_string(),
                     ifindex: (idx + 1) as u32,
                     device: net_dev,
-                }
-            })
+                })
         })
         .collect()
 }

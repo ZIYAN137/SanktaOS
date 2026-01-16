@@ -8,7 +8,7 @@ use core::fmt;
 use sync::SpinLock;
 use uapi::fcntl::{FdFlags, OpenFlags};
 
-use crate::{vfs_ops, File, FsError};
+use crate::{File, FsError, vfs_ops};
 
 /// 文件描述符表
 pub struct FDTable {

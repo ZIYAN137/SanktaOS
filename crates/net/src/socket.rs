@@ -1,13 +1,13 @@
 //! Socket implementation using smoltcp
 
-use sync::SpinLock;
-use vfs::{File, FsError, InodeMetadata};
 use alloc::collections::VecDeque;
 use alloc::vec;
 use lazy_static::lazy_static;
 use smoltcp::iface::{Interface, SocketHandle as SmoltcpHandle, SocketSet};
 use smoltcp::socket::{tcp, udp};
 use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address};
+use sync::SpinLock;
+use vfs::{File, FsError, InodeMetadata};
 
 #[derive(Clone, Copy, Debug)]
 pub enum SocketHandle {

@@ -8,7 +8,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use sync::SpinLock;
 
-use crate::{normalize_path, Dentry, FileSystem, FsError, DENTRY_CACHE};
+use crate::{DENTRY_CACHE, Dentry, FileSystem, FsError, normalize_path};
 
 /// 挂载标志
 bitflags::bitflags! {
@@ -204,9 +204,9 @@ impl MountTable {
         mounts
             .iter()
             .filter_map(|(key, stack)| {
-                stack.last().map(|mount_point| {
-                    (key.clone(), mount_point.clone())
-                })
+                stack
+                    .last()
+                    .map(|mount_point| (key.clone(), mount_point.clone()))
             })
             .collect()
     }

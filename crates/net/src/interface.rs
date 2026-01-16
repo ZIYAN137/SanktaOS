@@ -1,13 +1,13 @@
-use device::DeviceType;
-use device::NetDevice;
-use sync::SpinLock;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use device::DeviceType;
+use device::NetDevice;
 use lazy_static::lazy_static;
 use smoltcp::iface::Interface;
 use smoltcp::time::Instant;
 use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address};
+use sync::SpinLock;
 
 /// 网络接口管理器
 pub struct NetworkInterfaceManager {

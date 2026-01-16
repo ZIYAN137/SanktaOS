@@ -81,7 +81,11 @@ impl TmpfsInode {
             atime: now,
             mtime: now,
             ctime: now,
-            nlinks: if inode_type == InodeType::Directory { 2 } else { 1 },
+            nlinks: if inode_type == InodeType::Directory {
+                2
+            } else {
+                1
+            },
             blocks: 0,
             rdev: 0,
         };
@@ -399,7 +403,10 @@ impl Inode for TmpfsInode {
         drop(child_meta);
 
         let child_data = child.data.lock();
-        let allocated = child_data.iter().filter(|f: &&Option<_>| f.is_some()).count();
+        let allocated = child_data
+            .iter()
+            .filter(|f: &&Option<_>| f.is_some())
+            .count();
         drop(child_data);
 
         children.remove(name);

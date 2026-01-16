@@ -14,38 +14,37 @@
 
 extern crate alloc;
 
-pub mod ops;
-pub mod error;
 pub mod dev;
+pub mod error;
+pub mod ops;
 
 // 先声明基础模块，后续会添加更多
 mod adapter;
-mod file;
-mod inode;
-mod file_system;
 mod dentry;
+mod devno;
+mod fd_table;
+mod file;
+mod file_lock;
+mod file_system;
+pub mod impls;
+mod inode;
 mod mount;
 mod path;
-mod fd_table;
-mod file_lock;
-mod devno;
-pub mod impls;
 
 // Re-export ops
 pub use ops::{
-    register_vfs_ops, vfs_ops, VfsOps,
-    register_device_ops, device_ops, DeviceOps, CharDriver,
-    UserAccessGuard,
+    CharDriver, DeviceOps, UserAccessGuard, VfsOps, device_ops, register_device_ops,
+    register_vfs_ops, vfs_ops,
 };
 
 // Re-export error
 pub use error::FsError;
 
 // Re-export dev
-pub use dev::{major, minor, makedev};
+pub use dev::{major, makedev, minor};
 
 // Re-export adapter
-pub use adapter::{inode_type_to_d_type, StatExt, StatxExt};
+pub use adapter::{StatExt, StatxExt, inode_type_to_d_type};
 
 // Re-export file
 pub use file::File;
@@ -57,15 +56,15 @@ pub use inode::{DirEntry, FileMode, Inode, InodeMetadata, InodeType};
 pub use file_system::{FileSystem, StatFs};
 
 // Re-export dentry
-pub use dentry::{Dentry, DentryCache, DENTRY_CACHE};
+pub use dentry::{DENTRY_CACHE, Dentry, DentryCache};
 
 // Re-export mount
-pub use mount::{get_root_dentry, MountFlags, MountPoint, MountTable, MOUNT_TABLE};
+pub use mount::{MOUNT_TABLE, MountFlags, MountPoint, MountTable, get_root_dentry};
 
 // Re-export path
 pub use path::{
-    normalize_path, parse_path, split_path, vfs_lookup, vfs_lookup_from,
-    vfs_lookup_no_follow, vfs_lookup_no_follow_from, PathComponent,
+    PathComponent, normalize_path, parse_path, split_path, vfs_lookup, vfs_lookup_from,
+    vfs_lookup_no_follow, vfs_lookup_no_follow_from,
 };
 
 // Re-export fd_table
@@ -79,8 +78,8 @@ pub use devno::{blkdev_major, chrdev_major, get_blkdev_index, get_chrdev_driver,
 
 // Re-export impls
 pub use impls::{
-    create_stdio_files, BlkDeviceFile, CharDeviceFile, PipeFile, RegFile, StderrFile, StdinFile,
-    StdoutFile,
+    BlkDeviceFile, CharDeviceFile, PipeFile, RegFile, StderrFile, StdinFile, StdoutFile,
+    create_stdio_files,
 };
 
 // Re-export uapi types for convenience

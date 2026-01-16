@@ -1,11 +1,11 @@
 use alloc::collections::btree_map::BTreeMap;
 use core::cmp::min;
 
-use crate::arch_ops::{arch_ops, TlbBatchContextWrapper};
-use crate::mm_config;
 use crate::address::{Paddr, PageNum, Ppn, UsizeConvert, Vpn, VpnRange};
+use crate::arch_ops::{TlbBatchContextWrapper, arch_ops};
 use crate::frame_allocator::{TrackedFrames, alloc_frame};
 use crate::memory_space::MmapFile;
+use crate::mm_config;
 use crate::page_table::{self, PageSize, PageTableEntry, PageTableInner, UniversalPTEFlag};
 use uapi::mm::MapFlags;
 
@@ -216,7 +216,12 @@ impl MappingArea {
     }
 
     /// 复制数据到已映射的区域
-    pub fn copy_data<PT: PageTableInner<E>, E: PageTableEntry>(&self, page_table: &mut PT, data: &[u8], offset: usize) {
+    pub fn copy_data<PT: PageTableInner<E>, E: PageTableEntry>(
+        &self,
+        page_table: &mut PT,
+        data: &[u8],
+        offset: usize,
+    ) {
         let mut copied = 0;
         let total_len = data.len();
         let page_size = mm_config().page_size();
@@ -327,8 +332,10 @@ impl MappingArea {
                             let src_ppn = frame.ppn();
 
                             unsafe {
-                                let src_va = arch_ops().paddr_to_vaddr(src_ppn.start_addr().as_usize());
-                                let dst_va = arch_ops().paddr_to_vaddr(new_ppn.start_addr().as_usize());
+                                let src_va =
+                                    arch_ops().paddr_to_vaddr(src_ppn.start_addr().as_usize());
+                                let dst_va =
+                                    arch_ops().paddr_to_vaddr(new_ppn.start_addr().as_usize());
 
                                 core::ptr::copy_nonoverlapping(
                                     src_va as *const u8,
@@ -528,7 +535,11 @@ impl MappingArea {
                 if wants_mapping {
                     TlbBatchContextWrapper::execute(|batch| {
                         for vpn in VpnRange::new(change_start, change_end) {
-                            page_table.update_flags_with_batch(vpn, middle_area.permission.clone(), Some(batch))?;
+                            page_table.update_flags_with_batch(
+                                vpn,
+                                middle_area.permission.clone(),
+                                Some(batch),
+                            )?;
                         }
                         Ok::<(), page_table::PagingError>(())
                     })?;

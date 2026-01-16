@@ -19,7 +19,7 @@ mod spin_lock;
 mod ticket_lock;
 
 pub use intr_guard::*;
-pub use preempt::{preempt_disable, preempt_enable, preempt_disabled, PreemptGuard};
+pub use preempt::{PreemptGuard, preempt_disable, preempt_disabled, preempt_enable};
 pub use raw_spin_lock::*;
 pub use raw_spin_lock_without_guard::*;
 pub use rwlock::*;
@@ -65,8 +65,7 @@ static ARCH_OPS_VTABLE: AtomicUsize = AtomicUsize::new(0);
 pub unsafe fn register_arch_ops(ops: &'static dyn ArchOps) {
     let ptr = ops as *const dyn ArchOps;
     // SAFETY: transmute 在这里是安全的，因为 fat pointer 的布局是 (data, vtable)
-    let (data, vtable) =
-        unsafe { core::mem::transmute::<*const dyn ArchOps, (usize, usize)>(ptr) };
+    let (data, vtable) = unsafe { core::mem::transmute::<*const dyn ArchOps, (usize, usize)>(ptr) };
     ARCH_OPS_DATA.store(data, Ordering::Release);
     ARCH_OPS_VTABLE.store(vtable, Ordering::Release);
 }

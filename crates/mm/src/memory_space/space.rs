@@ -3,11 +3,11 @@
 use core::cmp::Ordering;
 use core::marker::PhantomData;
 
-use crate::arch_ops::arch_ops;
-use crate::mm_config;
 use crate::address::{PageNum, Ppn, UsizeConvert, Vaddr, Vpn, VpnRange};
+use crate::arch_ops::arch_ops;
 use crate::memory_space::MmapFile;
 use crate::memory_space::mapping_area::{AreaType, MapType, MappingArea};
+use crate::mm_config;
 use crate::page_table::{PageTableEntry, PageTableInner, PagingError, UniversalPTEFlag};
 use alloc::vec::Vec;
 
@@ -273,18 +273,17 @@ impl<PT: PageTableInner<E>, E: PageTableEntry> MemorySpace<PT, E> {
     }
 
     /// 在指定范围内查找空闲的虚拟地址空间
-    pub fn find_free_area(
-        &self,
-        start: Vpn,
-        end: Vpn,
-        size_pages: usize,
-    ) -> Option<VpnRange> {
+    pub fn find_free_area(&self, start: Vpn, end: Vpn, size_pages: usize) -> Option<VpnRange> {
         let mut current = start;
 
         while current.as_usize() + size_pages <= end.as_usize() {
-            let candidate = VpnRange::new(current, Vpn::from_usize(current.as_usize() + size_pages));
+            let candidate =
+                VpnRange::new(current, Vpn::from_usize(current.as_usize() + size_pages));
 
-            let overlaps = self.areas.iter().any(|area| area.vpn_range().overlaps(&candidate));
+            let overlaps = self
+                .areas
+                .iter()
+                .any(|area| area.vpn_range().overlaps(&candidate));
 
             if !overlaps {
                 return Some(candidate);

@@ -7,8 +7,7 @@ use uapi::ioctl::Termios;
 use crate::dev::{major, minor};
 use crate::devno::{chrdev_major, get_chrdev_driver, misc_minor};
 use crate::{
-    CharDriver, Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence,
-    UserAccessGuard,
+    CharDriver, Dentry, File, FsError, Inode, InodeMetadata, OpenFlags, SeekWhence, UserAccessGuard,
 };
 
 /// 字符设备文件

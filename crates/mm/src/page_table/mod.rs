@@ -1,11 +1,11 @@
 //! 页表模块
 //!
 //! 本模块提供与页表管理相关的功能，包括页表的创建、映射、解除映射、翻译等操作。
-mod table;
 mod page_table_entry;
+mod table;
 
-pub use table::*;
 pub use page_table_entry::*;
+pub use table::*;
 
 /// 支持的页大小
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

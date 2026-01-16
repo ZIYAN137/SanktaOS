@@ -67,7 +67,8 @@ impl TlbBatchContextWrapper {
             core::ptr::write(storage_ptr, ctx);
             // 设置 inner 指向 storage 中的数据
             let fat_ptr = storage_ptr as *mut dyn TlbBatchContextTrait;
-            let (data, vtable) = core::mem::transmute::<*mut dyn TlbBatchContextTrait, (usize, usize)>(fat_ptr);
+            let (data, vtable) =
+                core::mem::transmute::<*mut dyn TlbBatchContextTrait, (usize, usize)>(fat_ptr);
             wrapper.inner_data = data;
             wrapper.inner_vtable = vtable;
             wrapper
@@ -79,7 +80,7 @@ impl TlbBatchContextWrapper {
         if self.inner_data != 0 {
             unsafe {
                 let fat_ptr = core::mem::transmute::<(usize, usize), *mut dyn TlbBatchContextTrait>(
-                    (self.inner_data, self.inner_vtable)
+                    (self.inner_data, self.inner_vtable),
                 );
                 (*fat_ptr).flush()
             }

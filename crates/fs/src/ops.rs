@@ -229,8 +229,7 @@ static FS_OPS_VTABLE: AtomicUsize = AtomicUsize::new(0);
 pub unsafe fn register_fs_ops(ops: &'static dyn FsOps) {
     let ptr = ops as *const dyn FsOps;
     // SAFETY: 将 fat pointer 拆分为 data 和 vtable 两部分存储
-    let (data, vtable) =
-        unsafe { core::mem::transmute::<*const dyn FsOps, (usize, usize)>(ptr) };
+    let (data, vtable) = unsafe { core::mem::transmute::<*const dyn FsOps, (usize, usize)>(ptr) };
     FS_OPS_DATA.store(data, Ordering::Release);
     FS_OPS_VTABLE.store(vtable, Ordering::Release);
 }
