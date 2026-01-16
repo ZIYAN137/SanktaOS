@@ -4,6 +4,50 @@ use crate::vfs::*;
 use alloc::string::String;
 use alloc::sync::Arc;
 
+// ========== Test Assertions ==========
+//
+// These tests run inside the kernel test framework, where we prefer "record a failure and keep
+// running" semantics (instead of panicking). Map familiar `assert!*` names to `kassert!` here,
+// scoped only to `os::vfs::tests::*`.
+#[cfg(test)]
+macro_rules! assert {
+    ($cond:expr $(,)?) => {
+        $crate::kassert!($cond)
+    };
+    ($cond:expr, $($arg:tt)+) => {
+        // Keep the failure recording behavior; ignore the message for now.
+        $crate::kassert!($cond)
+    };
+}
+
+#[cfg(test)]
+macro_rules! assert_eq {
+    ($left:expr, $right:expr $(,)?) => {{
+        let left = &$left;
+        let right = &$right;
+        $crate::kassert!(left == right);
+    }};
+    ($left:expr, $right:expr, $($arg:tt)+) => {{
+        let left = &$left;
+        let right = &$right;
+        $crate::kassert!(left == right);
+    }};
+}
+
+#[cfg(test)]
+macro_rules! assert_ne {
+    ($left:expr, $right:expr $(,)?) => {{
+        let left = &$left;
+        let right = &$right;
+        $crate::kassert!(left != right);
+    }};
+    ($left:expr, $right:expr, $($arg:tt)+) => {{
+        let left = &$left;
+        let right = &$right;
+        $crate::kassert!(left != right);
+    }};
+}
+
 // 测试辅助函数 (fixtures)
 
 /// 创建一个测试用文件系统实例
@@ -20,7 +64,7 @@ pub fn create_test_ramdisk(size_in_blocks: usize) -> Arc<RamDisk> {
     RamDisk::new(total_size, block_size, 0)
 }
 
-/// 在测试 SimpleFS 中创建一个文件并写入内容
+/// 在测试文件系统中创建一个文件并写入内容
 pub fn create_test_file_with_content(
     fs: &Arc<dyn FileSystem>,
     path: &str,
@@ -32,7 +76,7 @@ pub fn create_test_file_with_content(
     Ok(inode)
 }
 
-/// 在测试 SimpleFS 中创建一个目录
+/// 在测试文件系统中创建一个目录
 pub fn create_test_dir(fs: &Arc<dyn FileSystem>, path: &str) -> Result<Arc<dyn Inode>, FsError> {
     let root = fs.root_inode();
     root.mkdir(path, FileMode::from_bits_truncate(0o755))
