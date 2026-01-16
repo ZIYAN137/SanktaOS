@@ -4,3 +4,7 @@
 
 pub mod arch;
 pub mod mm;
+pub mod vfs;
+pub mod fs;
+pub mod net;
+pub mod device;

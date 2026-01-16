@@ -243,8 +243,95 @@ pub fn fs_ops() -> &'static dyn FsOps {
     let data = FS_OPS_DATA.load(Ordering::Acquire);
     let vtable = FS_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::fs::MOCK_FS_OPS;
+        }
+        #[cfg(not(test))]
         panic!("fs: FsOps not registered");
     }
     // SAFETY: 重组 fat pointer
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn FsOps>((data, vtable)) }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::{FsOps, MountInfo, TaskInfo};
+    use alloc::string::String;
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
+    use uapi::time::TimeSpec;
+
+    impl FsOps for test_support::mock::fs::MockFsOps {
+        fn page_size(&self) -> usize {
+            4096
+        }
+
+        fn ext4_block_size(&self) -> usize {
+            4096
+        }
+
+        fn fs_image_size(&self) -> usize {
+            0
+        }
+
+        fn virtio_blk_sector_size(&self) -> usize {
+            512
+        }
+
+        fn timespec_now(&self) -> TimeSpec {
+            TimeSpec::zero()
+        }
+
+        fn get_task(&self, _pid: u32) -> Option<Arc<dyn TaskInfo>> {
+            None
+        }
+
+        fn list_process_pids(&self) -> Vec<u32> {
+            Vec::new()
+        }
+
+        fn current_task_pid(&self) -> u32 {
+            1
+        }
+
+        fn get_uptime_ms(&self) -> u64 {
+            0
+        }
+
+        fn get_total_frames(&self) -> usize {
+            0
+        }
+
+        fn get_free_frames(&self) -> usize {
+            0
+        }
+
+        fn proc_cpuinfo(&self) -> Vec<u8> {
+            Vec::new()
+        }
+
+        fn list_mounts(&self) -> Vec<MountInfo> {
+            Vec::new()
+        }
+    }
+
+    #[test]
+    fn test_fs_ops_fallback_does_not_panic() {
+        assert_eq!(super::fs_ops().page_size(), 4096);
+        assert_eq!(super::fs_ops().current_task_pid(), 1);
+
+        // Ensure alloc types are usable in the mock path.
+        let mounts: Vec<MountInfo> = super::fs_ops().list_mounts();
+        assert!(mounts.is_empty());
+
+        let cpuinfo: Vec<u8> = super::fs_ops().proc_cpuinfo();
+        assert!(cpuinfo.is_empty());
+
+        // Touch String to ensure alloc is linked in tests.
+        let _s = String::from("ok");
+    }
 }

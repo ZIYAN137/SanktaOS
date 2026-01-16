@@ -111,6 +111,12 @@ pub fn vfs_ops() -> &'static dyn VfsOps {
     let data = VFS_OPS_DATA.load(Ordering::Acquire);
     let vtable = VFS_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::vfs::MOCK_VFS_OPS;
+        }
+        #[cfg(not(test))]
         panic!("vfs: VfsOps not registered");
     }
     // SAFETY: 重组 fat pointer
@@ -144,6 +150,12 @@ pub fn device_ops() -> &'static dyn DeviceOps {
     let data = DEVICE_OPS_DATA.load(Ordering::Acquire);
     let vtable = DEVICE_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::vfs::MOCK_DEVICE_OPS;
+        }
+        #[cfg(not(test))]
         panic!("vfs: DeviceOps not registered");
     }
     // SAFETY: 重组 fat pointer
@@ -174,5 +186,74 @@ impl Drop for UserAccessGuard {
 impl Default for UserAccessGuard {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::{CharDriver, DeviceOps, VfsOps};
+    use crate::Dentry;
+    use alloc::sync::Arc;
+    use uapi::time::TimeSpec;
+
+    impl VfsOps for test_support::mock::vfs::MockVfsOps {
+        fn current_cwd(&self) -> Option<Arc<Dentry>> {
+            None
+        }
+
+        fn current_root(&self) -> Option<Arc<Dentry>> {
+            None
+        }
+
+        fn default_max_fds(&self) -> usize {
+            1024
+        }
+
+        fn timespec_now(&self) -> TimeSpec {
+            TimeSpec::zero()
+        }
+
+        fn enter_user_access(&self) {}
+
+        fn exit_user_access(&self) {}
+
+        fn console_getchar(&self) -> Option<u8> {
+            None
+        }
+
+        fn console_putchar(&self, _c: u8) {}
+
+        fn console_write_str(&self, _s: &str) {}
+    }
+
+    impl DeviceOps for test_support::mock::vfs::MockDeviceOps {
+        fn get_chrdev_driver(&self, _dev: u64) -> Option<Arc<dyn CharDriver>> {
+            None
+        }
+
+        fn get_blkdev_index(&self, _dev: u64) -> Option<usize> {
+            None
+        }
+
+        fn read_block(&self, _idx: usize, _block_id: usize, _buf: &mut [u8]) -> bool {
+            false
+        }
+
+        fn write_block(&self, _idx: usize, _block_id: usize, _buf: &[u8]) -> bool {
+            false
+        }
+
+        fn blkdev_total_blocks(&self, _idx: usize) -> usize {
+            0
+        }
+    }
+
+    #[test]
+    fn test_vfs_ops_fallback_does_not_panic() {
+        // vfs_ops/device_ops 在 cfg(test) 下应自动回退到 mock。
+        assert_eq!(super::vfs_ops().default_max_fds(), 1024);
+        assert_eq!(super::device_ops().blkdev_total_blocks(0), 0);
     }
 }

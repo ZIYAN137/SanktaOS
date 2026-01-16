@@ -37,8 +37,30 @@ pub fn irq_ops() -> &'static dyn IrqOps {
     let data = IRQ_OPS_DATA.load(Ordering::Acquire);
     let vtable = IRQ_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::device::MOCK_IRQ_OPS;
+        }
+        #[cfg(not(test))]
         panic!("device: IrqOps not registered");
     }
     // SAFETY: 重组 fat pointer
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn IrqOps>((data, vtable)) }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::IrqOps;
+
+    impl IrqOps for test_support::mock::device::MockIrqOps {
+        fn enable_irq(&self, _irq: usize) {}
+    }
+
+    #[test]
+    fn test_irq_ops_fallback_does_not_panic() {
+        super::irq_ops().enable_irq(1);
+    }
 }

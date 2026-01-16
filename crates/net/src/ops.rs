@@ -45,8 +45,35 @@ pub fn net_ops() -> &'static dyn NetOps {
     let data = NET_OPS_DATA.load(Ordering::Acquire);
     let vtable = NET_OPS_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::net::MOCK_NET_OPS;
+        }
+        #[cfg(not(test))]
         panic!("net: NetOps not registered");
     }
     // SAFETY: 重组 fat pointer
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn NetOps>((data, vtable)) }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::NetOps;
+
+    impl NetOps for test_support::mock::net::MockNetOps {
+        fn get_time_ms(&self) -> u64 {
+            0
+        }
+
+        fn wake_poll_waiters(&self) {}
+    }
+
+    #[test]
+    fn test_net_ops_fallback_does_not_panic() {
+        assert_eq!(super::net_ops().get_time_ms(), 0);
+        super::net_ops().wake_poll_waiters();
+    }
 }

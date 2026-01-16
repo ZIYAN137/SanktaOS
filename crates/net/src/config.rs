@@ -26,11 +26,11 @@ impl NetworkConfigManager {
     /// * `Err(NetworkConfigError)` - 失败时返回错误
     ///
     /// # 示例
-    /// ```
-    /// parse_subnet_mask("255.255.255.0") // 返回 Ok(24)
-    /// parse_subnet_mask("255.255.0.0")   // 返回 Ok(16)
-    /// parse_subnet_mask("255.255.255.128") // 返回 Ok(25)
-    /// parse_subnet_mask("255.255.255.3") // 返回 Err (无效掩码)
+    /// ```text
+    /// parse_subnet_mask("255.255.255.0") -> Ok(24)
+    /// parse_subnet_mask("255.255.0.0") -> Ok(16)
+    /// parse_subnet_mask("255.255.255.128") -> Ok(25)
+    /// parse_subnet_mask("255.255.255.3") -> Err (invalid mask)
     /// ```
     fn parse_subnet_mask(mask: &str) -> Result<u8, NetworkConfigError> {
         // 解析点分十进制字符串为4个字节

@@ -32,6 +32,7 @@ dependencies = [
  "lazy_static",
  "log",
  "sync",
+ "test-support",
 ]
 
 [[package]]
@@ -85,3 +86,7 @@ version = "0.1.0"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "test-support"
+version = "0.1.0"

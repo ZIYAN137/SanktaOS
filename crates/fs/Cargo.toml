@@ -18,6 +18,9 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4"
 ext4_rs = "1.3.2"
 
+[dev-dependencies]
+test-support = { path = "../../test-support" }
+
 [lints.rust]
 missing_docs = "warn"
 
