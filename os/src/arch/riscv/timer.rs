@@ -58,45 +58,27 @@ pub fn clock_freq() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, println, test_case};
-    test_case!(test_set_next_trigger, {
+use crate::println;
+    #[test_case]
+    fn test_set_next_trigger() {
         let current_time = get_time();
         set_next_trigger();
         let next_time = get_time();
-        kassert!(next_time > current_time);
-    });
+        assert!(next_time > current_time);
+    }
 
-    // test_case!(test_timer_ticks_increment, {
-    //     crate::arch::trap::init_boot_trap();
-    //     unsafe {
-    //         crate::arch::intr::enable_interrupts();
-    //         crate::arch::intr::enable_timer_interrupt();
-    //     }
-    //     let initial_ticks = TIMER_TICKS.load(Ordering::Relaxed);
-    //     // 模拟等待一段时间以触发定时器中断
-    //     let mut i = 0;
 
-    //     while i < 1000000 {
-    //         core::hint::spin_loop();
-    //         i += 1;
-    //     }
-    //     let later_ticks = TIMER_TICKS.load(Ordering::Relaxed);
-    //     kassert!(later_ticks > initial_ticks);
-    //     unsafe {
-    //         crate::arch::intr::disable_timer_interrupt();
-    //         crate::arch::intr::disable_interrupts();
-    //     }
-    // });
-
-    test_case!(test_get_time, {
+    #[test_case]
+    fn test_get_time() {
         println!("Testing get_time...");
         let time = get_time();
-        kassert!(time > 0);
-    });
+        assert!(time > 0);
+    }
 
-    test_case!(test_get_time_ms, {
+    #[test_case]
+    fn test_get_time_ms() {
         println!("Testing get_time_ms...");
         let time_ms = get_time_ms();
-        kassert!(time_ms > 0);
-    });
+        assert!(time_ms > 0);
+    }
 }

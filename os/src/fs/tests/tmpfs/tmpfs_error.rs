@@ -1,9 +1,9 @@
 //! Tmpfs 错误处理测试
 
 use super::*;
-use crate::{kassert, test_case};
 
-test_case!(test_tmpfs_create_in_file, {
+#[test_case]
+fn test_tmpfs_create_in_file() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -13,10 +13,11 @@ test_case!(test_tmpfs_create_in_file, {
 
     // 尝试在文件中创建文件应该失败
     let result = file.create("invalid", FileMode::from_bits_truncate(0o644));
-    kassert!(matches!(result, Err(FsError::NotDirectory)));
-});
+    assert!(matches!(result, Err(FsError::NotDirectory)));
+}
 
-test_case!(test_tmpfs_mkdir_in_file, {
+#[test_case]
+fn test_tmpfs_mkdir_in_file() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -26,10 +27,11 @@ test_case!(test_tmpfs_mkdir_in_file, {
 
     // 尝试在文件中创建目录应该失败
     let result = file.mkdir("invalid", FileMode::from_bits_truncate(0o755));
-    kassert!(matches!(result, Err(FsError::NotDirectory)));
-});
+    assert!(matches!(result, Err(FsError::NotDirectory)));
+}
 
-test_case!(test_tmpfs_lookup_in_file, {
+#[test_case]
+fn test_tmpfs_lookup_in_file() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -39,10 +41,11 @@ test_case!(test_tmpfs_lookup_in_file, {
 
     // 尝试在文件中查找应该失败
     let result = file.lookup("something");
-    kassert!(matches!(result, Err(FsError::NotDirectory)));
-});
+    assert!(matches!(result, Err(FsError::NotDirectory)));
+}
 
-test_case!(test_tmpfs_unlink_directory, {
+#[test_case]
+fn test_tmpfs_unlink_directory() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -51,10 +54,11 @@ test_case!(test_tmpfs_unlink_directory, {
 
     // 尝试用 unlink 删除目录应该失败
     let result = root.unlink("dir");
-    kassert!(matches!(result, Err(FsError::IsDirectory)));
-});
+    assert!(matches!(result, Err(FsError::IsDirectory)));
+}
 
-test_case!(test_tmpfs_rmdir_file, {
+#[test_case]
+fn test_tmpfs_rmdir_file() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -63,32 +67,35 @@ test_case!(test_tmpfs_rmdir_file, {
 
     // 尝试用 rmdir 删除文件应该失败
     let result = root.rmdir("file.txt");
-    kassert!(matches!(result, Err(FsError::NotDirectory)));
-});
+    assert!(matches!(result, Err(FsError::NotDirectory)));
+}
 
-test_case!(test_tmpfs_lookup_nonexistent, {
+#[test_case]
+fn test_tmpfs_lookup_nonexistent() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
     // 查找不存在的文件
     let result = root.lookup("nonexistent.txt");
-    kassert!(matches!(result, Err(FsError::NotFound)));
-});
+    assert!(matches!(result, Err(FsError::NotFound)));
+}
 
-test_case!(test_tmpfs_delete_nonexistent, {
+#[test_case]
+fn test_tmpfs_delete_nonexistent() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
     // 删除不存在的文件
     let result = root.unlink("nonexistent.txt");
-    kassert!(matches!(result, Err(FsError::NotFound)));
+    assert!(matches!(result, Err(FsError::NotFound)));
 
     // 删除不存在的目录
     let result = root.rmdir("nonexistent_dir");
-    kassert!(matches!(result, Err(FsError::NotFound)));
-});
+    assert!(matches!(result, Err(FsError::NotFound)));
+}
 
-test_case!(test_tmpfs_write_to_directory, {
+#[test_case]
+fn test_tmpfs_write_to_directory() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -98,10 +105,11 @@ test_case!(test_tmpfs_write_to_directory, {
 
     // 尝试向目录写入应该失败
     let result = dir.write_at(0, b"data");
-    kassert!(matches!(result, Err(FsError::IsDirectory)));
-});
+    assert!(matches!(result, Err(FsError::IsDirectory)));
+}
 
-test_case!(test_tmpfs_read_from_directory, {
+#[test_case]
+fn test_tmpfs_read_from_directory() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -112,10 +120,11 @@ test_case!(test_tmpfs_read_from_directory, {
     // 尝试从目录读取应该失败
     let mut buf = [0u8; 10];
     let result = dir.read_at(0, &mut buf);
-    kassert!(matches!(result, Err(FsError::IsDirectory)));
-});
+    assert!(matches!(result, Err(FsError::IsDirectory)));
+}
 
-test_case!(test_tmpfs_truncate_directory, {
+#[test_case]
+fn test_tmpfs_truncate_directory() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -125,10 +134,11 @@ test_case!(test_tmpfs_truncate_directory, {
 
     // 尝试截断目录应该失败
     let result = dir.truncate(0);
-    kassert!(matches!(result, Err(FsError::IsDirectory)));
-});
+    assert!(matches!(result, Err(FsError::IsDirectory)));
+}
 
-test_case!(test_tmpfs_capacity_exceeded, {
+#[test_case]
+fn test_tmpfs_capacity_exceeded() {
     let fs = create_test_tmpfs_small(); // 1 MB
     let root = fs.root_inode();
 
@@ -141,5 +151,5 @@ test_case!(test_tmpfs_capacity_exceeded, {
     let result = file.write_at(0, &data);
 
     // 应该失败并返回 NoSpace
-    kassert!(matches!(result, Err(FsError::NoSpace)));
-});
+    assert!(matches!(result, Err(FsError::NoSpace)));
+}

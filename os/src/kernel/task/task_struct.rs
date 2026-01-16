@@ -503,16 +503,14 @@ impl Drop for Task {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kassert;
-
     // new_dummy_task：应为内核线程，pid=tid，初始状态为 Running
     #[test_case]
     fn test_dummy_task_basic() {
         let t = Task::new_dummy_task(7);
-        kassert!(t.tid == 7);
-        kassert!(t.pid == 7);
-        kassert!(t.is_kernel_thread());
-        kassert!(t.is_process());
-        kassert!(matches!(t.state, TaskState::Running));
+        assert!(t.tid == 7);
+        assert!(t.pid == 7);
+        assert!(t.is_kernel_thread());
+        assert!(t.is_process());
+        assert!(matches!(t.state, TaskState::Running));
     }
 }

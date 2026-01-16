@@ -5,23 +5,20 @@
 #[cfg(test)]
 mod tests {
     use loongArch64::register::{CpuMode, crmd};
-
-    use crate::kassert;
-
     #[test_case]
     fn test_loongarch_smoke() {
         // Basic CSR sanity: should be in PLV0 at boot.
         let plv = crmd::read().plv();
-        kassert!(matches!(plv, CpuMode::Ring0));
+        assert!(matches!(plv, CpuMode::Ring0));
 
         // Trap trampoline symbol should be linked in.
         let sigret = crate::arch::trap::sigreturn_trampoline_address();
-        kassert!(sigret != 0);
-        kassert!(sigret & 0x3 == 0);
+        assert!(sigret != 0);
+        assert!(sigret & 0x3 == 0);
 
         // Syscall numbers: asm-generic aligned sanity checks.
-        kassert!(crate::arch::syscall::SYS_READ == 63);
-        kassert!(crate::arch::syscall::SYS_WRITE == 64);
-        kassert!(crate::arch::syscall::SYS_EXIT == 93);
+        assert!(crate::arch::syscall::SYS_READ == 63);
+        assert!(crate::arch::syscall::SYS_WRITE == 64);
+        assert!(crate::arch::syscall::SYS_EXIT == 93);
     }
 }

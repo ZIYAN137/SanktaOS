@@ -89,56 +89,54 @@ impl Drop for SumGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, println, test_case};
+use crate::println;
 
     // 测试 SumGuard::new() 是否成功设置 SUM 位
-    test_case!(test_guard_sets_sum, {
+    #[test_case]
+    fn test_guard_sets_sum() {
         println!("Testing: test_guard_sets_sum");
 
         // 确保初始状态下 SUM 未设置
         unsafe { sstatus::clear_sum() };
-        kassert!(!sstatus::read().sum());
+        assert!(!sstatus::read().sum());
 
         {
             let _guard = SumGuard::new();
             // SUM 位应该已设置
-            kassert!(sstatus::read().sum());
+            assert!(sstatus::read().sum());
         }
 
         // 离开作用域后 SUM 位应该被清除
-        kassert!(!sstatus::read().sum());
-    });
+        assert!(!sstatus::read().sum());
+    }
 
     // 测试嵌套 SumGuard（现在应该能正确工作）
-    test_case!(test_guard_nested, {
+    #[test_case]
+    fn test_guard_nested() {
         println!("Testing: test_guard_nested");
 
         unsafe { sstatus::clear_sum() };
-        kassert!(!sstatus::read().sum());
+        assert!(!sstatus::read().sum());
 
         {
             let guard1 = SumGuard::new();
-            kassert!(sstatus::read().sum());
-            kassert!(!guard1.was_set()); // 第一个 guard 设置了 SUM 位
+            assert!(sstatus::read().sum());
+            assert!(!guard1.was_set()); // 第一个 guard 设置了 SUM 位
 
             {
                 let guard2 = SumGuard::new();
-                kassert!(sstatus::read().sum());
-                kassert!(guard2.was_set()); // 第二个 guard 发现 SUM 已设置
+                assert!(sstatus::read().sum());
+                assert!(guard2.was_set()); // 第二个 guard 发现 SUM 已设置
             }
 
             // 内层 guard 销毁后，SUM 位应该仍然为 1（因为外层还需要它）
-            kassert!(sstatus::read().sum());
+            assert!(sstatus::read().sum());
         }
 
         // 外层 guard 销毁后，SUM 位才被清除
-        kassert!(!sstatus::read().sum());
-    });
+        assert!(!sstatus::read().sum());
+    }
 
     // 测试 panic 时 SumGuard 是否能正确清理
     // 注意：此测试需要 panic handler 支持
-    // test_case!(test_guard_cleans_on_panic, {
-    //     println!("Testing: test_guard_cleans_on_panic");
-    //     // 此测试需要特殊的 panic 处理机制
-    // });
 }

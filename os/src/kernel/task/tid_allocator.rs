@@ -28,27 +28,28 @@ impl TidAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
 
     // 顺序分配测试：检查分配值从2开始并依次递增
-    test_case!(test_tid_allocate_sequence, {
+    #[test_case]
+    fn test_tid_allocate_sequence() {
         let alloc = TidAllocator::new();
-        kassert!(alloc.allocate() == 2);
-        kassert!(alloc.allocate() == 3);
-        kassert!(alloc.allocate() == 4);
-    });
+        assert!(alloc.allocate() == 2);
+        assert!(alloc.allocate() == 3);
+        assert!(alloc.allocate() == 4);
+    }
 
     // 多引用调用测试：通过多个引用连续分配，确保值唯一且递增
-    test_case!(test_tid_allocate_multiple_refs, {
+    #[test_case]
+    fn test_tid_allocate_multiple_refs() {
         let alloc = TidAllocator::new();
         let a1 = alloc.allocate();
         let a2 = alloc.allocate();
-        kassert!(a1 == 2);
-        kassert!(a2 == 3);
+        assert!(a1 == 2);
+        assert!(a2 == 3);
 
         // 通过另一个不可变引用继续分配
         let r = &alloc;
         let a3 = r.allocate();
-        kassert!(a3 == 4);
-    });
+        assert!(a3 == 4);
+    }
 }

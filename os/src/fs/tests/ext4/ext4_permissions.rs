@@ -1,10 +1,10 @@
 use super::*;
 use crate::vfs::InodeType;
-use crate::{kassert, test_case};
 
 // P1 重要功能测试 - chown/chmod
 
-test_case!(test_ext4_chown_basic, {
+#[test_case]
+fn test_ext4_chown_basic() {
     // 创建文件
     let fs = create_test_ext4();
     let content = b"Test content";
@@ -19,17 +19,18 @@ test_case!(test_ext4_chown_basic, {
     let new_uid = 1000;
     let new_gid = 1000;
     let result = inode.chown(new_uid, new_gid);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证修改成功
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.uid == new_uid);
-    kassert!(metadata.gid == new_gid);
-    kassert!(metadata.uid != original_uid || original_uid == new_uid);
-    kassert!(metadata.gid != original_gid || original_gid == new_gid);
-});
+    assert!(metadata.uid == new_uid);
+    assert!(metadata.gid == new_gid);
+    assert!(metadata.uid != original_uid || original_uid == new_uid);
+    assert!(metadata.gid != original_gid || original_gid == new_gid);
+}
 
-test_case!(test_ext4_chown_uid_only, {
+#[test_case]
+fn test_ext4_chown_uid_only() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -40,15 +41,16 @@ test_case!(test_ext4_chown_uid_only, {
     // 只修改 uid，gid 传 u32::MAX 表示不改变
     let new_uid = 2000;
     let result = inode.chown(new_uid, u32::MAX);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证：uid 改变，gid 不变
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.uid == new_uid);
-    kassert!(metadata.gid == original_gid);
-});
+    assert!(metadata.uid == new_uid);
+    assert!(metadata.gid == original_gid);
+}
 
-test_case!(test_ext4_chown_gid_only, {
+#[test_case]
+fn test_ext4_chown_gid_only() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -59,15 +61,16 @@ test_case!(test_ext4_chown_gid_only, {
     // 只修改 gid，uid 传 u32::MAX 表示不改变
     let new_gid = 3000;
     let result = inode.chown(u32::MAX, new_gid);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证：gid 改变，uid 不变
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.uid == original_uid);
-    kassert!(metadata.gid == new_gid);
-});
+    assert!(metadata.uid == original_uid);
+    assert!(metadata.gid == new_gid);
+}
 
-test_case!(test_ext4_chown_directory, {
+#[test_case]
+fn test_ext4_chown_directory() {
     // 创建目录
     let fs = create_test_ext4();
     let dir = create_test_dir(&fs, "testdir").unwrap();
@@ -76,16 +79,17 @@ test_case!(test_ext4_chown_directory, {
     let new_uid = 1001;
     let new_gid = 1001;
     let result = dir.chown(new_uid, new_gid);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证修改成功
     let metadata = dir.metadata().unwrap();
-    kassert!(metadata.inode_type == InodeType::Directory);
-    kassert!(metadata.uid == new_uid);
-    kassert!(metadata.gid == new_gid);
-});
+    assert!(metadata.inode_type == InodeType::Directory);
+    assert!(metadata.uid == new_uid);
+    assert!(metadata.gid == new_gid);
+}
 
-test_case!(test_ext4_chmod_basic, {
+#[test_case]
+fn test_ext4_chmod_basic() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -93,22 +97,23 @@ test_case!(test_ext4_chmod_basic, {
     // 修改权限为 0o755 (rwxr-xr-x)
     let new_mode = FileMode::from_bits_truncate(0o755);
     let result = inode.chmod(new_mode);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证修改成功
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.mode.contains(FileMode::S_IRUSR)); // owner read
-    kassert!(metadata.mode.contains(FileMode::S_IWUSR)); // owner write
-    kassert!(metadata.mode.contains(FileMode::S_IXUSR)); // owner execute
-    kassert!(metadata.mode.contains(FileMode::S_IRGRP)); // group read
-    kassert!(metadata.mode.contains(FileMode::S_IXGRP)); // group execute
-    kassert!(metadata.mode.contains(FileMode::S_IROTH)); // other read
-    kassert!(metadata.mode.contains(FileMode::S_IXOTH)); // other execute
-    kassert!(!metadata.mode.contains(FileMode::S_IWGRP)); // no group write
-    kassert!(!metadata.mode.contains(FileMode::S_IWOTH)); // no other write
-});
+    assert!(metadata.mode.contains(FileMode::S_IRUSR)); // owner read
+    assert!(metadata.mode.contains(FileMode::S_IWUSR)); // owner write
+    assert!(metadata.mode.contains(FileMode::S_IXUSR)); // owner execute
+    assert!(metadata.mode.contains(FileMode::S_IRGRP)); // group read
+    assert!(metadata.mode.contains(FileMode::S_IXGRP)); // group execute
+    assert!(metadata.mode.contains(FileMode::S_IROTH)); // other read
+    assert!(metadata.mode.contains(FileMode::S_IXOTH)); // other execute
+    assert!(!metadata.mode.contains(FileMode::S_IWGRP)); // no group write
+    assert!(!metadata.mode.contains(FileMode::S_IWOTH)); // no other write
+}
 
-test_case!(test_ext4_chmod_readonly, {
+#[test_case]
+fn test_ext4_chmod_readonly() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -116,22 +121,23 @@ test_case!(test_ext4_chmod_readonly, {
     // 修改权限为 0o444 (r--r--r--)
     let new_mode = FileMode::from_bits_truncate(0o444);
     let result = inode.chmod(new_mode);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证修改成功
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.mode.contains(FileMode::S_IRUSR));
-    kassert!(metadata.mode.contains(FileMode::S_IRGRP));
-    kassert!(metadata.mode.contains(FileMode::S_IROTH));
-    kassert!(!metadata.mode.contains(FileMode::S_IWUSR));
-    kassert!(!metadata.mode.contains(FileMode::S_IWGRP));
-    kassert!(!metadata.mode.contains(FileMode::S_IWOTH));
-    kassert!(!metadata.mode.contains(FileMode::S_IXUSR));
-    kassert!(!metadata.mode.contains(FileMode::S_IXGRP));
-    kassert!(!metadata.mode.contains(FileMode::S_IXOTH));
-});
+    assert!(metadata.mode.contains(FileMode::S_IRUSR));
+    assert!(metadata.mode.contains(FileMode::S_IRGRP));
+    assert!(metadata.mode.contains(FileMode::S_IROTH));
+    assert!(!metadata.mode.contains(FileMode::S_IWUSR));
+    assert!(!metadata.mode.contains(FileMode::S_IWGRP));
+    assert!(!metadata.mode.contains(FileMode::S_IWOTH));
+    assert!(!metadata.mode.contains(FileMode::S_IXUSR));
+    assert!(!metadata.mode.contains(FileMode::S_IXGRP));
+    assert!(!metadata.mode.contains(FileMode::S_IXOTH));
+}
 
-test_case!(test_ext4_chmod_special_bits, {
+#[test_case]
+fn test_ext4_chmod_special_bits() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -139,16 +145,17 @@ test_case!(test_ext4_chmod_special_bits, {
     // 设置特殊权限位：setuid(4), setgid(2), sticky(1)
     let new_mode = FileMode::from_bits_truncate(0o6755); // setuid + setgid + rwxr-xr-x
     let result = inode.chmod(new_mode);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证特殊位设置成功
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.mode.contains(FileMode::S_ISUID)); // setuid
-    kassert!(metadata.mode.contains(FileMode::S_ISGID)); // setgid
-    kassert!(!metadata.mode.contains(FileMode::S_ISVTX)); // no sticky bit
-});
+    assert!(metadata.mode.contains(FileMode::S_ISUID)); // setuid
+    assert!(metadata.mode.contains(FileMode::S_ISGID)); // setgid
+    assert!(!metadata.mode.contains(FileMode::S_ISVTX)); // no sticky bit
+}
 
-test_case!(test_ext4_chmod_directory, {
+#[test_case]
+fn test_ext4_chmod_directory() {
     // 创建目录
     let fs = create_test_ext4();
     let dir = create_test_dir(&fs, "testdir").unwrap();
@@ -156,19 +163,20 @@ test_case!(test_ext4_chmod_directory, {
     // 修改目录权限为 0o700 (rwx------)
     let new_mode = FileMode::from_bits_truncate(0o700);
     let result = dir.chmod(new_mode);
-    kassert!(result.is_ok());
+    assert!(result.is_ok());
 
     // 验证修改成功
     let metadata = dir.metadata().unwrap();
-    kassert!(metadata.inode_type == InodeType::Directory);
-    kassert!(metadata.mode.contains(FileMode::S_IRUSR));
-    kassert!(metadata.mode.contains(FileMode::S_IWUSR));
-    kassert!(metadata.mode.contains(FileMode::S_IXUSR));
-    kassert!(!metadata.mode.contains(FileMode::S_IRGRP));
-    kassert!(!metadata.mode.contains(FileMode::S_IROTH));
-});
+    assert!(metadata.inode_type == InodeType::Directory);
+    assert!(metadata.mode.contains(FileMode::S_IRUSR));
+    assert!(metadata.mode.contains(FileMode::S_IWUSR));
+    assert!(metadata.mode.contains(FileMode::S_IXUSR));
+    assert!(!metadata.mode.contains(FileMode::S_IRGRP));
+    assert!(!metadata.mode.contains(FileMode::S_IROTH));
+}
 
-test_case!(test_ext4_chmod_preserves_file_type, {
+#[test_case]
+fn test_ext4_chmod_preserves_file_type() {
     // 创建文件和目录
     let fs = create_test_ext4();
     let file = create_test_file(&fs, "file.txt").unwrap();
@@ -181,11 +189,12 @@ test_case!(test_ext4_chmod_preserves_file_type, {
     // 验证文件类型不变
     let file_meta = file.metadata().unwrap();
     let dir_meta = dir.metadata().unwrap();
-    kassert!(file_meta.inode_type == InodeType::File);
-    kassert!(dir_meta.inode_type == InodeType::Directory);
-});
+    assert!(file_meta.inode_type == InodeType::File);
+    assert!(dir_meta.inode_type == InodeType::Directory);
+}
 
-test_case!(test_ext4_chown_chmod_combined, {
+#[test_case]
+fn test_ext4_chown_chmod_combined() {
     // 创建文件
     let fs = create_test_ext4();
     let inode = create_test_file(&fs, "test.txt").unwrap();
@@ -199,11 +208,11 @@ test_case!(test_ext4_chown_chmod_combined, {
 
     // 验证两者都生效
     let metadata = inode.metadata().unwrap();
-    kassert!(metadata.uid == 1234);
-    kassert!(metadata.gid == 5678);
-    kassert!(metadata.mode.contains(FileMode::S_IRUSR));
-    kassert!(metadata.mode.contains(FileMode::S_IWUSR));
-    kassert!(!metadata.mode.contains(FileMode::S_IXUSR));
-    kassert!(!metadata.mode.contains(FileMode::S_IRGRP));
-    kassert!(!metadata.mode.contains(FileMode::S_IROTH));
-});
+    assert!(metadata.uid == 1234);
+    assert!(metadata.gid == 5678);
+    assert!(metadata.mode.contains(FileMode::S_IRUSR));
+    assert!(metadata.mode.contains(FileMode::S_IWUSR));
+    assert!(!metadata.mode.contains(FileMode::S_IXUSR));
+    assert!(!metadata.mode.contains(FileMode::S_IRGRP));
+    assert!(!metadata.mode.contains(FileMode::S_IROTH));
+}

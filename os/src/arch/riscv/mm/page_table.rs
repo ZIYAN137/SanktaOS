@@ -559,7 +559,6 @@ fn ppn_to_satp(ppn: Ppn) -> usize {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::kassert;
     use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
@@ -567,9 +566,9 @@ mod page_table_tests {
     fn test_pt_create() {
         let pt = PageTableInner::new();
         // 根 PPN 应该有效 (大于 0)
-        kassert!(pt.root_ppn().as_usize() > 0);
+        assert!(pt.root_ppn().as_usize() > 0);
         // 默认创建为用户页表
-        kassert!(pt.is_user_table());
+        assert!(pt.is_user_table());
     }
 
     // 2. 映射与转换测试
@@ -581,15 +580,15 @@ mod page_table_tests {
 
         // 映射 vpn -> ppn
         let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 转换验证 - 使用 vpn.start_addr() 获取正确的虚拟地址
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
-        kassert!(translated.is_some());
+        assert!(translated.is_some());
         let paddr = translated.unwrap();
         // 验证转换后的物理页号是否正确
-        kassert!(paddr.as_usize() >> 12 == ppn.as_usize());
+        assert!(paddr.as_usize() >> 12 == ppn.as_usize());
     }
 
     // 3. 解除映射测试
@@ -605,12 +604,12 @@ mod page_table_tests {
 
         // 解除映射
         let result = pt.unmap(vpn);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 应该不再被映射
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
-        kassert!(translated.is_none());
+        assert!(translated.is_none());
     }
 
     // 4. 错误测试：已映射
@@ -626,7 +625,7 @@ mod page_table_tests {
             PageSize::Size4K,
             UniversalPTEFlag::kernel_rw(),
         );
-        kassert!(result1.is_ok());
+        assert!(result1.is_ok());
 
         // 第二次映射应该失败 (返回 AlreadyMapped 错误)
         let result2 = pt.map(
@@ -635,7 +634,7 @@ mod page_table_tests {
             PageSize::Size4K,
             UniversalPTEFlag::kernel_rw(),
         );
-        kassert!(result2.is_err());
+        assert!(result2.is_err());
     }
 
     // 5. 页表遍历 (Walk) 测试
@@ -651,13 +650,13 @@ mod page_table_tests {
 
         // 遍历获取映射信息
         let walk_result = pt.walk(vpn);
-        kassert!(walk_result.is_ok());
+        assert!(walk_result.is_ok());
 
         let (mapped_ppn, _, mapped_flags) = walk_result.unwrap();
-        kassert!(mapped_ppn == ppn);
+        assert!(mapped_ppn == ppn);
         // 创建新的flags实例用于比较，避免所有权问题
         let expected_flags = UniversalPTEFlag::kernel_rw();
-        kassert!(mapped_flags.bits() == expected_flags.bits());
+        assert!(mapped_flags.bits() == expected_flags.bits());
     }
 
     // 6. 更新标志位测试
@@ -674,13 +673,13 @@ mod page_table_tests {
         // 更新为内核只读 (kernel_r)
         let update_flags = UniversalPTEFlag::kernel_r();
         let result = pt.update_flags(vpn, update_flags);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 验证标志位是否已更改
         let (_, _, flags) = pt.walk(vpn).unwrap();
         // 创建新的flags实例用于比较，避免所有权问题
         let expected_flags = UniversalPTEFlag::kernel_r();
-        kassert!(flags.bits() == expected_flags.bits());
+        assert!(flags.bits() == expected_flags.bits());
     }
 
     // 7. 多重映射测试
@@ -693,7 +692,7 @@ mod page_table_tests {
             let vpn = Vpn::from_usize(0x1000 + i);
             let ppn = Ppn::from_usize(0x80000 + i);
             let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-            kassert!(result.is_ok());
+            assert!(result.is_ok());
         }
 
         // 验证所有映射
@@ -701,7 +700,7 @@ mod page_table_tests {
             let vpn = Vpn::from_usize(0x1000 + i);
             let expected_ppn = Ppn::from_usize(0x80000 + i);
             let (mapped_ppn, _, _) = pt.walk(vpn).unwrap();
-            kassert!(mapped_ppn == expected_ppn);
+            assert!(mapped_ppn == expected_ppn);
         }
     }
 
@@ -712,7 +711,7 @@ mod page_table_tests {
     fn test_tlb_flush_ipi_basic() {
         // 调用 send_tlb_flush_ipi_all 不应该 panic
         crate::arch::ipi::send_tlb_flush_ipi_all();
-        kassert!(true);
+        assert!(true);
     }
 
     /// 测试页表映射触发 TLB shootdown
@@ -724,11 +723,11 @@ mod page_table_tests {
 
         // 执行映射操作（应该触发 TLB shootdown）
         let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 验证映射生效
         let translated = pt.translate(vpn.start_addr());
-        kassert!(translated.is_some());
+        assert!(translated.is_some());
     }
 
     /// 测试页表解除映射触发 TLB shootdown
@@ -740,15 +739,15 @@ mod page_table_tests {
 
         // 先映射
         let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 再解除映射（应该触发 TLB shootdown）
         let result = pt.unmap(vpn);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 验证解除映射生效
         let translated = pt.translate(vpn.start_addr());
-        kassert!(translated.is_none());
+        assert!(translated.is_none());
     }
 
     /// 测试页表权限更新触发 TLB shootdown
@@ -760,10 +759,10 @@ mod page_table_tests {
 
         // 先映射为只读
         let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_r());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 更新权限为读写（应该触发 TLB shootdown）
         let result = pt.update_flags(vpn, UniversalPTEFlag::kernel_rw());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
     }
 }

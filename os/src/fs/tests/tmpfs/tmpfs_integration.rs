@@ -1,10 +1,10 @@
 //! Tmpfs 集成测试 - 综合场景
 
 use super::*;
-use crate::{kassert, test_case};
 use alloc::vec;
 
-test_case!(test_tmpfs_complex_scenario, {
+#[test_case]
+fn test_tmpfs_complex_scenario() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -44,10 +44,11 @@ test_case!(test_tmpfs_complex_scenario, {
     let found = root.lookup("etc").unwrap().lookup("passwd").unwrap();
     let mut buf = vec![0u8; 26];
     found.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"root:x:0:0::/root:/bin/sh\n");
-});
+    assert!(&buf[..] == b"root:x:0:0::/root:/bin/sh\n");
+}
 
-test_case!(test_tmpfs_concurrent_operations, {
+#[test_case]
+fn test_tmpfs_concurrent_operations() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -70,16 +71,17 @@ test_case!(test_tmpfs_concurrent_operations, {
     // 验证数据独立
     let mut buf = vec![0u8; 14];
     file1.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"File 1 content");
+    assert!(&buf[..] == b"File 1 content");
 
     file2.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"File 2 content");
+    assert!(&buf[..] == b"File 2 content");
 
     file3.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"File 3 content");
-});
+    assert!(&buf[..] == b"File 3 content");
+}
 
-test_case!(test_tmpfs_lifecycle, {
+#[test_case]
+fn test_tmpfs_lifecycle() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -103,14 +105,15 @@ test_case!(test_tmpfs_lifecycle, {
     // 验证最终状态
     let mut buf = vec![0u8; 7];
     file.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"updated");
+    assert!(&buf[..] == b"updated");
 
     // 删除
     root.unlink("lifecycle.txt").unwrap();
-    kassert!(root.lookup("lifecycle.txt").is_err());
-});
+    assert!(root.lookup("lifecycle.txt").is_err());
+}
 
-test_case!(test_tmpfs_stats, {
+#[test_case]
+fn test_tmpfs_stats() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -128,28 +131,30 @@ test_case!(test_tmpfs_stats, {
 
     // 检查使用量增加
     let used_size = fs.used_size();
-    kassert!(used_size > initial_size);
-    kassert!(used_size >= 10 * 8192); // 至少 10 个文件的数据
-});
+    assert!(used_size > initial_size);
+    assert!(used_size >= 10 * 8192); // 至少 10 个文件的数据
+}
 
-test_case!(test_tmpfs_metadata_update, {
+#[test_case]
+fn test_tmpfs_metadata_update() {
     let fs = create_test_tmpfs();
     let file = create_test_file_with_content(&fs, "test.txt", b"hello").unwrap();
 
     let meta1 = file.metadata().unwrap();
-    kassert!(meta1.size == 5);
+    assert!(meta1.size == 5);
 
     // 写入更多数据
     file.write_at(5, b", world!").unwrap();
 
     let meta2 = file.metadata().unwrap();
-    kassert!(meta2.size == 13);
+    assert!(meta2.size == 13);
 
     // mtime 应该更新
-    kassert!(meta2.mtime.tv_sec >= meta1.mtime.tv_sec);
-});
+    assert!(meta2.mtime.tv_sec >= meta1.mtime.tv_sec);
+}
 
-test_case!(test_tmpfs_shared_access, {
+#[test_case]
+fn test_tmpfs_shared_access() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -167,5 +172,5 @@ test_case!(test_tmpfs_shared_access, {
     // 通过 file2 读取
     let mut buf = vec![0u8; 11];
     file2.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"shared data");
-});
+    assert!(&buf[..] == b"shared data");
+}

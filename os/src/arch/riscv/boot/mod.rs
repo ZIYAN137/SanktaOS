@@ -353,17 +353,18 @@ fn clear_bss() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
 
     /// 测试 NUM_CPU 设置正确
-    test_case!(test_num_cpu, {
+    #[test_case]
+    fn test_num_cpu() {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        kassert!(num_cpu >= 1);
-        kassert!(num_cpu <= crate::config::MAX_CPU_COUNT);
-    });
+        assert!(num_cpu >= 1);
+        assert!(num_cpu <= crate::config::MAX_CPU_COUNT);
+    }
 
     /// 测试 CPU 上线掩码（多核环境）
-    test_case!(test_cpu_online_mask, {
+    #[test_case]
+    fn test_cpu_online_mask() {
         use core::sync::atomic::Ordering;
 
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
@@ -379,18 +380,18 @@ mod tests {
         let expected_mask = (1 << num_cpu) - 1;
 
         // 验证所有 CPU 都已上线
-        kassert!(actual_mask == expected_mask);
+        assert!(actual_mask == expected_mask);
 
         // 验证主核已上线
-        kassert!((actual_mask & 1) != 0);
+        assert!((actual_mask & 1) != 0);
 
         // 如果是多核，验证从核也已上线
         if num_cpu > 1 {
             for hartid in 1..num_cpu {
-                kassert!((actual_mask & (1 << hartid)) != 0);
+                assert!((actual_mask & (1 << hartid)) != 0);
             }
         }
-    });
+    }
 }
 
 /// 从核入口函数

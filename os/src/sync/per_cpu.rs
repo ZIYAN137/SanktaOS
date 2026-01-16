@@ -141,7 +141,6 @@ unsafe impl<T: Send> Sync for PerCpu<T> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kassert;
     use core::sync::atomic::{AtomicUsize, Ordering};
     use sync::PreemptGuard;
 
@@ -150,18 +149,18 @@ mod tests {
         let per_cpu = PerCpu::new(|| AtomicUsize::new(0));
         let _guard = PreemptGuard::new(); // 禁用抢占
         let counter = per_cpu.get();
-        kassert!(counter.load(Ordering::Relaxed) == 0);
+        assert!(counter.load(Ordering::Relaxed) == 0);
         counter.fetch_add(1, Ordering::Relaxed);
-        kassert!(counter.load(Ordering::Relaxed) == 1);
+        assert!(counter.load(Ordering::Relaxed) == 1);
     }
 
     #[test_case]
     fn test_per_cpu_get_of() {
         let per_cpu = PerCpu::new(|| AtomicUsize::new(42));
         let counter = per_cpu.get_of(0);
-        kassert!(counter.load(Ordering::Relaxed) == 42);
+        assert!(counter.load(Ordering::Relaxed) == 42);
         counter.fetch_add(1, Ordering::Relaxed);
-        kassert!(per_cpu.get_of(0).load(Ordering::Relaxed) == 43);
+        assert!(per_cpu.get_of(0).load(Ordering::Relaxed) == 43);
     }
 
     #[test_case]
@@ -169,8 +168,8 @@ mod tests {
         let per_cpu = PerCpu::new(|| 0usize);
         let _guard = PreemptGuard::new(); // 禁用抢占
         let value = per_cpu.get_mut();
-        kassert!(*value == 0);
+        assert!(*value == 0);
         *value = 100;
-        kassert!(*per_cpu.get_mut() == 100);
+        assert!(*per_cpu.get_mut() == 100);
     }
 }

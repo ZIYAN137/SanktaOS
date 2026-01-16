@@ -239,9 +239,7 @@ impl Scheduler for RRScheduler {
 mod tests {
     use super::*;
     use crate::{
-        kassert,
         kernel::{cpu::current_cpu, task::TaskStruct},
-        test_case,
     };
 
     fn mk_task(tid: u32) -> SharedTask {
@@ -249,62 +247,12 @@ mod tests {
     }
 
     // // 基础轮转：current=T0，队列[T1,T2]，三次切换应依次运行 T1 -> T2 -> T0
-    // test_case!(test_rr_prepare_switch_round_robin_order, {
-    //     // 设置当前任务
-    //     let t0 = mk_task(10);
-    //     current_cpu().lock().current_task = Some(t0.clone());
-
-    //     // 构造调度器并加入待运行任务
-    //     let mut rr = RRScheduler::new();
-    //     let t1 = mk_task(11);
-    //     let t2 = mk_task(12);
-    //     rr.add_task(t1.clone());
-    //     rr.add_task(t2.clone());
-
-    //     // 第一次切换：next 应为 t1，prev=t0 被放回队列
-    //     let plan1 = rr.prepare_switch().expect("no switch plan 1");
-    //     kassert!(plan1.old as usize != 0 && plan1.new as usize != 0);
-    //     let cur1 = {
-    //         let g = current_cpu().lock();
-    //         g.current_task.as_ref().unwrap().lock().tid
-    //     };
-    //     kassert!(cur1 == 11);
-
-    //     // 第二次切换：current=t1，next=t2，prev=t1 放回队列
-    //     let plan2 = rr.prepare_switch().expect("no switch plan 2");
-    //     kassert!(plan2.old as usize != 0 && plan2.new as usize != 0);
-    //     let cur2 = {
-    //         let g = current_cpu().lock();
-    //         g.current_task.as_ref().unwrap().lock().tid
-    //     };
-    //     kassert!(cur2 == 12);
-
-    //     // 第三次切换：current=t2，next 应为 t0（被回收至队列尾）
-    //     let plan3 = rr.prepare_switch().expect("no switch plan 3");
-    //     kassert!(plan3.old as usize != 0 && plan3.new as usize != 0);
-    //     let cur3 = {
-    //         let g = current_cpu().lock();
-    //         g.current_task.as_ref().unwrap().lock().tid
-    //     };
-    //     kassert!(cur3 == 10);
-    // });
 
     // // 添加任务：仅允许 Running 状态
-    // test_case!(test_rr_add_task_only_running, {
-    //     let mut rr = RRScheduler::new();
-    //     let stopped = mk_task(21);
-    //     {
-    //         let mut g = stopped.lock();
-    //         g.state = TaskState::Stopped;
-    //     }
-    //     let result = catch_unwind(AssertUnwindSafe(|| {
-    //         rr.add_task(stopped);
-    //     }));
-    //     kassert!(result.is_err());
-    // });
 
     // sleep / wake：sleep 后应不在队列且状态更新；wake 后回到队列且为 Running
-    test_case!(test_rr_sleep_and_wakeup, {
+    #[test_case]
+    fn test_rr_sleep_and_wakeup() {
         // 需要一个当前任务以便 prepare_switch 不报错；本测试不调用 prepare_switch，但保持一致设定
         {
             let _guard = crate::sync::PreemptGuard::new();
@@ -319,21 +267,22 @@ mod tests {
         rr.sleep_task(t.clone(), false);
         {
             let g = t.lock();
-            kassert!(matches!(g.state, TaskState::Uninterruptible));
+            assert!(matches!(g.state, TaskState::Uninterruptible));
         }
-        kassert!(!rr.run_queue.contains(&t));
+        assert!(!rr.run_queue.contains(&t));
 
         // 唤醒
         rr.wake_up(t.clone());
         {
             let g = t.lock();
-            kassert!(matches!(g.state, TaskState::Running));
+            assert!(matches!(g.state, TaskState::Running));
         }
-        kassert!(rr.run_queue.contains(&t));
-    });
+        assert!(rr.run_queue.contains(&t));
+    }
 
     // 任务退出：应设置状态为 Zombie，并从队列移除
-    test_case!(test_rr_exit_task, {
+    #[test_case]
+    fn test_rr_exit_task() {
         {
             let _guard = crate::sync::PreemptGuard::new();
             current_cpu().current_task = Some(mk_task(40));
@@ -346,17 +295,18 @@ mod tests {
         rr.exit_task(t.clone());
         {
             let g = t.lock();
-            kassert!(matches!(g.state, TaskState::Zombie));
+            assert!(matches!(g.state, TaskState::Zombie));
         }
-        kassert!(!rr.run_queue.contains(&t));
-    });
+        assert!(!rr.run_queue.contains(&t));
+    }
 
     // 时间片更新：手动将 current_slice 置 1，update 后应返回 true 并递减到 0
-    test_case!(test_rr_update_time_slice, {
+    #[test_case]
+    fn test_rr_update_time_slice() {
         let mut rr = RRScheduler::new();
         rr.current_slice = 1; // 直接操纵以触发用尽路径
         let expired = rr.update_time_slice();
-        kassert!(expired);
-        kassert!(rr.current_slice == 0);
-    });
+        assert!(expired);
+        assert!(rr.current_slice == 0);
+    }
 }

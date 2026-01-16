@@ -401,9 +401,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        kassert,
         kernel::task::{SharedTask, TASK_MANAGER},
-        test_case,
     };
     // use core::sync::atomic::Ordering;
 
@@ -415,61 +413,31 @@ mod tests {
     }
 
     // 测试 kthread_spawn：应分配 tid 并放入任务管理器
-    test_case!(test_kthread_spawn_basic, {
+    #[test_case]
+    fn test_kthread_spawn_basic() {
         {
             let _guard = crate::sync::PreemptGuard::new();
             current_cpu().current_task = Some(mk_task(1));
         }
         let tid = kthread_spawn(dummy_thread);
-        kassert!(tid != 0);
+        assert!(tid != 0);
         let task_opt = TASK_MANAGER.lock().get_task(tid);
-        kassert!(task_opt.is_some());
+        assert!(task_opt.is_some());
         let t = task_opt.unwrap();
         let g = t.lock();
-        kassert!(g.tid == tid);
-        kassert!(g.is_kernel_thread());
-    });
+        assert!(g.tid == tid);
+        assert!(g.is_kernel_thread());
+    }
 
     // 测试 kthread_join 成功路径：预置一个 Stopped 状态的任务与返回值
-    // test_case!(test_kthread_join_success, {
-    //     // 预创建任务
-    //     let tid = TASK_MANAGER.lock().allocate_tid();
-    //     let kstack_tracker =
-    //         crate::mm::frame_allocator::physical_page_alloc_contiguous(1).expect("alloc kstack");
-    //     let trap_frame_tracker =
-    //         crate::mm::frame_allocator::physical_page_alloc().expect("alloc trap_frame");
-    //     let task = TaskStruct::ktask_create(
-    //         tid,
-    //         tid,
-    //         0,
-    //         kstack_tracker,
-    //         trap_frame_tracker,
-    //         dummy_thread as usize,
-    //     );
-    //     let shared = into_shared(task);
-    //     {
-    //         let mut g = shared.lock();
-    //         g.state = TaskState::Stopped;
-    //         g.return_value = Some(0xDEAD_BEEF);
-    //     }
-    //     TASK_MANAGER.lock().add_task(shared.clone());
-    //     SCHEDULER.lock().add_task(shared);
-
-    //     // 为返回值提供缓冲区
-    //     let mut rv_slot: usize = 0;
-    //     let rc = kthread_join(tid, Some(&mut rv_slot as *mut usize as usize));
-    //     kassert!(rc == 0);
-    //     kassert!(rv_slot == 0xDEAD_BEEF);
-    //     // 任务应已从管理器移除
-    //     kassert!(TASK_MANAGER.lock().get_task(tid).is_none());
-    // });
 
     // 测试 kthread_join 失败路径：不存在的 tid
-    test_case!(test_kthread_join_not_found, {
+    #[test_case]
+    fn test_kthread_join_not_found() {
         // 选择一个极小概率已存在的高 tid（或先确保不存在）
         let missing_tid = 0xFFFF_FFFFu32;
-        kassert!(TASK_MANAGER.lock().get_task(missing_tid).is_none());
+        assert!(TASK_MANAGER.lock().get_task(missing_tid).is_none());
         let rc = unsafe { kthread_join(missing_tid, None) };
-        kassert!(rc == -1);
-    });
+        assert!(rc == -1);
+    }
 }
