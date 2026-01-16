@@ -21,3 +21,19 @@ pub const fn major(dev: u64) -> u32 {
 pub const fn minor(dev: u64) -> u32 {
     (dev & 0xFFFFFFFF) as u32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_makedev_major_minor_roundtrip() {
+        for maj in [0u32, 1, 8, 10, 255, u32::MAX] {
+            for min in [0u32, 1, 16, 255, u32::MAX] {
+                let dev = makedev(maj, min);
+                assert_eq!(major(dev), maj);
+                assert_eq!(minor(dev), min);
+            }
+        }
+    }
+}
