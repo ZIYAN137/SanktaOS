@@ -58,12 +58,14 @@ pub const FUTEX_CLOCK_REALTIME: FutexOp = 256; // 0x100
 /// 这个结构体是用户空间维护的，用于告诉内核当前线程持有健壮 futex 锁的列表信息。
 /// 示例用法（在需要时使用 volatile 访问）：
 /// ```rust
+/// use uapi::futex::RobustListHead;
+///
 /// fn access_robust_head(head: &mut RobustListHead) {
 ///    unsafe {
 ///        // 安全地读取 head 字段的 volatile 值
-///        let first_lock_ptr = head.head.read_volatile();
+///        let _first_lock_ptr = core::ptr::read_volatile(&head.head);
 ///        // 安全地写入 head 字段的 volatile 值
-///        head.head.write_volatile(core::ptr::null_mut());
+///        core::ptr::write_volatile(&mut head.head, core::ptr::null_mut());
 ///    }
 /// }
 /// ```

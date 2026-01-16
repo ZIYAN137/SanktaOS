@@ -57,7 +57,10 @@ pub fn create_test_ext4_with_root() -> (Arc<Ext4FileSystem>, Arc<Dentry>) {
     let device_id = ramdisk.device_id();
     // 注意: ramdisk 使用 512 字节扇区,但 Ext4 使用 4096 字节块
     // 适配器会处理这个转换
-    let total_blocks = ramdisk.total_blocks();
+    // Ext4FileSystem::open expects `total_blocks` in units of EXT4_BLOCK_SIZE.
+    // RamDisk uses 512-byte blocks here, so convert device blocks -> ext4 blocks.
+    let total_bytes = ramdisk.total_blocks() * ramdisk.block_size();
+    let total_blocks = total_bytes / EXT4_BLOCK_SIZE;
 
     // 将 ramdisk 转换为 BlockDriver
     let block_driver: Arc<dyn BlockDriver> = ramdisk;
