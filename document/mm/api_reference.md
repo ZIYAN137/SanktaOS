@@ -185,6 +185,24 @@ impl FrameRangeTracker {
 
 **源代码**：`os/src/mm/frame_allocator/frame_allocator.rs:74-132`
 
+### 统计信息（新增）
+
+```rust
+pub fn get_stats() -> FrameAllocStats
+
+pub struct FrameAllocStats {
+    pub total_frames: usize,
+    pub allocated_frames: usize,
+    pub free_frames: usize,
+    pub watermark: usize,
+    pub recycle_stack_size: usize,
+}
+```
+
+**功能**：获取物理帧分配器的详细统计信息
+
+**源代码**：`crates/mm/src/frame_allocator.rs`
+
 ### 错误类型
 
 ```rust
@@ -348,6 +366,46 @@ pub fn activate(&self)                          // 激活地址空间
 pub fn root_ppn(&self) -> Ppn                   // 获取根页表页号
 ```
 
+#### 跨页读写（新增）
+
+```rust
+pub fn write_bytes_at(&mut self, va: usize, bytes: &[u8]) -> Result<(), PagingError>
+pub fn read_bytes_at(&self, va: usize, out: &mut [u8]) -> Result<(), PagingError>
+pub fn read_u64_at(&self, va: usize) -> Result<u64, PagingError>
+pub fn write_usize_at(&mut self, va: usize, value: usize) -> Result<(), PagingError>
+```
+
+**功能**：安全地跨页读写数据，自动处理页边界
+
+**源代码**：`crates/mm/src/memory_space/space.rs:86-120`
+
+#### 区域管理（新增）
+
+```rust
+pub fn insert_reserved_area(&mut self, vpn_range: VpnRange, area_type: AreaType) -> PagingResult<()>
+pub fn find_overlapping_areas(&self, vpn_range: &VpnRange) -> Vec<usize>
+pub fn find_free_area(&self, start: Vpn, end: Vpn, size_pages: usize) -> Option<VpnRange>
+```
+
+**功能**：
+- `insert_reserved_area` - 插入保留区域（不分配物理页）
+- `find_overlapping_areas` - 查找与指定范围重叠的区域
+- `find_free_area` - 在指定范围内查找空闲区域
+
+**源代码**：`crates/mm/src/memory_space/space.rs`
+
+#### 文件映射同步（新增）
+
+```rust
+pub fn sync_all_file_mappings(&mut self) -> Result<(), PagingError>
+```
+
+**功能**：同步所有文件映射区域到磁盘
+
+**源代码**：`crates/mm/src/memory_space/space.rs`
+
+---
+
 ### MappingArea
 
 #### 创建
@@ -397,6 +455,41 @@ pub fn shrink(&mut self, page_table: &mut ActivePageTableInner,
 ```
 
 **源代码**：`os/src/mm/memory_space/mapping_area.rs:113-626`
+
+#### 高级操作（新增）
+
+```rust
+pub fn get_ppn(&self, vpn: Vpn, page_table: &ActivePageTableInner) -> Option<Ppn>
+pub fn map_one(&mut self, vpn: Vpn, page_table: &mut ActivePageTableInner) -> PagingResult<()>
+pub fn unmap_one(&mut self, vpn: Vpn, page_table: &mut ActivePageTableInner) -> PagingResult<()>
+pub fn split_at(&mut self, vpn: Vpn) -> Option<Self>
+pub fn partial_change_permission(&mut self, vpn_range: VpnRange, new_perm: UniversalPTEFlag,
+                                  page_table: &mut ActivePageTableInner) -> PagingResult<()>
+pub fn partial_unmap(&mut self, vpn_range: VpnRange,
+                     page_table: &mut ActivePageTableInner) -> PagingResult<()>
+```
+
+**功能**：
+- `get_ppn` - 获取虚拟页对应的物理页号
+- `map_one` / `unmap_one` - 单页映射/解映射
+- `split_at` - 在指定位置分割映射区域
+- `partial_change_permission` - 部分修改权限
+- `partial_unmap` - 部分解映射
+
+**源代码**：`crates/mm/src/memory_space/mapping_area.rs`
+
+#### 文件映射（新增）
+
+```rust
+pub fn load_from_file(&mut self, page_table: &mut ActivePageTableInner) -> PagingResult<()>
+pub fn sync_file(&self, page_table: &mut ActivePageTableInner) -> PagingResult<()>
+```
+
+**功能**：
+- `load_from_file` - 从文件加载数据到映射区域
+- `sync_file` - 同步映射区域到文件
+
+**源代码**：`crates/mm/src/memory_space/mapping_area.rs`
 
 ---
 
