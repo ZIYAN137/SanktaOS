@@ -1,6 +1,34 @@
 //! 系统调用模块
 //!
-//! 提供系统调用的实现
+//! 本目录提供“内核侧系统调用实现”，并通过 `impl_syscall!` 宏生成架构分发所需的 `sys_*` 包装函数。
+//!
+//! # 分层与调用链（概览）
+//!
+//! 以 RISC-V 为例：
+//! - 用户态触发 `ecall` 进入 trap；
+//! - 架构侧分发：`os/src/arch/riscv/syscall/mod.rs` 读取 `a7`（syscall number）并分发；
+//! - `sys_*` 包装器：由 `impl_syscall!` 生成，负责从 TrapFrame 提取 `a0..a5`，调用本目录下的实现函数，
+//!   并把 `isize` 返回值写回 `a0`；
+//! - 具体实现：位于 `os/src/kernel/syscall/*.rs`。
+//!
+//! # 约定
+//!
+//! - 系统调用实现函数通常返回 `isize`：
+//!   - 成功：非负值
+//!   - 失败：返回 `-(errno as isize)`（errno 常量见 `crates/uapi/src/errno.rs`）
+//! - 访问用户空间指针时，建议使用 `SumGuard` / `UserBuffer` / `validate_user_ptr*` 等工具封装，
+//!   并对 `unsafe` 补充 `// SAFETY:` 说明。
+//!
+//! # 文件拆分
+//!
+//! 主要按领域拆分：
+//! - `io.rs`：read/write/readv/writev 等基础 I/O
+//! - `fs.rs` / `fcntl.rs` / `ioctl.rs`：文件系统与 fd 操作
+//! - `mm.rs`：内存管理相关
+//! - `ipc.rs` / `signal.rs`：进程间通信与信号
+//! - `task.rs` / `cred.rs`：任务管理与凭证相关
+//! - `network.rs`：socket/网络相关
+//! - `sys.rs`：uname/sysinfo/syslog 等系统信息类调用
 
 #![allow(dead_code)]
 mod cred;

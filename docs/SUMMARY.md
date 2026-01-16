@@ -53,7 +53,7 @@
 
 # 系统调用
 
-- [系统调用速查](syscall/README.md)
+- [系统调用概述](syscall/README.md)
 
 # 架构相关
 
