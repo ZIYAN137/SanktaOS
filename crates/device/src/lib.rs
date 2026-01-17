@@ -16,6 +16,15 @@
 //! - [`IrqOps`]: 中断启用操作
 //!
 //! 使用前必须调用 [`register_irq_ops`] 注册实现。
+//!
+//! # OS 侧集成
+//!
+//! `crates/device` 只提供平台无关的抽象；OS 侧通常会：
+//! - 在启动早期注册 `IrqOps`（例如启用某个中断号）；
+//! - 提供设备树遍历与总线探测逻辑；
+//! - 实现具体驱动并登记到 `DRIVERS` / `BLK_DRIVERS` / `NETWORK_DEVICES` 等全局表。
+//!
+//! 具体实现可参考 `os/src/device/`。
 
 #![no_std]
 #![allow(clippy::module_inception)]

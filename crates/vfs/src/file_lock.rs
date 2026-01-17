@@ -1,6 +1,12 @@
 //! 文件锁管理
 //!
 //! 实现 POSIX 文件锁（advisory locks）语义
+//!
+//! 当前实现提供 `F_GETLK`/`F_SETLK` 风格的基础能力：
+//!
+//! - 以（dev, ino）标识文件，以（start, len, pid）标识锁区间与持有者
+//! - 读锁共享、写锁独占；同一 pid 的锁不视为冲突
+//! - 阻塞等待（`F_SETLKW`）与死锁检测属于后续增强点
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;

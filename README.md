@@ -56,7 +56,7 @@ SanktaOS/
 │   ├── klog/        # 内核日志
 │   └── uapi/        # 用户态 API
 ├── data/            # 根文件系统基础内容（busybox、init 等）
-├── document/        # 设计文档（mdBook）
+├── docs/            # 设计文档（mdBook）
 └── scripts/         # 构建工具脚本
 ```
 
@@ -96,7 +96,7 @@ make fmt
 
 ## 文档
 
-- 设计文档：[document/README.md](document/README.md)
+- 设计文档：[docs/README.md](docs/README.md)
 - 贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)
 - 开发指南：[CLAUDE.md](CLAUDE.md)
 

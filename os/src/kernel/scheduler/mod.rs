@@ -1,6 +1,10 @@
-//！ 调度器模块
+//! 调度器模块
 //!
-//！ 定义了调度器接口和相关功能
+//! 定义了调度器接口、运行队列以及阻塞/唤醒等基础设施，并提供 `schedule()` 触发上下文切换。
+//!
+//! - 调度策略实现：`rr_scheduler.rs`
+//! - 运行队列实现：`task_queue.rs`
+//! - 等待队列实现：`wait_queue.rs`
 mod rr_scheduler;
 mod task_queue;
 mod wait_queue;

@@ -1,6 +1,16 @@
 //! 管道文件实现
 //!
-//! 管道是流式单向通信设备，读端和写端分别由两个 [`PipeFile`] 实例表示。
+//! 管道是流式单向通信设备，读端和写端分别由两个 [`PipeFile`] 实例表示，并共享同一个
+//! 内存环形缓冲区。
+//!
+//! # 当前语义（实现现状）
+//!
+//! 该实现目前偏“最小可用/原型”：
+//! - 不包含等待队列与阻塞读写：缓冲为空时 `read()` 直接返回 `Ok(0)`；
+//! - 无读端时 `write()` 返回 [`FsError::BrokenPipe`]；
+//! - `OpenFlags::O_NONBLOCK` 等标志位会被保存，但暂未影响读写行为。
+//!
+//! 若需要更接近 POSIX 的阻塞/唤醒、`EAGAIN`、`SIGPIPE` 等语义，需要在此基础上补齐。
 
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
@@ -8,17 +18,17 @@ use sync::SpinLock;
 
 use crate::{File, FileMode, FsError, InodeMetadata, InodeType, OpenFlags, TimeSpec};
 
-/// 管道环形缓冲区
+/// 管道环形缓冲区（仅内存结构）
 ///
-/// 容量默认 4KB（POSIX 最小 512 字节）。
+/// 容量默认 4KB（此处仅作为实现选择，不表示完整的 POSIX 语义）。
 struct PipeRingBuffer {
     /// 内部缓冲区
     buffer: VecDeque<u8>,
     /// 缓冲区容量
     capacity: usize,
-    /// 写端引用计数 (用于检测写端关闭)
+    /// 写端端点计数（用于判断“是否仍存在写端”）
     write_end_count: usize,
-    /// 读端引用计数 (用于检测读端关闭)
+    /// 读端端点计数（用于判断“是否仍存在读端”）
     read_end_count: usize,
 }
 

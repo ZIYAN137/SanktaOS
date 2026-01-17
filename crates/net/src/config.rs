@@ -1,3 +1,11 @@
+//! 网络配置管理
+//!
+//! 目前主要提供：
+//! - 默认接口的初始化与兜底（在无真实网卡时创建 loopback-only 的 `lo0`）；
+//! - 对接口 IP/网关/掩码等配置的更新与校验。
+//!
+//! 配置入口通常由系统调用层调用（见 `os/src/kernel/syscall/network.rs`）。
+
 use crate::interface::{NETWORK_INTERFACE_MANAGER, NetworkInterface};
 use alloc::string::String;
 use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
@@ -5,10 +13,15 @@ use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
 /// 网络配置错误
 #[derive(Debug)]
 pub enum NetworkConfigError {
+    /// 指定的网络接口不存在
     InterfaceNotFound,
+    /// IP 地址格式或取值无效
     InvalidAddress,
+    /// 子网掩码/前缀无效
     InvalidSubnet,
+    /// 网关地址无效
     InvalidGateway,
+    /// 应用配置时失败（底层接口/协议栈拒绝或出错）
     ConfigFailed,
 }
 
@@ -26,11 +39,11 @@ impl NetworkConfigManager {
     /// * `Err(NetworkConfigError)` - 失败时返回错误
     ///
     /// # 示例
-    /// ```
-    /// parse_subnet_mask("255.255.255.0") // 返回 Ok(24)
-    /// parse_subnet_mask("255.255.0.0")   // 返回 Ok(16)
-    /// parse_subnet_mask("255.255.255.128") // 返回 Ok(25)
-    /// parse_subnet_mask("255.255.255.3") // 返回 Err (无效掩码)
+    /// ```ignore
+    /// parse_subnet_mask("255.255.255.0") // Ok(24)
+    /// parse_subnet_mask("255.255.0.0") // Ok(16)
+    /// parse_subnet_mask("255.255.255.128") // Ok(25)
+    /// parse_subnet_mask("255.255.255.3") // Err（无效掩码）
     /// ```
     fn parse_subnet_mask(mask: &str) -> Result<u8, NetworkConfigError> {
         // 解析点分十进制字符串为4个字节

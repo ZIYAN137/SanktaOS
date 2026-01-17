@@ -2,6 +2,18 @@
 //!
 //! 本模块定义了页表的内部接口，供不同架构的页表实现使用。
 //! 通过该接口，可以实现对页表的创建、映射、解除映射、翻译等操作。
+//!
+//! ## 设计要点
+//!
+//! - `PageTableInner` 由各架构实现（例如不同 MMU、不同页表格式）。
+//! - 上层（如 [`crate::memory_space::MemorySpace`]）只依赖该 trait，
+//!   从而实现“地址空间管理逻辑”与“页表硬件细节”的解耦。
+//!
+//! ## TLB 刷新与批处理
+//!
+//! 映射/解除映射通常需要配合 TLB 刷新；为减少频繁刷新带来的开销，
+//! 该接口提供 `*_with_batch` 版本，配合 [`crate::arch_ops::TlbBatchContextWrapper`]
+//! 在一次批处理中合并刷新操作（具体行为由架构实现决定）。
 #![allow(dead_code)]
 use super::{PageSize, PageTableEntry, PagingResult, UniversalPTEFlag};
 use crate::address::{Paddr, Ppn, Vaddr, Vpn};

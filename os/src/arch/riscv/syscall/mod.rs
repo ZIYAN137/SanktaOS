@@ -1,4 +1,10 @@
 //! RISC-V 架构的系统调用分发模块
+//!
+//! 该模块负责根据 `a7`（syscall number）分发系统调用，并调用 `os/src/kernel/syscall/mod.rs`
+//! 中通过 `impl_syscall!` 生成的 `sys_*` 包装函数。
+//!
+//! - 系统调用号定义：`os/src/arch/riscv/syscall/syscall_number.rs`
+//! - 内核侧实现：`os/src/kernel/syscall/*.rs`
 use crate::kernel::syscall::*;
 use uapi::errno::ENOSYS;
 

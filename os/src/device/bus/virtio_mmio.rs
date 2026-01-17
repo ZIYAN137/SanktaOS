@@ -1,8 +1,11 @@
-//! Virtio MMIO 设备驱动模块
+//! VirtIO MMIO 探测与初始化入口
 //!
-//! 提供对 Virtio MMIO 设备的探测和初始化功能
-//! 通过设备树节点信息创建 Virtio 传输对象，并根据设备类型调用相应的初始化函数
-//! 支持块设备、GPU、输入设备和网络设备的初始化
+//! 该模块负责：
+//! - 在设备树注册 `compatible = "virtio,mmio"` 的探测函数；
+//! - 解析节点 `reg`，映射 MMIO 区域并构造 `MmioTransport`；
+//! - 根据 `device_type()` 将初始化流程分发到对应设备驱动（blk/net/gpu/input）。
+//!
+//! 说明：这里只负责“传输层探测 + 分发”，具体设备语义由各子模块实现。
 use core::ptr::NonNull;
 
 use fdt::node::FdtNode;

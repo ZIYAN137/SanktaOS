@@ -1,3 +1,12 @@
+//! 网络接口与接口管理
+//!
+//! - [`NetworkInterface`]：对单个网卡/设备的抽象封装，持有底层 [`device::NetDevice`]。
+//! - [`NETWORK_INTERFACE_MANAGER`]：全局接口管理器，保存系统中已注册的网络接口列表。
+//! - [`SmoltcpInterface`]：对 `smoltcp::iface::Interface` 的封装，保证其借用的 device adapter
+//!   具备正确的生命周期（避免返回悬垂引用）。
+//!
+//! 说明：接口对象主要被 socket/poll 逻辑使用，用于驱动协议栈收发与路由决策。
+
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -243,6 +252,7 @@ impl NetDeviceAdapter {
         }
     }
 
+    /// 获取 loopback 队列当前缓存的帧数量
     pub fn loopback_queue_len(&self) -> usize {
         self.loopback_queue.lock().len()
     }

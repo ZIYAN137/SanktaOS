@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'document/**'
+      - 'docs/**'
       - 'os/src/**'
-      - 'book.toml'
+      - 'docs/book.toml'
       - '.github/workflows/docs-deployment.yml'
   workflow_dispatch:
 
@@ -31,7 +31,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly-2025-10-28
-          targets: riscv64gc-unknown-none-elf
+          targets: |
+            riscv64gc-unknown-none-elf
+            loongarch64-unknown-none
           components: rust-src, rustfmt, clippy
 
       - name: 安装 mdBook
@@ -42,24 +44,29 @@ jobs:
 
       - name: 构建 mdBook 文档
         run: |
-          python3 scripts/rewrite_links.py document/
+          python3 scripts/rewrite_links.py docs/
+          cd docs
           mdbook build
 
       - name: 构建 Rust API 文档
         run: |
           cd os
-          cargo doc --no-deps --target riscv64gc-unknown-none-elf
+          # 仅用于生成 API 文档；设置 TEST=1 避免 build.rs 生成大体积运行时镜像
+          TEST=1 cargo doc --no-deps --target riscv64gc-unknown-none-elf
+          TEST=1 cargo doc --no-deps --target loongarch64-unknown-none
 
       - name: 合并文档到统一目录
         run: |
           mkdir -p site
           # 复制 mdBook 输出
-          cp -r book/* site/
+          cp -r docs/book/* site/
           # 删除 mdBook 生成的 api 目录（如果存在），避免与 cargo doc 输出冲突
           rm -rf site/api
-          # 复制 cargo doc 输出到 api 子目录
-          mkdir -p site/api
-          cp -r os/target/riscv64gc-unknown-none-elf/doc/* site/api/
+          # 复制 cargo doc 输出到 api 子目录（按架构分目录，避免覆盖）
+          mkdir -p site/api/riscv
+          mkdir -p site/api/loongarch
+          cp -r os/target/riscv64gc-unknown-none-elf/doc/* site/api/riscv/
+          cp -r os/target/loongarch64-unknown-none/doc/* site/api/loongarch/
 
       - name: 上传 Pages 构件
         uses: actions/upload-pages-artifact@v3

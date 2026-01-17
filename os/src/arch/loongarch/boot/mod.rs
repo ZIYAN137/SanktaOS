@@ -31,7 +31,7 @@ use crate::{
         signal::SignalFlags,
         uts_namespace::UtsNamespace,
     },
-    vfs::{create_stdio_files, fd_table, get_root_dentry},
+    vfs::{FDTable, create_stdio_files, get_root_dentry},
 };
 
 global_asm!(include_str!("entry.S"));
@@ -44,7 +44,7 @@ pub fn rest_init() {
     let tid = 1;
     let kstack_tracker = alloc_contig_frames(4).expect("kthread_spawn: failed to alloc kstack");
     let trap_frame_tracker = alloc_frame().expect("kthread_spawn: failed to alloc trap_frame");
-    let fd_table = fd_table::FDTable::new();
+    let fd_table = FDTable::new();
     let (stdin, stdout, stderr) = create_stdio_files();
     fd_table
         .install_at(0, stdin)

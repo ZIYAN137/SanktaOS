@@ -1,6 +1,19 @@
-//! RISC-V 架构的陷阱处理模块
+//! RISC-V 架构的陷阱（Trap）处理模块
 //!
-//! 包含陷阱处理程序的实现
+//! 该模块提供 RISC-V 的 trap 入口、上下文保存/恢复、以及与系统调用/信号返回等路径的集成。
+//!
+//! # 处理链路（概览）
+//!
+//! - 初始化：[`init_boot_trap`] / [`init`] 设置 `stvec` 指向汇编入口（`boot_trap_entry` / `trap_entry`）。
+//! - 入口汇编：`trap_entry.S` 在内核栈上构造并保存 [`TrapFrame`]，随后调用 `trap_handler`（见 `trap_handler.rs`）。
+//! - Rust 分发：`trap_handler` 读取 `scause/sepc/stval` 等信息，按异常/中断/系统调用进行分发；
+//!   系统调用会进一步交给 `os/src/arch/riscv/syscall/mod.rs`。
+//! - 恢复返回：[`restore`] 进入汇编 `__restore` 并执行 `sret` 返回。
+//!
+//! # 注意事项
+//!
+//! - Trap 处理中可能触发调度（例如用户态时钟中断）：返回时需要恢复“当前任务”的 TrapFrame，而不一定是入口参数。
+//! - `SumGuard` 用于在内核态临时打开/关闭用户空间访问（SUM 位），供系统调用与 copyin/copyout 使用。
 mod sum_guard;
 mod trap_frame;
 mod trap_handler;

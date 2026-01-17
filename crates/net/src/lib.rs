@@ -6,6 +6,13 @@
 //! - 网络接口管理
 //! - 网络配置管理
 //! - 与 VFS 层的集成
+//!
+//! # OS 侧集成
+//!
+//! `crates/net` 只提供协议栈与 socket 等平台无关能力；OS 侧通常会：
+//! - 在启动早期注册 [`NetOps`]（时间与唤醒回调），见 `os/src/net/mod.rs`；
+//! - 初始化网卡驱动并创建网络接口（例如 virtio-net），见 `os/src/device/net/virtio_net.rs`；
+//! - 在系统调用层将 socket API 映射到 [`SocketFile`] 等实现，见 `os/src/kernel/syscall/network.rs`。
 
 #![no_std]
 

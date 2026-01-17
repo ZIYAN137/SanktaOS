@@ -1,4 +1,23 @@
 //! 进程间消息模块
+//!
+//! 提供一个简单的“有界消息队列”实现：以 [`Message`] 为离散单元传递数据。
+//!
+//! # 容量与背压
+//!
+//! 队列容量以“字节数”计（默认为 `DEFAULT_QUEUE_BYTES`，并由 `MessageQueue::max_bytes` 控制）。
+//! 当队列已满时：
+//! - [`MessageQueue::send`] 会阻塞睡眠，直到有空间；
+//! - [`MessageQueue::try_send`] 立即返回失败。
+//!
+//! 当队列为空时：
+//! - [`MessageQueue::recv`] / [`MessageQueue::recv_by_type`] 会阻塞睡眠，直到有消息；
+//! - `try_*` 系列立即返回 `None`。
+//!
+//! # 实现说明与局限
+//!
+//! - 阻塞通过 [`WaitQueue`] 实现；当前版本未显式处理“被信号打断”的语义。
+//! - 代码中标注了 “丢失唤醒风险” 的 TODO（见 [`MessageQueue::send`]），因此该实现更偏
+//!   教学/原型性质；若要在高并发下使用，需要进一步验证等待条件与唤醒时机。
 
 use core::sync::atomic::Ordering;
 

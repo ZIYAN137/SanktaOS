@@ -6,6 +6,7 @@ use crate::ops::fs_ops;
 use crate::proc::ContentGenerator;
 use vfs::FsError;
 
+/// `/proc/psmem` 内容生成器。
 pub struct PsmemGenerator;
 
 impl ContentGenerator for PsmemGenerator {

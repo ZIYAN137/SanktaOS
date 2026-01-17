@@ -1,4 +1,4 @@
-//! /proc/[pid]/cmdline 生成器
+//! `/proc/[pid]/cmdline` 生成器
 
 use alloc::vec::Vec;
 
@@ -6,12 +6,13 @@ use crate::ops::fs_ops;
 use crate::proc::ContentGenerator;
 use vfs::FsError;
 
-/// 为指定任务生成 /proc/[pid]/cmdline 内容的生成器
+/// 为指定任务生成 `/proc/[pid]/cmdline` 内容的生成器
 pub struct CmdlineGenerator {
     pid: u32,
 }
 
 impl CmdlineGenerator {
+    /// 创建生成器（绑定到指定 pid）。
     pub fn new(pid: u32) -> Self {
         Self { pid }
     }
