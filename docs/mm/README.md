@@ -75,7 +75,8 @@ MM 子系统使用 trait 系统实现架构抽象，架构特定代码必须实�
 
 ### 3. 性能优化
 
-- **帧回收优化**：回收栈自动合并连续帧，减少碎片
+- **位图分配**：使用位图跟踪帧状态，支持 O(1) 释放和快速查找
+- **局部性优化**：last_alloc_hint 缓存上次分配位置，减少扫描开销
 - **直接映射**：内核空间使用直接映射，避免页表查找开销
 - **对齐分配**：支持对齐的连续帧分配，优化 DMA 等场景
 
@@ -153,20 +154,20 @@ SanktaOS 源自 Comix，并沿用其**高半核（Higher Half Kernel）**设计�
 
 MM 子系统在 `mm::init()` 中按以下顺序初始化：
 
-1. **物理帧分配器初始化** - 管理 `[ekernel, MEMORY_END)` 物理内存区域
-2. **内核堆分配器初始化** - 初始化全局堆分配器
+1. **内核堆分配器初始化** - 初始化全局堆分配器（使用链接器脚本定义的静态堆区域）
+2. **物理帧分配器初始化** - 管理 `[ekernel, MEMORY_END)` 物理内存区域（需要堆分配来创建位图）
 3. **内核地址空间创建** - 创建并激活内核页表
 
 ```rust
-// os/src/mm/mod.rs:33
+// os/src/mm/mod.rs:48
 pub fn init() {
-    // 1. 初始化物理帧分配器
+    // 1. 初始化堆分配器
+    init_heap();
+
+    // 2. 初始化物理帧分配器
     let ekernel_paddr = unsafe { vaddr_to_paddr(ekernel as usize) };
     init_frame_allocator(Ppn::from_addr_ceil(ekernel_paddr),
                          Ppn::from_addr_floor(MEMORY_END));
-
-    // 2. 初始化堆分配器
-    init_heap();
 
     // 3. 创建并激活内核地址空间
     #[cfg(target_arch = "riscv64")] {
