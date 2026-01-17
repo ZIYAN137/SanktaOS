@@ -174,11 +174,16 @@ mod tests {
         let root = fs.root_inode();
 
         let dir = root
-            .mkdir("dir", FileMode::S_IRUSR | FileMode::S_IWUSR | FileMode::S_IXUSR)
+            .mkdir(
+                "dir",
+                FileMode::S_IRUSR | FileMode::S_IWUSR | FileMode::S_IXUSR,
+            )
             .unwrap();
         assert_eq!(dir.metadata().unwrap().inode_type, InodeType::Directory);
 
-        let file = root.create("file", FileMode::S_IRUSR | FileMode::S_IWUSR).unwrap();
+        let file = root
+            .create("file", FileMode::S_IRUSR | FileMode::S_IWUSR)
+            .unwrap();
         assert_eq!(file.metadata().unwrap().inode_type, InodeType::File);
 
         let looked = root.lookup("file").unwrap();

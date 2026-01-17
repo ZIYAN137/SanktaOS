@@ -101,4 +101,3 @@ fn test_normalize_path_root_parent() {
     assert_eq!(normalize_path("/foo/.."), "/");
     assert_eq!(normalize_path("/foo/bar/../.."), "/");
 }
-

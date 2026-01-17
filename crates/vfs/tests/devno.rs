@@ -1,6 +1,7 @@
 use vfs::{
-    blkdev_major, chrdev_major, get_blkdev_index,
+    blkdev_major, chrdev_major,
     dev::{major, makedev, minor},
+    get_blkdev_index,
 };
 
 #[test]
@@ -52,17 +53,35 @@ fn test_chrdev_major_constants() {
 
 #[test]
 fn test_get_blkdev_index_virtio_blk() {
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::VIRTIO_BLK, 0)), Some(0));
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::VIRTIO_BLK, 3)), Some(3));
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::VIRTIO_BLK, 0)),
+        Some(0)
+    );
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::VIRTIO_BLK, 3)),
+        Some(3)
+    );
 }
 
 #[test]
 fn test_get_blkdev_index_scsi_disk() {
     // Each disk occupies 16 minors.
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 0)), Some(0));
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 15)), Some(0));
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 16)), Some(1));
-    assert_eq!(get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 32)), Some(2));
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 0)),
+        Some(0)
+    );
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 15)),
+        Some(0)
+    );
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 16)),
+        Some(1)
+    );
+    assert_eq!(
+        get_blkdev_index(makedev(blkdev_major::SCSI_DISK, 32)),
+        Some(2)
+    );
 }
 
 #[test]
@@ -105,4 +124,3 @@ fn test_devno_consistency() {
     assert_eq!(major(dev1), major(dev2));
     assert_eq!(minor(dev1), minor(dev2));
 }
-

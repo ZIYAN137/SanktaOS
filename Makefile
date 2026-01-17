@@ -25,7 +25,7 @@ build_docker:
 	docker build -t ${DOCKER_TAG} --target build .
 
 fmt:
-	cd os && cargo fmt
+	cd os && cargo fmt --all
 
 # 构建内核（build.rs 会自动编译 user 并打包镜像）
 build:

@@ -14,4 +14,3 @@ impl MockIrqOps {
 
 /// 全局 Mock 实例
 pub static MOCK_IRQ_OPS: MockIrqOps = MockIrqOps::new();
-

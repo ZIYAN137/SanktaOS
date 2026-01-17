@@ -277,4 +277,3 @@ mod tests {
         assert_eq!(lock.reader_count(), 2);
     }
 }
-

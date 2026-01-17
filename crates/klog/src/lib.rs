@@ -58,7 +58,7 @@ pub use config::{
 };
 pub use entry::LogEntry;
 pub use level::LogLevel;
-pub use log_core::{format_log_entry, LogCore};
+pub use log_core::{LogCore, format_log_entry};
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 

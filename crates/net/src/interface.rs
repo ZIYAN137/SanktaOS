@@ -50,10 +50,10 @@ impl NetworkInterfaceManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use device::NullNetDevice;
     use core::sync::atomic::{AtomicUsize, Ordering};
-    use sync::ArchOps;
+    use device::NullNetDevice;
     use smoltcp::wire::Ipv4Cidr;
+    use sync::ArchOps;
 
     struct DummyArchOps;
 

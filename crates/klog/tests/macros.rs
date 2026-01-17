@@ -2,7 +2,7 @@
 
 use std::sync::{Mutex, MutexGuard, Once, OnceLock};
 
-use klog::{pr_debug, pr_err, pr_info, pr_warn, LogContextProvider, LogLevel, LogOutput};
+use klog::{LogContextProvider, LogLevel, LogOutput, pr_debug, pr_err, pr_info, pr_warn};
 
 static INIT: Once = Once::new();
 
