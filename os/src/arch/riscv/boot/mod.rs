@@ -183,7 +183,14 @@ fn init() {
     // - rcS 会执行 `mount -t tmpfs none /dev`
     // - 内核在 mount("/dev") 的系统调用中对该挂载点做了特殊处理，会在挂载 tmpfs 后自动 init_dev()
 
-    kernel_execve("/sbin/init", &["/sbin/init"], &[]);
+    #[cfg(feature = "oscomp")]
+    {
+        crate::oscomp::init();
+    }
+    #[cfg(not(feature = "oscomp"))]
+    {
+        kernel_execve("/sbin/init", &["/sbin/init"], &[]);
+    }
 }
 
 /// 内核守护线程

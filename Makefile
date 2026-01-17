@@ -2,18 +2,26 @@ DOCKER_TAG ?= comix:latest
 
 # 架构选择: riscv (默认) 或 loongarch
 ARCH ?= riscv
+# 启用 oscomp 特性（1/0）
+OSCOMP ?= 0
+
+# 可选特性开关
+FEATURE_FLAGS :=
+ifeq ($(OSCOMP),1)
+    FEATURE_FLAGS := --features oscomp
+endif
 
 # 根据架构设置 target 和运行命令
 ifeq ($(ARCH),loongarch)
     TARGET := loongarch64-unknown-none
     TARGET_DIR := target/loongarch64-unknown-none/debug
     PROJECT_DIR := $(TARGET_DIR)/os
-    RUN_SCRIPT := cargo run --target $(TARGET)
-    GDB_SCRIPT := cargo run --target $(TARGET) -- gdb
+    RUN_SCRIPT := cargo run --target $(TARGET) $(FEATURE_FLAGS)
+    GDB_SCRIPT := cargo run --target $(TARGET) $(FEATURE_FLAGS) -- gdb
 else
     TARGET := riscv64gc-unknown-none-elf
-    RUN_SCRIPT := cargo run
-    GDB_SCRIPT := cargo run -- --gdb
+    RUN_SCRIPT := cargo run $(FEATURE_FLAGS)
+    GDB_SCRIPT := cargo run $(FEATURE_FLAGS) -- --gdb
 endif
 
 .PHONY: docker build_docker fmt run build clean clean-all gdb
@@ -29,7 +37,7 @@ fmt:
 
 # 构建内核（build.rs 会自动编译 user 并打包镜像）
 build:
-	cd os && cargo build --target $(TARGET)
+	cd os && cargo build --target $(TARGET) $(FEATURE_FLAGS)
 
 # 运行内核（build.rs 会自动编译 user 并打包镜像）
 run:

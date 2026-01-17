@@ -209,7 +209,14 @@ fn init() {
     // /dev(/proc,/sys,/tmp) 的挂载交给用户态 rcS：
     // - rcS 会执行 `mount -t tmpfs none /dev` 等
     // - 内核在 mount("/dev") 的系统调用里会自动 init_dev() 创建设备节点
-    kernel_execve("/sbin/init", &["/sbin/init"], &[]);
+    #[cfg(feature = "oscomp")]
+    {
+        crate::oscomp::init();
+    }
+    #[cfg(not(feature = "oscomp"))]
+    {
+        kernel_execve("/sbin/init", &["/sbin/init"], &[]);
+    }
 }
 
 /// 内核守护线程
