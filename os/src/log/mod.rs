@@ -174,6 +174,6 @@ pub fn init() {
     }
 }
 
-// ========== 测试模块 ==========
-#[cfg(test)]
-mod tests;
+// NOTE: os crate 的日志实现是对 klog crate 的封装层。
+// 原有测试依赖 klog 的内部模块（LogCore/level 等），在 crate 拆分后无法直接访问。
+// 这些测试应迁移到 crates/klog 中以使用标准 `#[test]` 运行。

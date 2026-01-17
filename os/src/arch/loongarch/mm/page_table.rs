@@ -532,39 +532,41 @@ impl PageTableInner {
 #[cfg(test)]
 mod page_table_tests {
     use super::*;
-    use crate::{kassert, test_case};
     use mm::page_table::PageTableInner as PageTableInnerTrait;
 
     // 1. 页表创建测试
-    test_case!(test_pt_create, {
+    #[test_case]
+    fn test_pt_create() {
         let pt = PageTableInner::new();
         // 根 PPN 应该有效 (大于 0)
-        kassert!(pt.root_ppn().as_usize() > 0);
+        assert!(pt.root_ppn().as_usize() > 0);
         // 默认创建为用户页表
-        kassert!(pt.is_user_table());
-    });
+        assert!(pt.is_user_table());
+    }
 
     // 2. 映射与转换测试
-    test_case!(test_pt_map_translate, {
+    #[test_case]
+    fn test_pt_map_translate() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
 
         // 映射 vpn -> ppn
         let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 转换验证 - 使用 vpn.start_addr() 获取正确的虚拟地址
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
-        kassert!(translated.is_some());
+        assert!(translated.is_some());
         let paddr = translated.unwrap();
         // 验证转换后的物理页号是否正确
-        kassert!(paddr.as_usize() >> 12 == ppn.as_usize());
-    });
+        assert!(paddr.as_usize() >> 12 == ppn.as_usize());
+    }
 
     // 3. 解除映射测试
-    test_case!(test_pt_unmap, {
+    #[test_case]
+    fn test_pt_unmap() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -575,16 +577,17 @@ mod page_table_tests {
 
         // 解除映射
         let result = pt.unmap(vpn);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 应该不再被映射
         let vaddr = vpn.start_addr();
         let translated = pt.translate(vaddr);
-        kassert!(translated.is_none());
-    });
+        assert!(translated.is_none());
+    }
 
     // 4. 错误测试：已映射
-    test_case!(test_pt_error_already_mapped, {
+    #[test_case]
+    fn test_pt_error_already_mapped() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
 
@@ -595,7 +598,7 @@ mod page_table_tests {
             PageSize::Size4K,
             UniversalPTEFlag::kernel_rw(),
         );
-        kassert!(result1.is_ok());
+        assert!(result1.is_ok());
 
         // 第二次映射应该失败 (返回 AlreadyMapped 错误)
         let result2 = pt.map(
@@ -604,11 +607,12 @@ mod page_table_tests {
             PageSize::Size4K,
             UniversalPTEFlag::kernel_rw(),
         );
-        kassert!(result2.is_err());
-    });
+        assert!(result2.is_err());
+    }
 
     // 5. 页表遍历 (Walk) 测试
-    test_case!(test_pt_walk, {
+    #[test_case]
+    fn test_pt_walk() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -619,21 +623,22 @@ mod page_table_tests {
 
         // 遍历获取映射信息
         let walk_result = pt.walk(vpn);
-        kassert!(walk_result.is_ok());
+        assert!(walk_result.is_ok());
 
         let (mapped_ppn, _, mapped_flags) = walk_result.unwrap();
-        kassert!(mapped_ppn == ppn);
+        assert!(mapped_ppn == ppn);
 
         // 注意：LoongArch 的 D 位同时表示可写和脏位
         // 因此 kernel_rw() 经过 from_universal -> to_universal 后会多出 DIRTY 标志
         // 验证关键权限位正确即可
-        kassert!(mapped_flags.contains(UniversalPTEFlag::VALID));
-        kassert!(mapped_flags.contains(UniversalPTEFlag::READABLE));
-        kassert!(mapped_flags.contains(UniversalPTEFlag::WRITEABLE));
-    });
+        assert!(mapped_flags.contains(UniversalPTEFlag::VALID));
+        assert!(mapped_flags.contains(UniversalPTEFlag::READABLE));
+        assert!(mapped_flags.contains(UniversalPTEFlag::WRITEABLE));
+    }
 
     // 6. 更新标志位测试
-    test_case!(test_pt_update_flags, {
+    #[test_case]
+    fn test_pt_update_flags() {
         let mut pt = PageTableInner::new();
         let vpn = Vpn::from_usize(0x1000);
         let ppn = Ppn::from_usize(0x80000);
@@ -645,18 +650,19 @@ mod page_table_tests {
         // 更新为内核只读 (kernel_r = VALID | READABLE)
         let update_flags = UniversalPTEFlag::kernel_r();
         let result = pt.update_flags(vpn, update_flags);
-        kassert!(result.is_ok());
+        assert!(result.is_ok());
 
         // 验证标志位是否已更改为只读
         let (_, _, flags) = pt.walk(vpn).unwrap();
-        kassert!(flags.contains(UniversalPTEFlag::VALID));
-        kassert!(flags.contains(UniversalPTEFlag::READABLE));
+        assert!(flags.contains(UniversalPTEFlag::VALID));
+        assert!(flags.contains(UniversalPTEFlag::READABLE));
         // kernel_r 不应包含 WRITEABLE
-        kassert!(!flags.contains(UniversalPTEFlag::WRITEABLE));
-    });
+        assert!(!flags.contains(UniversalPTEFlag::WRITEABLE));
+    }
 
     // 7. 多重映射测试
-    test_case!(test_pt_multiple_mappings, {
+    #[test_case]
+    fn test_pt_multiple_mappings() {
         let mut pt = PageTableInner::new();
 
         // 映射多个 VPN
@@ -664,7 +670,7 @@ mod page_table_tests {
             let vpn = Vpn::from_usize(0x1000 + i);
             let ppn = Ppn::from_usize(0x80000 + i);
             let result = pt.map(vpn, ppn, PageSize::Size4K, UniversalPTEFlag::kernel_rw());
-            kassert!(result.is_ok());
+            assert!(result.is_ok());
         }
 
         // 验证所有映射
@@ -672,7 +678,7 @@ mod page_table_tests {
             let vpn = Vpn::from_usize(0x1000 + i);
             let expected_ppn = Ppn::from_usize(0x80000 + i);
             let (mapped_ppn, _, _) = pt.walk(vpn).unwrap();
-            kassert!(mapped_ppn == expected_ppn);
+            assert!(mapped_ppn == expected_ppn);
         }
-    });
+    }
 }

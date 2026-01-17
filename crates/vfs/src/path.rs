@@ -133,6 +133,68 @@ pub fn split_path(path: &str) -> Result<(String, String), FsError> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn test_parse_path_components() {
+        assert_eq!(parse_path("/"), vec![PathComponent::Root]);
+        assert_eq!(
+            parse_path("/a/b/./c/.."),
+            vec![
+                PathComponent::Root,
+                PathComponent::Normal(String::from("a")),
+                PathComponent::Normal(String::from("b")),
+                PathComponent::Current,
+                PathComponent::Normal(String::from("c")),
+                PathComponent::Parent,
+            ]
+        );
+        assert_eq!(
+            parse_path("a//b"),
+            vec![
+                PathComponent::Normal(String::from("a")),
+                PathComponent::Normal(String::from("b")),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_normalize_path_absolute() {
+        assert_eq!(normalize_path("/a/b/../c"), "/a/c");
+        assert_eq!(normalize_path("/a/./b"), "/a/b");
+        assert_eq!(normalize_path("/../../a"), "/a");
+        assert_eq!(normalize_path("/"), "/");
+    }
+
+    #[test]
+    fn test_normalize_path_relative() {
+        assert_eq!(normalize_path("a/b/../c"), "a/c");
+        assert_eq!(normalize_path("./a"), "a");
+        assert_eq!(normalize_path("../a/.."), "..");
+        assert_eq!(normalize_path(""), ".");
+    }
+
+    #[test]
+    fn test_split_path() {
+        assert_eq!(
+            split_path("/a/b/c").unwrap(),
+            (String::from("/a/b"), String::from("c"))
+        );
+        assert_eq!(
+            split_path("a/b").unwrap(),
+            (String::from("a"), String::from("b"))
+        );
+        assert_eq!(
+            split_path("file").unwrap(),
+            (String::from("."), String::from("file"))
+        );
+        assert!(split_path("/a/b/").is_err());
+    }
+}
+
 /// 将路径字符串解析为 Dentry（支持绝对/相对路径、符号链接解析）
 pub fn vfs_lookup(path: &str) -> Result<Arc<Dentry>, FsError> {
     let components = parse_path(path);

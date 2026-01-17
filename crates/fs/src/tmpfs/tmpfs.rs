@@ -107,3 +107,95 @@ impl FileSystem for TmpFs {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use sync::ArchOps;
+    use vfs::{FileMode, InodeType};
+
+    struct DummyArchOps;
+
+    impl ArchOps for DummyArchOps {
+        unsafe fn read_and_disable_interrupts(&self) -> usize {
+            0
+        }
+
+        unsafe fn restore_interrupts(&self, _flags: usize) {}
+
+        fn sstatus_sie(&self) -> usize {
+            0
+        }
+
+        fn cpu_id(&self) -> usize {
+            0
+        }
+
+        fn max_cpu_count(&self) -> usize {
+            1
+        }
+    }
+
+    static DUMMY_ARCH_OPS: DummyArchOps = DummyArchOps;
+    static SYNC_INIT: AtomicUsize = AtomicUsize::new(0);
+
+    fn init_sync_arch_ops() {
+        match SYNC_INIT.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => {
+                // Safety: tests use a single global dummy ArchOps.
+                unsafe { sync::register_arch_ops(&DUMMY_ARCH_OPS) };
+                SYNC_INIT.store(2, Ordering::Release);
+            }
+            Err(_) => {
+                while SYNC_INIT.load(Ordering::Acquire) != 2 {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_tmpfs_root_is_directory() {
+        init_sync_arch_ops();
+        let fs = TmpFs::new(0);
+        let root = fs.root_inode();
+        let meta = root.metadata().unwrap();
+        assert_eq!(meta.inode_type, InodeType::Directory);
+
+        // Creating directories/files should not allocate data pages.
+        assert_eq!(fs.used_size(), 0);
+    }
+
+    #[test]
+    fn test_tmpfs_create_lookup_readdir_no_data_pages() {
+        init_sync_arch_ops();
+        let fs = TmpFs::new(0);
+        let root = fs.root_inode();
+
+        let dir = root
+            .mkdir(
+                "dir",
+                FileMode::S_IRUSR | FileMode::S_IWUSR | FileMode::S_IXUSR,
+            )
+            .unwrap();
+        assert_eq!(dir.metadata().unwrap().inode_type, InodeType::Directory);
+
+        let file = root
+            .create("file", FileMode::S_IRUSR | FileMode::S_IWUSR)
+            .unwrap();
+        assert_eq!(file.metadata().unwrap().inode_type, InodeType::File);
+
+        let looked = root.lookup("file").unwrap();
+        assert_eq!(looked.metadata().unwrap().inode_type, InodeType::File);
+
+        let entries = root.readdir().unwrap();
+        assert!(entries.iter().any(|e| e.name == "."));
+        assert!(entries.iter().any(|e| e.name == ".."));
+        assert!(entries.iter().any(|e| e.name == "dir"));
+        assert!(entries.iter().any(|e| e.name == "file"));
+
+        // No writes => no page allocations.
+        assert_eq!(fs.used_size(), 0);
+    }
+}

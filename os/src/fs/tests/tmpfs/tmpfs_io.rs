@@ -1,11 +1,11 @@
 //! Tmpfs I/O 操作测试
 
 use super::*;
-use crate::{kassert, test_case};
 use alloc::vec;
 use alloc::vec::Vec;
 
-test_case!(test_tmpfs_large_write, {
+#[test_case]
+fn test_tmpfs_large_write() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -16,21 +16,22 @@ test_case!(test_tmpfs_large_write, {
     // 写入 1 MB 数据
     let data = vec![0xAB; 1024 * 1024];
     let written = file.write_at(0, &data).unwrap();
-    kassert!(written == data.len());
+    assert!(written == data.len());
 
     // 验证大小
-    kassert!(file.metadata().unwrap().size == data.len());
-});
+    assert!(file.metadata().unwrap().size == data.len());
+}
 
-test_case!(test_tmpfs_random_access, {
+#[test_case]
+fn test_tmpfs_random_access() {
     let fs = create_test_tmpfs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"0123456789").unwrap();
 
     // 读取中间部分
     let mut buf = vec![0u8; 5];
     let read = inode.read_at(3, &mut buf).unwrap();
-    kassert!(read == 5);
-    kassert!(&buf[..] == b"34567");
+    assert!(read == 5);
+    assert!(&buf[..] == b"34567");
 
     // 写入中间部分
     inode.write_at(5, b"XXXXX").unwrap();
@@ -38,10 +39,11 @@ test_case!(test_tmpfs_random_access, {
     // 读取全部
     let mut buf = vec![0u8; 10];
     inode.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"01234XXXXX");
-});
+    assert!(&buf[..] == b"01234XXXXX");
+}
 
-test_case!(test_tmpfs_append, {
+#[test_case]
+fn test_tmpfs_append() {
     let fs = create_test_tmpfs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"Hello").unwrap();
 
@@ -52,10 +54,11 @@ test_case!(test_tmpfs_append, {
     // 读取全部
     let mut buf = vec![0u8; 13];
     inode.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"Hello, World!");
-});
+    assert!(&buf[..] == b"Hello, World!");
+}
 
-test_case!(test_tmpfs_overwrite, {
+#[test_case]
+fn test_tmpfs_overwrite() {
     let fs = create_test_tmpfs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"Hello, World!").unwrap();
 
@@ -65,26 +68,28 @@ test_case!(test_tmpfs_overwrite, {
     // 读取
     let mut buf = vec![0u8; 13];
     inode.read_at(0, &mut buf).unwrap();
-    kassert!(&buf[..] == b"Hello, Tmpfs!");
-});
+    assert!(&buf[..] == b"Hello, Tmpfs!");
+}
 
-test_case!(test_tmpfs_read_beyond_end, {
+#[test_case]
+fn test_tmpfs_read_beyond_end() {
     let fs = create_test_tmpfs();
     let inode = create_test_file_with_content(&fs, "test.txt", b"Hello").unwrap();
 
     // 从文件末尾之后读取
     let mut buf = vec![0xFFu8; 10];
     let read = inode.read_at(10, &mut buf).unwrap();
-    kassert!(read == 0);
+    assert!(read == 0);
 
     // 从接近末尾读取
     let mut buf = vec![0xFFu8; 10];
     let read = inode.read_at(3, &mut buf).unwrap();
-    kassert!(read == 2); // 只读到 "lo"
-    kassert!(&buf[..2] == b"lo");
-});
+    assert!(read == 2); // 只读到 "lo"
+    assert!(&buf[..2] == b"lo");
+}
 
-test_case!(test_tmpfs_empty_write, {
+#[test_case]
+fn test_tmpfs_empty_write() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -94,11 +99,12 @@ test_case!(test_tmpfs_empty_write, {
 
     // 写入空数据
     let written = file.write_at(0, b"").unwrap();
-    kassert!(written == 0);
-    kassert!(file.metadata().unwrap().size == 0);
-});
+    assert!(written == 0);
+    assert!(file.metadata().unwrap().size == 0);
+}
 
-test_case!(test_tmpfs_sparse_read, {
+#[test_case]
+fn test_tmpfs_sparse_read() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -112,16 +118,17 @@ test_case!(test_tmpfs_sparse_read, {
     // 读取前面的空洞
     let mut buf = vec![0xFFu8; 100];
     let read = file.read_at(0, &mut buf).unwrap();
-    kassert!(read == 100);
-    kassert!(buf.iter().all(|&b| b == 0));
+    assert!(read == 100);
+    assert!(buf.iter().all(|&b| b == 0));
 
     // 读取写入的数据
     let mut buf = vec![0u8; 4];
     file.read_at(8192, &mut buf).unwrap();
-    kassert!(&buf[..] == b"data");
-});
+    assert!(&buf[..] == b"data");
+}
 
-test_case!(test_tmpfs_cross_page_write, {
+#[test_case]
+fn test_tmpfs_cross_page_write() {
     let fs = create_test_tmpfs();
     let root = fs.root_inode();
 
@@ -136,5 +143,5 @@ test_case!(test_tmpfs_cross_page_write, {
     // 读取验证
     let mut buf = vec![0u8; data.len()];
     file.read_at(4095, &mut buf).unwrap();
-    kassert!(&buf[..] == data);
-});
+    assert!(&buf[..] == data);
+}

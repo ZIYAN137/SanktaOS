@@ -1,0 +1,11 @@
+[package]
+name = "test-support"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 基础依赖
+core = { version = "1.0", optional = true, package = "rustc-std-workspace-core" }
+
+[features]
+default = []

@@ -25,7 +25,6 @@ use crate::{
     },
     pr_err, pr_info, println,
     sync::SpinLock,
-    test::run_early_tests,
     uapi::{
         resource::{INIT_RLIMITS, RlimitStruct},
         signal::SignalFlags,
@@ -279,8 +278,6 @@ pub fn main(hartid: usize) {
     // 初始化 sync crate 的架构操作（必须在任何使用 sync 原语之前）
     unsafe { crate::arch::init_sync_arch_ops() };
 
-    run_early_tests();
-
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] LoongArch CPU {} is up!", hartid);
 
@@ -298,8 +295,34 @@ pub fn main(hartid: usize) {
         current_cpu().switch_space(kernel_space);
     }
 
+    // 测试模式下：
+    // - 提前注册 FsOps，避免 tests/ 中的 TmpFs/Ext4 等依赖 fs_ops() 时 panic。
+    // - 提前创建并切换到一个可用的 current_task，避免 /proc/self 等依赖 current_task() 的用例直接 panic。
     #[cfg(test)]
-    crate::test_main();
+    {
+        crate::fs::init_fs_ops();
+        crate::vfs::init_vfs_ops();
+
+        let _guard = crate::sync::PreemptGuard::new();
+        if current_cpu().current_task.is_none() {
+            let idle0 = create_idle_task(0);
+            let tf_ptr = idle0.lock().trap_frame_ptr.load(Ordering::SeqCst);
+            unsafe {
+                // KScratch0 <- TrapFrame 指针（trap/restore 路径会使用）
+                asm!(
+                    "csrwr {0}, 0x30",
+                    in(reg) tf_ptr as usize,
+                    options(nostack, preserves_flags)
+                );
+            }
+
+            let cpu = current_cpu();
+            cpu.idle_task = Some(idle0.clone());
+            cpu.switch_task(idle0);
+        }
+
+        crate::test_main();
+    }
 
     // 初始化工作
     trap::init_boot_trap();
@@ -317,6 +340,7 @@ pub fn main(hartid: usize) {
     crate::vfs::init_vfs_ops();
 
     // 初始化 FS 操作（必须在使用 fs crate 之前）
+    #[cfg(not(test))]
     crate::fs::init_fs_ops();
 
     earlyprintln!("[Boot] entering rest_init");
@@ -340,45 +364,3 @@ fn clear_bss() {
         (va as *mut u8).write_volatile(0)
     });
 }
-
-// 由于最近的更新使得create_kthreadd内部会调用current_task等函数
-// 该单元测试已无法在不完整的测试环境下运行
-// #[cfg(test)]
-// mod tests {
-
-//     use core::sync::atomic::Ordering;
-
-//     // 测试 create_kthreadd：应创建一个任务并加入 TASK_MANAGER
-//     use crate::{
-//         arch::boot::{create_kthreadd, kthreadd},
-//         kassert,
-//         kernel::{TASK_MANAGER, TaskManagerTrait},
-//         test_case,
-//     };
-
-//     test_case!(test_create_kthreadd, {
-//         // 记录当前已有任务数量
-//         let before_count = {
-//             let mgr = TASK_MANAGER.lock();
-//             mgr.task_count()
-//         };
-//         create_kthreadd();
-//         // 找到新增的任务（PID=tid，入口=kthreadd）
-//         let after_count = {
-//             let mgr = TASK_MANAGER.lock();
-//             mgr.task_count()
-//         };
-//         kassert!(after_count == before_count + 1);
-//         // 查找新 tid
-//         let new_tid = after_count as u32; // 简单假设 tid 连续分配
-//         let task = TASK_MANAGER.lock().get_task(new_tid).expect("task missing");
-//         let g = task.lock();
-//         let tf = g.trap_frame_ptr.load(Ordering::SeqCst);
-//         kassert!(g.tid == new_tid);
-//         kassert!(g.pid == new_tid); // kthreadd 设 pid=tid
-//         kassert!(unsafe { (*tf).sepc } as usize == kthreadd as usize);
-//     });
-
-//     // 由于 kernel_execve / rest_init / init / kthreadd 涉及不可返回的流控与实际陷入/页表切换，
-//     // 在单元测试环境下不执行它们（需要集成测试或仿真环境）。
-// }

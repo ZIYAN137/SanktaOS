@@ -40,6 +40,10 @@
 #![no_std]
 #![allow(unused)]
 
+// `no_std` crates still run unit tests with the standard test harness.
+#[cfg(test)]
+extern crate std;
+
 extern crate alloc;
 
 mod buffer;
@@ -54,7 +58,7 @@ pub use config::{
 };
 pub use entry::LogEntry;
 pub use level::LogLevel;
-pub use log_core::format_log_entry;
+pub use log_core::{LogCore, format_log_entry};
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 

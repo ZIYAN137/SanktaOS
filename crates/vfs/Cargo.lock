@@ -52,6 +52,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-support"
+version = "0.1.0"
+
+[[package]]
 name = "uapi"
 version = "0.1.0"
 dependencies = [
@@ -66,5 +70,6 @@ dependencies = [
  "lazy_static",
  "log",
  "sync",
+ "test-support",
  "uapi",
 ]

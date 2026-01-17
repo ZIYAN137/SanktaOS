@@ -97,3 +97,32 @@ impl<T> core::ops::DerefMut for SpinLockGuard<'_, T> {
 // 因为它通过 RawSpinLock 保证了对数据的互斥访问。
 unsafe impl<T: Send> Send for SpinLock<T> {}
 unsafe impl<T: Send> Sync for SpinLock<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spinlock_basic() {
+        let lock = SpinLock::new(42);
+        assert_eq!(*lock.lock(), 42);
+    }
+
+    #[test]
+    fn test_spinlock_modify() {
+        let lock = SpinLock::new(0);
+        {
+            let mut guard = lock.lock();
+            *guard = 10;
+        }
+        assert_eq!(*lock.lock(), 10);
+    }
+
+    #[test]
+    fn test_spinlock_try_lock() {
+        let lock = SpinLock::new(5);
+        let guard = lock.try_lock();
+        assert!(guard.is_some());
+        assert_eq!(*guard.unwrap(), 5);
+    }
+}

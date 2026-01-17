@@ -43,8 +43,11 @@ impl LogCore {
     /// # 示例
     ///
     /// ```rust
-    /// // 全局单例 (编译时初始化)
+    /// use klog::LogCore;
+    ///
+    /// // Global singleton (const-initialized)
     /// static GLOBAL_LOG: LogCore = LogCore::default();
+    /// let _ = &GLOBAL_LOG;
     /// ```
     pub const fn default() -> Self {
         Self {
@@ -67,11 +70,13 @@ impl LogCore {
     /// # 示例
     ///
     /// ```rust
-    /// // 启用 Debug 级别的测试实例
-    /// let test_log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+    /// use klog::{LogCore, LogLevel};
     ///
-    /// // 使用自定义级别的生产实例
-    /// let log = LogCore::new(LogLevel::Info, LogLevel::Error);
+    /// // Test instance (enable Debug)
+    /// let _test_log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+    ///
+    /// // Production instance (custom levels)
+    /// let _log = LogCore::new(LogLevel::Info, LogLevel::Error);
     /// ```
     pub fn new(global_level: LogLevel, console_level: LogLevel) -> Self {
         Self {
@@ -257,12 +262,12 @@ unsafe impl Sync for LogCore {}
 /// - `buffer::calculate_formatted_length` - 用于精确字节计数
 ///
 /// # 格式
-/// ```
+/// ```text
 /// <color_code>[LEVEL] [timestamp] [CPU<id>/T<tid>] message<reset>
 /// ```
 ///
 /// # 示例
-/// ```
+/// ```text
 /// \x1b[37m[INFO] [      123456] [CPU0/T  1] Kernel initialized\x1b[0m
 /// \x1b[31m[ERR] [      789012] [CPU0/T  5] Failed to mount /dev/sda1\x1b[0m
 /// ```
@@ -285,4 +290,508 @@ pub fn format_log_entry(entry: &LogEntry) -> alloc::string::String {
         entry.message(),
         entry.level().reset_color_code()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    // Unit tests for LogCore.
+    //
+    // NOTE: These tests used to live under `os/src/log/tests/*` and relied on the kernel test
+    // framework. They are moved here so `crates/klog` can be validated with standard host
+    // `cargo test`, while still testing internal (non-public) LogCore behavior.
+    extern crate alloc;
+
+    use super::*;
+
+    /// Test-only logging helper (mirrors production macro behavior, but targets a local `LogCore`).
+    macro_rules! test_log {
+        ($logger:expr, $level:expr, $($arg:tt)*) => {
+            $logger._log($level, format_args!($($arg)*))
+        };
+    }
+
+    #[test]
+    fn test_write_and_read() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Info, "test message");
+
+        assert_eq!(log._log_len(), 1);
+
+        let entry = log._read_log().unwrap();
+        assert_eq!(entry.message(), "test message");
+        assert_eq!(entry.level(), LogLevel::Info);
+
+        assert_eq!(log._log_len(), 0);
+    }
+
+    #[test]
+    fn test_format_arguments() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Info, "value: {}", 42);
+        test_log!(log, LogLevel::Debug, "hex: {:#x}", 0xDEAD);
+
+        let e1 = log._read_log().unwrap();
+        assert_eq!(e1.message(), "value: 42");
+
+        let e2 = log._read_log().unwrap();
+        assert_eq!(e2.message(), "hex: 0xdead");
+    }
+
+    #[test]
+    fn test_fifo_order() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        for i in 0..5 {
+            test_log!(log, LogLevel::Debug, "message {}", i);
+        }
+
+        assert_eq!(log._log_len(), 5);
+
+        for i in 0..5 {
+            let entry = log._read_log().unwrap();
+            let expected = alloc::format!("message {}", i);
+            assert_eq!(entry.message(), expected.as_str());
+        }
+
+        assert_eq!(log._log_len(), 0);
+    }
+
+    #[test]
+    fn test_empty_buffer_read() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        assert_eq!(log._log_len(), 0);
+        assert!(log._read_log().is_none());
+        assert!(log._read_log().is_none());
+        assert!(log._read_log().is_none());
+    }
+
+    #[test]
+    fn test_message_truncation() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        // Create a long message (> MAX_LOG_MESSAGE_LENGTH).
+        let long_msg = "a".repeat(300);
+        test_log!(log, LogLevel::Info, "{}", long_msg);
+
+        let entry = log._read_log().unwrap();
+        assert!(entry.message().len() <= crate::MAX_LOG_MESSAGE_LENGTH);
+    }
+
+    #[test]
+    fn test_empty_message() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+        test_log!(log, LogLevel::Info, "");
+        let entry = log._read_log().unwrap();
+        assert_eq!(entry.message(), "");
+    }
+
+    #[test]
+    fn test_special_characters() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+        test_log!(log, LogLevel::Info, "special: !@#$%^&*()");
+        let entry = log._read_log().unwrap();
+        assert_eq!(entry.message(), "special: !@#$%^&*()");
+    }
+
+    #[test]
+    fn test_utf8_message() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        // Non-ASCII strings are intentional here to validate UTF-8 handling.
+        test_log!(log, LogLevel::Info, "你好，世界！");
+        test_log!(log, LogLevel::Info, "Hello, мир!");
+
+        let e1 = log._read_log().unwrap();
+        assert_eq!(e1.message(), "你好，世界！");
+
+        let e2 = log._read_log().unwrap();
+        assert_eq!(e2.message(), "Hello, мир!");
+    }
+
+    #[test]
+    fn test_global_level_filtering() {
+        let log = LogCore::new(LogLevel::Warning, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Emergency, "emergency");
+        test_log!(log, LogLevel::Error, "error");
+        test_log!(log, LogLevel::Warning, "warning");
+        test_log!(log, LogLevel::Info, "info");
+        test_log!(log, LogLevel::Debug, "debug");
+
+        assert_eq!(log._log_len(), 3);
+        assert_eq!(log._read_log().unwrap().message(), "emergency");
+        assert_eq!(log._read_log().unwrap().message(), "error");
+        assert_eq!(log._read_log().unwrap().message(), "warning");
+        assert_eq!(log._log_len(), 0);
+    }
+
+    #[test]
+    fn test_level_boundary() {
+        let log = LogCore::new(LogLevel::Info, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Info, "boundary");
+        assert_eq!(log._log_len(), 1);
+
+        test_log!(log, LogLevel::Debug, "filtered");
+        assert_eq!(log._log_len(), 1);
+
+        assert_eq!(log._read_log().unwrap().message(), "boundary");
+    }
+
+    #[test]
+    fn test_dynamic_level_change() {
+        let log = LogCore::new(LogLevel::Info, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Debug, "debug1");
+        test_log!(log, LogLevel::Info, "info1");
+
+        assert_eq!(log._log_len(), 1);
+
+        log._set_global_level(LogLevel::Debug);
+
+        test_log!(log, LogLevel::Debug, "debug2");
+        test_log!(log, LogLevel::Info, "info2");
+
+        assert_eq!(log._log_len(), 3);
+        assert_eq!(log._read_log().unwrap().message(), "info1");
+        assert_eq!(log._read_log().unwrap().message(), "debug2");
+        assert_eq!(log._read_log().unwrap().message(), "info2");
+    }
+
+    #[test]
+    fn test_all_levels() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        test_log!(log, LogLevel::Emergency, "emerg");
+        test_log!(log, LogLevel::Alert, "alert");
+        test_log!(log, LogLevel::Critical, "crit");
+        test_log!(log, LogLevel::Error, "err");
+        test_log!(log, LogLevel::Warning, "warn");
+        test_log!(log, LogLevel::Notice, "notice");
+        test_log!(log, LogLevel::Info, "info");
+        test_log!(log, LogLevel::Debug, "debug");
+
+        assert_eq!(log._log_len(), 8);
+        for expected in [
+            "emerg", "alert", "crit", "err", "warn", "notice", "info", "debug",
+        ] {
+            assert_eq!(log._read_log().unwrap().message(), expected);
+        }
+    }
+
+    #[test]
+    fn test_buffer_overflow() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        const TOTAL: usize = 100;
+        for i in 0..TOTAL {
+            test_log!(log, LogLevel::Info, "log {}", i);
+        }
+
+        let buffered = log._log_len();
+        let dropped = log._log_dropped_count();
+
+        assert!(dropped > 0);
+        assert_eq!(buffered + dropped, TOTAL);
+    }
+
+    #[test]
+    fn test_overflow_fifo_behavior() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        for i in 0..100 {
+            test_log!(log, LogLevel::Info, "entry {}", i);
+        }
+
+        let dropped = log._log_dropped_count();
+        assert!(dropped > 0);
+
+        let first = log._read_log().unwrap();
+        assert!(first.message().starts_with("entry"));
+    }
+
+    #[test]
+    fn test_write_after_overflow() {
+        let log = LogCore::new(LogLevel::Debug, LogLevel::Warning);
+
+        for i in 0..100 {
+            test_log!(log, LogLevel::Info, "overflow {}", i);
+        }
+
+        let dropped_before = log._log_dropped_count();
+        assert!(dropped_before > 0);
+
+        while log._read_log().is_some() {}
+
+        test_log!(log, LogLevel::Info, "after overflow");
+
+        assert_eq!(log._log_len(), 1);
+        assert_eq!(log._read_log().unwrap().message(), "after overflow");
+    }
+
+    #[test]
+    fn test_peek_basic() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "Test message");
+
+        let start = logger._log_reader_index();
+        let end = logger._log_writer_index();
+
+        assert_eq!(end, start + 1);
+
+        assert!(logger._peek_log(start).is_some());
+        assert_eq!(logger._log_reader_index(), start);
+
+        assert!(logger._peek_log(start).is_some());
+        assert_eq!(logger._log_reader_index(), start);
+    }
+
+    #[test]
+    fn test_peek_vs_read() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "Message 1");
+        test_log!(logger, LogLevel::Info, "Message 2");
+
+        let start = logger._log_reader_index();
+        let entry_peek = logger._peek_log(start).unwrap();
+        assert_eq!(logger._log_reader_index(), start);
+
+        let entry_read = logger._read_log().unwrap();
+        assert_eq!(logger._log_reader_index(), start + 1);
+        assert_eq!(entry_peek.message(), entry_read.message());
+    }
+
+    #[test]
+    fn test_peek_multiple() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "Message 1");
+        test_log!(logger, LogLevel::Info, "Message 2");
+        test_log!(logger, LogLevel::Info, "Message 3");
+
+        let start = logger._log_reader_index();
+
+        let e1 = logger._peek_log(start);
+        let e2 = logger._peek_log(start + 1);
+        let e3 = logger._peek_log(start + 2);
+
+        assert!(e1.is_some());
+        assert!(e2.is_some());
+        assert!(e3.is_some());
+
+        assert_eq!(logger._log_reader_index(), start);
+
+        assert!(e1.unwrap().message().contains("Message 1"));
+        assert!(e2.unwrap().message().contains("Message 2"));
+        assert!(e3.unwrap().message().contains("Message 3"));
+    }
+
+    #[test]
+    fn test_peek_out_of_range() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        test_log!(logger, LogLevel::Info, "Test");
+
+        let start = logger._log_reader_index();
+        let end = logger._log_writer_index();
+
+        assert!(logger._peek_log(start).is_some());
+        assert!(logger._peek_log(end).is_none());
+        assert!(logger._peek_log(end + 1).is_none());
+        assert!(logger._peek_log(start - 1).is_none());
+    }
+
+    #[test]
+    fn test_peek_after_read() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "Message 1");
+        test_log!(logger, LogLevel::Info, "Message 2");
+        test_log!(logger, LogLevel::Info, "Message 3");
+
+        let start = logger._log_reader_index();
+        logger._read_log();
+
+        assert!(logger._peek_log(start).is_none());
+        assert!(logger._peek_log(start + 1).is_some());
+        assert!(logger._peek_log(start + 2).is_some());
+    }
+
+    #[test]
+    fn test_peek_index_tracking() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        let r0 = logger._log_reader_index();
+        let w0 = logger._log_writer_index();
+        assert_eq!(r0, w0);
+
+        test_log!(logger, LogLevel::Info, "Test");
+        assert_eq!(logger._log_writer_index(), w0 + 1);
+        assert_eq!(logger._log_reader_index(), r0);
+
+        logger._read_log();
+        assert_eq!(logger._log_reader_index(), r0 + 1);
+        assert_eq!(logger._log_reader_index(), logger._log_writer_index());
+    }
+
+    #[test]
+    fn test_peek_with_byte_counting() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        test_log!(logger, LogLevel::Info, "Test");
+
+        let bytes_before = logger._log_unread_bytes();
+        let start = logger._log_reader_index();
+
+        logger._peek_log(start);
+        assert_eq!(logger._log_unread_bytes(), bytes_before);
+
+        logger._peek_log(start);
+        assert_eq!(logger._log_unread_bytes(), bytes_before);
+
+        logger._read_log();
+        assert_eq!(logger._log_unread_bytes(), 0);
+    }
+
+    #[test]
+    fn test_peek_empty_buffer() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        let start = logger._log_reader_index();
+        assert!(logger._peek_log(start).is_none());
+        assert!(logger._peek_log(start + 1).is_none());
+    }
+
+    #[test]
+    fn test_peek_sequential_access() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        for i in 0..5 {
+            test_log!(logger, LogLevel::Info, "Message {}", i);
+        }
+
+        let start = logger._log_reader_index();
+        for i in 0..5 {
+            assert!(logger._peek_log(start + i).is_some());
+        }
+        assert!(logger._peek_log(start + 5).is_none());
+        assert_eq!(logger._log_reader_index(), start);
+    }
+
+    #[test]
+    fn test_unread_bytes_basic() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        assert_eq!(logger._log_unread_bytes(), 0);
+
+        test_log!(logger, LogLevel::Info, "Test message");
+
+        let after_write = logger._log_unread_bytes();
+        assert!(after_write > 0);
+
+        let _ = logger._read_log();
+
+        let after_read = logger._log_unread_bytes();
+        assert!(after_read < after_write);
+        assert_eq!(after_read, 0);
+    }
+
+    #[test]
+    fn test_unread_bytes_multiple() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "Message 1");
+        test_log!(logger, LogLevel::Info, "Message 2");
+        test_log!(logger, LogLevel::Info, "Message 3");
+
+        let total = logger._log_unread_bytes();
+        assert!(total > 0);
+
+        let _ = logger._read_log();
+        let after_one = logger._log_unread_bytes();
+        assert!(after_one < total);
+        assert!(after_one > 0);
+
+        let _ = logger._read_log();
+        let after_two = logger._log_unread_bytes();
+        assert!(after_two < after_one);
+        assert!(after_two > 0);
+
+        let _ = logger._read_log();
+        let after_three = logger._log_unread_bytes();
+        assert_eq!(after_three, 0);
+    }
+
+    #[test]
+    fn test_unread_bytes_accuracy() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        test_log!(logger, LogLevel::Info, "Hello");
+
+        let reported = logger._log_unread_bytes();
+        let entry = logger._read_log().unwrap();
+        let formatted = crate::format_log_entry(&entry);
+        let actual = formatted.len();
+
+        // Context fields (cpu/task/timestamp) may vary; just check a reasonable bound.
+        assert!(reported > 0);
+        assert!(reported >= actual.saturating_sub(10));
+        assert!(reported <= actual + 10);
+    }
+
+    #[test]
+    fn test_unread_bytes_different_lengths() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Info, "A");
+        let bytes_short = logger._log_unread_bytes();
+
+        test_log!(
+            logger,
+            LogLevel::Info,
+            "This is a much longer message with more content"
+        );
+        let bytes_both = logger._log_unread_bytes();
+
+        assert!(bytes_both > bytes_short);
+        let diff = bytes_both - bytes_short;
+        assert!(diff > 30);
+    }
+
+    #[test]
+    fn test_unread_bytes_with_different_levels() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+
+        test_log!(logger, LogLevel::Emergency, "Test");
+        let bytes_emerg = logger._log_unread_bytes();
+        let _ = logger._read_log();
+
+        test_log!(logger, LogLevel::Info, "Test");
+        let bytes_info = logger._log_unread_bytes();
+
+        assert_ne!(bytes_emerg, bytes_info);
+    }
+
+    #[test]
+    fn test_unread_bytes_empty_message() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        test_log!(logger, LogLevel::Info, "");
+
+        let bytes = logger._log_unread_bytes();
+        assert!(bytes > 40);
+    }
+
+    #[test]
+    fn test_unread_bytes_persistence() {
+        let logger = LogCore::new(LogLevel::Debug, LogLevel::Emergency);
+        test_log!(logger, LogLevel::Info, "Persistent");
+
+        let initial = logger._log_unread_bytes();
+        assert_eq!(logger._log_unread_bytes(), initial);
+        assert_eq!(logger._log_unread_bytes(), initial);
+        assert_eq!(logger._log_unread_bytes(), initial);
+
+        let _ = logger._read_log();
+        assert_eq!(logger._log_unread_bytes(), 0);
+    }
 }

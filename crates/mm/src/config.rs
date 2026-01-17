@@ -51,8 +51,47 @@ pub fn mm_config() -> &'static dyn MmConfig {
     let data = CONFIG_DATA.load(Ordering::Acquire);
     let vtable = CONFIG_VTABLE.load(Ordering::Acquire);
     if data == 0 {
+        #[cfg(test)]
+        {
+            extern crate test_support;
+            return &test_support::mock::mm::MOCK_MM_CONFIG;
+        }
+        #[cfg(not(test))]
         panic!("mm: MmConfig not registered");
     }
     // SAFETY: 重组 fat pointer
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn MmConfig>((data, vtable)) }
+}
+
+#[cfg(test)]
+mod test_mock {
+    extern crate test_support;
+
+    use super::MmConfig;
+
+    impl MmConfig for test_support::mock::mm::MockMmConfig {
+        fn page_size(&self) -> usize {
+            self.page_size()
+        }
+
+        fn memory_end(&self) -> usize {
+            self.memory_end()
+        }
+
+        fn user_stack_size(&self) -> usize {
+            self.user_stack_size()
+        }
+
+        fn user_stack_top(&self) -> usize {
+            self.user_stack_top()
+        }
+
+        fn max_user_heap_size(&self) -> usize {
+            self.max_user_heap_size()
+        }
+
+        fn user_sigreturn_trampoline(&self) -> usize {
+            self.user_sigreturn_trampoline()
+        }
+    }
 }

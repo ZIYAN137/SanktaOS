@@ -216,10 +216,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        kassert,
         kernel::{TaskState, task::TaskStruct},
         sync::SpinLock,
-        test_case,
     };
 
     fn new_dummy_task(tid: u32) -> SharedTask {
@@ -227,35 +225,38 @@ mod tests {
         Arc::new(SpinLock::new(task))
     }
 
-    // 通过 TaskManager 分配 tid：应从 1 开始递增
-    test_case!(test_task_manager_allocate_sequence, {
+    // 通过 TaskManager 分配 tid：应从 2 开始递增（TID 1 保留给 init 进程）
+    #[test_case]
+    fn test_task_manager_allocate_sequence() {
         let mut tm = TaskManager::new();
         let t1 = tm.allocate_tid();
         let t2 = tm.allocate_tid();
         let t3 = tm.allocate_tid();
-        kassert!(t1 == 1);
-        kassert!(t2 == 2);
-        kassert!(t3 == 3);
-    });
+        assert!(t1 == 2);
+        assert!(t2 == 3);
+        assert!(t3 == 4);
+    }
 
     // 对不存在的 tid 进行查询与退出
-    test_case!(test_task_manager_get_remove_nonexistent, {
+    #[test_case]
+    fn test_task_manager_get_remove_nonexistent() {
         let mut tm = TaskManager::new();
         // 查询不存在的任务
-        kassert!(tm.get_task(42).is_none());
+        assert!(tm.get_task(42).is_none());
 
         // 删除不存在的任务（应为 no-op）
         tm.exit_task(new_dummy_task(42), 0);
-        kassert!(tm.get_task(42).is_none());
-    });
+        assert!(tm.get_task(42).is_none());
+    }
 
     // 关于 add_task/get_task/exit_task 的正向测试
-    test_case!(test_task_manager_add_get_exit, {
+    #[test_case]
+    fn test_task_manager_add_get_exit() {
         let mut tm = TaskManager::new();
         let tid = tm.allocate_tid();
         let task = new_dummy_task(tid);
         tm.add_task(task.clone());
-        kassert!(tm.get_task(tid).is_some());
+        assert!(tm.get_task(tid).is_some());
 
         const EXIT_CODE: i32 = 42;
 
@@ -266,14 +267,15 @@ mod tests {
         let g = exited_task.lock();
 
         // 验证任务管理器设置了返回值 (新的责任)
-        kassert!(g.exit_code == Some(EXIT_CODE as i32));
+        assert!(g.exit_code == Some(EXIT_CODE as i32));
 
         // 验证调度器设置了状态 (调度器的责任)
-        kassert!(g.state == TaskState::Zombie);
-    });
+        assert!(g.state == TaskState::Zombie);
+    }
 
     // 释放已退出任务的测试
-    test_case!(test_task_manager_release_task, {
+    #[test_case]
+    fn test_task_manager_release_task() {
         let mut tm = TaskManager::new();
         let tid = tm.allocate_tid();
         let task = new_dummy_task(tid);
@@ -281,11 +283,11 @@ mod tests {
 
         // 任务退出（此时状态为 Zombie，仍在 tasks 列表中）
         tm.exit_task(task.clone(), 0);
-        kassert!(tm.task_count() == 1);
+        assert!(tm.task_count() == 1);
 
         // 释放任务
         tm.release_task(task);
-        kassert!(tm.task_count() == 0);
-        kassert!(tm.get_task(tid).is_none());
-    });
+        assert!(tm.task_count() == 0);
+        assert!(tm.get_task(tid).is_none());
+    }
 }

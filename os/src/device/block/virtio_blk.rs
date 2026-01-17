@@ -151,20 +151,19 @@ pub fn init_pci(transport: PciTransport) {
 mod tests {
     use super::*;
     use crate::device::BLK_DRIVERS;
-    use crate::{kassert, test_case};
     use alloc::string::ToString;
 
     /// 通用校验：Driver 接口的基本行为
     fn check_common_driver_behavior(d: &dyn Driver) {
         // 设备类型是否为 Block
-        kassert!(matches!(d.device_type(), DeviceType::Block));
+        assert!(matches!(d.device_type(), DeviceType::Block));
         // get_id 是否符合预期
-        kassert!(d.get_id() == "virtio_block");
+        assert!(d.get_id() == "virtio_block");
         // as_block 能够返回 Some
-        kassert!(d.as_block().is_some());
+        assert!(d.as_block().is_some());
         // as_net / as_rtc 应该为 None
-        kassert!(d.as_net().is_none());
-        kassert!(d.as_rtc().is_none());
+        assert!(d.as_net().is_none());
+        assert!(d.as_rtc().is_none());
     }
 
     /// 通用的块读写轮询测试函数（需要真实设备支持）
@@ -188,40 +187,44 @@ mod tests {
             return false;
         }
         // 校验内容
-        kassert!(write_buf == read_buf);
+        assert!(write_buf == read_buf);
         true
     }
 
     // 编译期接口实现断言（无法运行时失败，只在类型不满足时编译报错）
-    test_case!(test_virtioblk_trait_impls, {
-        fn assert_driver<T: super::super::Driver>() {}
+    #[test_case]
+    fn test_virtioblk_trait_impls() {
+        fn assert_driver<T: crate::device::Driver>() {}
         fn assert_block<T: super::BlockDriver>() {}
         assert_driver::<VirtIOBlkDriver>();
         assert_block::<VirtIOBlkDriver>();
-    });
+    }
 
     // 基本 get_id 与类型校验
-    test_case!(test_virtioblk_basic_metadata, {
+    #[test_case]
+    fn test_virtioblk_basic_metadata() {
         // 无法直接构造 VirtIOBlkDriver（需要真实 MmioTransport），
         // 因此这里只做字符串与常量行为的直接校验。
-        kassert!("virtio_block".to_string() == "virtio_block");
-    });
+        assert!("virtio_block".to_string() == "virtio_block");
+    }
 
     // 中断处理逻辑的可调用性测试（只验证调用路径，不验证硬件副作用）
-    test_case!(test_virtioblk_interrupt_path, {
+    #[test_case]
+    fn test_virtioblk_interrupt_path() {
         // 如果系统已完成 init()，则可以遍历全局驱动集合取出 virtio_block 测试。
         let list = BLK_DRIVERS.read();
         if let Some(drv) = list.iter().find(|d| d.get_id() == "virtio_block") {
             // 调用中断处理函数，预期返回 true
-            kassert!(drv.try_handle_interrupt(None));
+            assert!(drv.try_handle_interrupt(None));
         } else {
             // 没有设备时跳过（保持测试通过）
-            kassert!(true);
+            assert!(true);
         }
-    });
+    }
 
     // 读写轮询逻辑测试：若存在真实 virtio-blk 驱动则执行，否则跳过
-    test_case!(test_virtioblk_read_write_roundtrip, {
+    #[test_case]
+    fn test_virtioblk_read_write_roundtrip() {
         let list = BLK_DRIVERS.read();
         if let Some(drv) = list.iter().find(|d| d.get_id() == "virtio_block") {
             check_common_driver_behavior(drv.as_ref());
@@ -229,15 +232,16 @@ mod tests {
             // 尝试测试第 0 号块（实际系统中可根据分配策略选择安全块号）
             let ok = try_block_roundtrip(block_iface, 0);
             // 如果失败（比如环境不支持实际 I/O），则跳过，不判为失败
-            kassert!(ok || !ok); // 始终为真，占位避免 panic；可替换为日志。
+            assert!(ok || !ok); // 始终为真，占位避免 panic；可替换为日志。
         } else {
             // 未初始化驱动，跳过
-            kassert!(true);
+            assert!(true);
         }
-    });
+    }
 
     // 额外：可重复多块写读测试（提高覆盖率），仅在存在设备时执行
-    test_case!(test_virtioblk_multi_block_pattern, {
+    #[test_case]
+    fn test_virtioblk_multi_block_pattern() {
         let list = BLK_DRIVERS.read();
         if let Some(drv) = list.iter().find(|d| d.get_id() == "virtio_block") {
             let block_iface = drv.as_block().unwrap();
@@ -246,7 +250,7 @@ mod tests {
                 let _ = try_block_roundtrip(block_iface, bid);
             }
         } else {
-            kassert!(true);
+            assert!(true);
         }
-    });
+    }
 }

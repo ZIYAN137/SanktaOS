@@ -337,46 +337,48 @@ impl PageTableEntryTrait for PageTableEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
 
     // 1. 标志位转换测试 - 内核读写
-    test_case!(test_flag_conversion_kernel_rw, {
+    #[test_case]
+    fn test_flag_conversion_kernel_rw() {
         let universal = UniversalPTEFlag::kernel_rw();
         let la_flags = LAPTEFlags::from_universal(universal);
 
         // 应该有 VALID, DIRTY, MAT_CC，不应该有 NR
-        kassert!(la_flags.contains(LAPTEFlags::VALID));
-        kassert!(la_flags.contains(LAPTEFlags::DIRTY));
-        kassert!(la_flags.contains(LAPTEFlags::MAT_CC));
-        kassert!(!la_flags.contains(LAPTEFlags::NR)); // 可读
+        assert!(la_flags.contains(LAPTEFlags::VALID));
+        assert!(la_flags.contains(LAPTEFlags::DIRTY));
+        assert!(la_flags.contains(LAPTEFlags::MAT_CC));
+        assert!(!la_flags.contains(LAPTEFlags::NR)); // 可读
 
         // PLV 应该为 0（内核态）
-        kassert!(!la_flags.is_user());
-    });
+        assert!(!la_flags.is_user());
+    }
 
     // 2. 标志位转换测试 - 用户读执行
-    test_case!(test_flag_conversion_user_rx, {
+    #[test_case]
+    fn test_flag_conversion_user_rx() {
         let universal = UniversalPTEFlag::user_rx();
         let la_flags = LAPTEFlags::from_universal(universal);
 
         // 应该有 VALID, PLV3, MAT_CC
-        kassert!(la_flags.contains(LAPTEFlags::VALID));
-        kassert!(la_flags.is_user());
-        kassert!(!la_flags.contains(LAPTEFlags::NR)); // 可读
-        kassert!(!la_flags.contains(LAPTEFlags::NX)); // 可执行
-        kassert!(!la_flags.contains(LAPTEFlags::DIRTY)); // 不可写
-    });
+        assert!(la_flags.contains(LAPTEFlags::VALID));
+        assert!(la_flags.is_user());
+        assert!(!la_flags.contains(LAPTEFlags::NR)); // 可读
+        assert!(!la_flags.contains(LAPTEFlags::NX)); // 可执行
+        assert!(!la_flags.contains(LAPTEFlags::DIRTY)); // 不可写
+    }
 
     // 3. 往返转换测试
-    test_case!(test_roundtrip_conversion, {
+    #[test_case]
+    fn test_roundtrip_conversion() {
         let original = UniversalPTEFlag::user_rw();
         let la_flags = LAPTEFlags::from_universal(original);
         let converted_back = la_flags.to_universal();
 
         // 应该能够往返转换（忽略 ACCESSED，因为 LoongArch 没有）
-        kassert!(converted_back.contains(UniversalPTEFlag::VALID));
-        kassert!(converted_back.contains(UniversalPTEFlag::READABLE));
-        kassert!(converted_back.contains(UniversalPTEFlag::WRITEABLE));
-        kassert!(converted_back.contains(UniversalPTEFlag::USER_ACCESSIBLE));
-    });
+        assert!(converted_back.contains(UniversalPTEFlag::VALID));
+        assert!(converted_back.contains(UniversalPTEFlag::READABLE));
+        assert!(converted_back.contains(UniversalPTEFlag::WRITEABLE));
+        assert!(converted_back.contains(UniversalPTEFlag::USER_ACCESSIBLE));
+    }
 }

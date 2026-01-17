@@ -21,6 +21,8 @@ impl FileSystemType {
     ///
     /// # 示例
     /// ```
+    /// use uapi::fs::FileSystemType;
+    ///
     /// let fs_type = FileSystemType::from_str("ext4");
     /// assert_eq!(fs_type, FileSystemType::Ext4);
     /// ```

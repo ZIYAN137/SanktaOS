@@ -48,7 +48,7 @@ static IPI_PENDING: [AtomicU32; MAX_CPU_COUNT] = [const { AtomicU32::new(0) }; M
 /// 如果 target_cpu >= NUM_CPU，会 panic
 pub fn send_ipi(target_cpu: usize, ipi_type: IpiType) {
     let num_cpu = unsafe { crate::kernel::NUM_CPU };
-    assert!(target_cpu < num_cpu, "Invalid target CPU: {}", target_cpu);
+    core::assert!(target_cpu < num_cpu, "Invalid target CPU: {}", target_cpu);
 
     // 1. 设置目标 CPU 的待处理标志
     IPI_PENDING[target_cpu].fetch_or(ipi_type as u32, Ordering::Release);
@@ -165,31 +165,33 @@ pub fn handle_ipi() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
 
     // 测试 IPI 类型位标志
-    test_case!(test_ipi_type_flags, {
-        kassert!(IpiType::Reschedule as u32 == 1);
-        kassert!(IpiType::TlbFlush as u32 == 2);
-        kassert!(IpiType::Stop as u32 == 4);
-    });
+    #[test_case]
+    fn test_ipi_type_flags() {
+        assert!(IpiType::Reschedule as u32 == 1);
+        assert!(IpiType::TlbFlush as u32 == 2);
+        assert!(IpiType::Stop as u32 == 4);
+    }
 
     // 测试 IPI 类型组合
-    test_case!(test_ipi_type_combination, {
+    #[test_case]
+    fn test_ipi_type_combination() {
         let combined = (IpiType::Reschedule as u32) | (IpiType::TlbFlush as u32);
-        kassert!(combined == 3);
+        assert!(combined == 3);
 
         let all =
             (IpiType::Reschedule as u32) | (IpiType::TlbFlush as u32) | (IpiType::Stop as u32);
-        kassert!(all == 7);
-    });
+        assert!(all == 7);
+    }
 
     // 测试 IPI 类型位检查
-    test_case!(test_ipi_type_bit_check, {
+    #[test_case]
+    fn test_ipi_type_bit_check() {
         let flags = (IpiType::Reschedule as u32) | (IpiType::Stop as u32);
 
-        kassert!(flags & (IpiType::Reschedule as u32) != 0);
-        kassert!(flags & (IpiType::TlbFlush as u32) == 0);
-        kassert!(flags & (IpiType::Stop as u32) != 0);
-    });
+        assert!(flags & (IpiType::Reschedule as u32) != 0);
+        assert!(flags & (IpiType::TlbFlush as u32) == 0);
+        assert!(flags & (IpiType::Stop as u32) != 0);
+    }
 }

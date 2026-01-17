@@ -36,3 +36,25 @@ pub fn format_mac_address(mac: [u8; 6]) -> alloc::string::String {
         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_mac_address() {
+        assert_eq!(
+            format_mac_address([0x02, 0x00, 0x0a, 0xbb, 0x10, 0xff]),
+            "02:00:0a:bb:10:ff"
+        );
+    }
+
+    #[test]
+    fn test_null_net_device_basics() {
+        let dev = NullNetDevice::new(7);
+        assert_eq!(dev.device_id(), 7);
+        assert_eq!(dev.name(), "null-net");
+        assert_eq!(dev.mtu(), 1500);
+        assert_eq!(dev.mac_address(), [0x02, 0x00, 0x00, 0x00, 0x00, 0x01]);
+    }
+}

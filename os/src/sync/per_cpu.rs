@@ -43,7 +43,7 @@ impl<T> PerCpu<T> {
     /// 如果 NUM_CPU 未设置或为 0，会 panic
     pub fn new<F: Fn() -> T>(init: F) -> Self {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
+        core::assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
 
         let mut data = Vec::with_capacity(num_cpu);
         for _ in 0..num_cpu {
@@ -61,7 +61,7 @@ impl<T> PerCpu<T> {
     /// 如果 NUM_CPU 未设置或为 0，会 panic
     pub fn new_with_id<F: Fn(usize) -> T>(init: F) -> Self {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
+        core::assert!(num_cpu > 0, "NUM_CPU must be set before creating PerCpu");
 
         let mut data = Vec::with_capacity(num_cpu);
         for i in 0..num_cpu {
@@ -77,7 +77,7 @@ impl<T> PerCpu<T> {
     ///
     /// 用于在 NUM_CPU 设置之前创建 PerCpu 实例（例如 CPUS 的 lazy_static 初始化）
     pub fn new_with_id_and_count<F: Fn(usize) -> T>(count: usize, init: F) -> Self {
-        assert!(count > 0, "CPU count must be greater than 0");
+        core::assert!(count > 0, "CPU count must be greater than 0");
 
         let mut data = Vec::with_capacity(count);
         for i in 0..count {
@@ -128,7 +128,7 @@ impl<T> PerCpu<T> {
     /// 用于跨核访问，例如负载均衡时查看其他 CPU 的队列长度。
     #[inline]
     pub fn get_of(&self, cpu_id: usize) -> &T {
-        assert!(cpu_id < self.data.len(), "Invalid CPU ID");
+        core::assert!(cpu_id < self.data.len(), "Invalid CPU ID");
         // SAFETY: cpu_id 已检查有效性
         unsafe { &*self.data[cpu_id].get() }
     }
@@ -141,33 +141,35 @@ unsafe impl<T: Send> Sync for PerCpu<T> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
     use core::sync::atomic::{AtomicUsize, Ordering};
     use sync::PreemptGuard;
 
-    test_case!(test_per_cpu_basic, {
+    #[test_case]
+    fn test_per_cpu_basic() {
         let per_cpu = PerCpu::new(|| AtomicUsize::new(0));
         let _guard = PreemptGuard::new(); // 禁用抢占
         let counter = per_cpu.get();
-        kassert!(counter.load(Ordering::Relaxed) == 0);
+        assert!(counter.load(Ordering::Relaxed) == 0);
         counter.fetch_add(1, Ordering::Relaxed);
-        kassert!(counter.load(Ordering::Relaxed) == 1);
-    });
+        assert!(counter.load(Ordering::Relaxed) == 1);
+    }
 
-    test_case!(test_per_cpu_get_of, {
+    #[test_case]
+    fn test_per_cpu_get_of() {
         let per_cpu = PerCpu::new(|| AtomicUsize::new(42));
         let counter = per_cpu.get_of(0);
-        kassert!(counter.load(Ordering::Relaxed) == 42);
+        assert!(counter.load(Ordering::Relaxed) == 42);
         counter.fetch_add(1, Ordering::Relaxed);
-        kassert!(per_cpu.get_of(0).load(Ordering::Relaxed) == 43);
-    });
+        assert!(per_cpu.get_of(0).load(Ordering::Relaxed) == 43);
+    }
 
-    test_case!(test_per_cpu_get_mut, {
+    #[test_case]
+    fn test_per_cpu_get_mut() {
         let per_cpu = PerCpu::new(|| 0usize);
         let _guard = PreemptGuard::new(); // 禁用抢占
         let value = per_cpu.get_mut();
-        kassert!(*value == 0);
+        assert!(*value == 0);
         *value = 100;
-        kassert!(*per_cpu.get_mut() == 100);
-    });
+        assert!(*per_cpu.get_mut() == 100);
+    }
 }

@@ -432,3 +432,24 @@ pub type PaddrRange = AddressRange<Paddr>;
 
 /// 虚拟地址范围的类型别名
 pub type VaddrRange = AddressRange<Vaddr>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_address_page_offset() {
+        let v = Vaddr::from_usize(0x1003);
+        assert_eq!(v.page_offset(), 3);
+    }
+
+    #[test]
+    fn test_paddr_vaddr_roundtrip_with_mock_ops() {
+        let p = Paddr::from_usize(0x1234_5678);
+        let v = p.to_vaddr();
+        assert_eq!(v.as_usize(), 0x1234_5678);
+
+        let p2 = v.to_paddr();
+        assert_eq!(p2.as_usize(), 0x1234_5678);
+    }
+}

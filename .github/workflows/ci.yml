@@ -112,6 +112,14 @@ jobs:
         if: steps.qemu-cache.outputs.cache-hit == 'true'
         run: echo "${{ env.QEMU_BUILD_PATH }}/bin" >> $GITHUB_PATH
 
-      - name: 🏃 Run usertests
-        run: cd os && make run TEST=1
-        timeout-minutes: 10
+      - name: 🧪 Run all tests (os + crates)
+        run: python3 scripts/run_all_tests.py --stream
+        timeout-minutes: 30
+
+      - name: 📤 Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: test-reports/
+          retention-days: 7

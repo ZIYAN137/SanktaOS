@@ -28,6 +28,9 @@ pub use ticket_lock::*;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(test)]
+extern crate test_support;
+
 /// 架构相关操作的 trait
 ///
 /// 由 os crate 实现并注册，提供中断控制和 CPU 信息
@@ -72,6 +75,7 @@ pub unsafe fn register_arch_ops(ops: &'static dyn ArchOps) {
 
 /// 获取架构操作实例
 #[inline]
+#[cfg(not(test))]
 pub(crate) fn arch_ops() -> &'static dyn ArchOps {
     let data = ARCH_OPS_DATA.load(Ordering::Acquire);
     let vtable = ARCH_OPS_VTABLE.load(Ordering::Acquire);
@@ -80,4 +84,39 @@ pub(crate) fn arch_ops() -> &'static dyn ArchOps {
     }
     // SAFETY: data 和 vtable 是通过 register_arch_ops 设置的有效指针
     unsafe { &*core::mem::transmute::<(usize, usize), *const dyn ArchOps>((data, vtable)) }
+}
+
+/// 获取架构操作实例（测试模式）
+#[inline]
+#[cfg(test)]
+pub(crate) fn arch_ops() -> &'static dyn ArchOps {
+    // 在测试模式下返回 mock 实现
+    &test_support::mock::arch::MOCK_ARCH_OPS
+}
+
+#[cfg(test)]
+mod test_mock {
+    use super::ArchOps;
+
+    impl ArchOps for test_support::mock::arch::MockArchOps {
+        unsafe fn read_and_disable_interrupts(&self) -> usize {
+            unsafe { self.read_and_disable_interrupts() }
+        }
+
+        unsafe fn restore_interrupts(&self, flags: usize) {
+            unsafe { self.restore_interrupts(flags) }
+        }
+
+        fn sstatus_sie(&self) -> usize {
+            self.sstatus_sie()
+        }
+
+        fn cpu_id(&self) -> usize {
+            self.cpu_id()
+        }
+
+        fn max_cpu_count(&self) -> usize {
+            self.max_cpu_count()
+        }
+    }
 }

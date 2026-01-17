@@ -10,14 +10,14 @@ LOG ?=
 # 根据架构设置变量
 ifeq ($(ARCH),loongarch)
     TARGET := loongarch64-unknown-none
-    TARGET_DIR := ../target/loongarch64-unknown-none/debug
+    TARGET_DIR := target/loongarch64-unknown-none/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-loongarch-run.sh
     GDB_BIN := loongarch64-unknown-elf-gdb
     GDB_ARCH_SETUP :=
 else
     TARGET := riscv64gc-unknown-none-elf
-    TARGET_DIR := ../target/riscv64gc-unknown-none-elf/debug
+    TARGET_DIR := target/riscv64gc-unknown-none-elf/debug
     PROJECT_DIR := $(TARGET_DIR)/os
     QEMU_RUNNER := ./qemu-run.sh
     GDB_BIN := riscv64-unknown-elf-gdb
@@ -47,11 +47,7 @@ else
 endif
 endif
 
-# 目标 2: test (显式运行测试)
-test:
-	@cargo test --target $(TARGET)
-
-.PHONY: run test debug gdb qemu-gdb-target help
+.PHONY: run debug gdb qemu-gdb-target help
 
 # 目标 3: qemu-gdb-target (启动 QEMU 等待 GDB)
 # 在后台启动 QEMU 并等待连接，使用 'gdb' 模式
@@ -88,22 +84,29 @@ debug:
 # 目标 1: 运行测试
 test: clean-test
 	@echo "Building tests with 'cargo test --no-run'..."
-	@TEST=1 cargo test --target $(TARGET) --no-run
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@bash -lc 'set -o pipefail; TEST=1 cargo test --target $(TARGET) --no-run --message-format=json 2>&1 | tee /tmp/test-build.log >/dev/null'
+	@TEST_ELF=$$(grep -a '^{' /tmp/test-build.log | jq -r 'select(.reason=="compiler-artifact" and .target.name=="os" and .executable!=null) | .executable' | tail -1); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find any test executable after build."; \
 		exit 1; \
 	fi; \
-	echo "Found latest test executable: $$TEST_ELF"; \
+	echo "Found test executable: $$TEST_ELF"; \
 	echo "Running tests in QEMU..."; \
 	$(QEMU_RUNNER) $$TEST_ELF run
 
 # 目标 2: 调试测试 (第一步)
 test-qemu: clean-test
 	@echo "Building tests with 'cargo test --no-run'..."
-	@TEST=1 cargo test --target $(TARGET) --no-run
-	@# 关键修复：把所有逻辑都放在一个 shell 进程中执行
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@bash -lc 'set -o pipefail; TEST=1 cargo test --target $(TARGET) --no-run --message-format=json 2>&1 | tee /tmp/test-build.log >/dev/null'
+	@TEST_ELF=$$(grep -a '^{' /tmp/test-build.log | jq -r 'select(.reason=="compiler-artifact" and .target.name=="os" and .executable!=null) | .executable' | tail -1); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find test executable after build."; \
 		exit 1; \
@@ -117,7 +120,11 @@ test-qemu: clean-test
 
 # 目标 3: 调试测试 (第二步)
 test-gdb:
-	@TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	@TEST_ELF=$$(grep -a '^{' /tmp/test-build.log 2>/dev/null | jq -r 'select(.reason=="compiler-artifact" and .target.name=="os" and .executable!=null) | .executable' | tail -1); \
+	if [ -z "$$TEST_ELF" ]; then \
+		echo "Error: Could not find test executable. Trying fallback method..."; \
+		TEST_ELF=$$(find $(TARGET_DIR)/deps -name "os-*" ! -name "*.d" ! -name "*.bin" -type f -executable 2>/dev/null | head -1); \
+	fi; \
 	if [ -z "$$TEST_ELF" ]; then \
 		echo "Error: Could not find test executable. Did you run 'make test-qemu' first?"; \
 		exit 1; \

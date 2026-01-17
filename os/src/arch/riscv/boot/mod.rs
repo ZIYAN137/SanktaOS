@@ -38,7 +38,6 @@ use crate::{
     },
     pr_debug, pr_err, pr_info, pr_warn,
     sync::SpinLock,
-    test::run_early_tests,
     uapi::{
         resource::{INIT_RLIMITS, RlimitStruct},
         signal::SignalFlags,
@@ -253,8 +252,6 @@ pub fn main(hartid: usize) {
     // 初始化日志系统（必须在使用 pr_* 宏之前）
     crate::log::init();
 
-    run_early_tests();
-
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] RISC-V Hart {} is up!", hartid);
 
@@ -285,8 +282,31 @@ pub fn main(hartid: usize) {
         earlyprintln!("[Boot] Activated kernel address space");
     }
 
+    // 测试模式下：
+    // - 提前注册 FsOps，避免 tests/ 中的 TmpFs/Ext4 等依赖 fs_ops() 时 panic。
+    // - 提前创建并切换到一个可用的 current_task，避免 /proc/self 等依赖 current_task() 的用例直接 panic。
     #[cfg(test)]
-    crate::test_main();
+    {
+        use core::sync::atomic::Ordering;
+
+        crate::fs::init_fs_ops();
+        crate::vfs::init_vfs_ops();
+
+        let _guard = crate::sync::PreemptGuard::new();
+        if current_cpu().current_task.is_none() {
+            let idle0 = create_idle_task(0);
+
+            // trap/scheduler 相关路径会依赖 sscratch 指向当前任务的 TrapFrame。
+            let tf_ptr = idle0.lock().trap_frame_ptr.load(Ordering::SeqCst);
+            unsafe { riscv::register::sscratch::write(tf_ptr as usize) };
+
+            let cpu = current_cpu();
+            cpu.idle_task = Some(idle0.clone());
+            cpu.switch_task(idle0);
+        }
+
+        crate::test_main();
+    }
 
     // 初始化工作
     trap::init_boot_trap();
@@ -301,6 +321,7 @@ pub fn main(hartid: usize) {
     crate::vfs::init_vfs_ops();
 
     // 初始化 FS 操作（必须在使用 fs crate 之前）
+    #[cfg(not(test))]
     crate::fs::init_fs_ops();
 
     // 启动从核（在启用定时器中断之前）
@@ -347,17 +368,18 @@ fn clear_bss() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kassert, test_case};
 
     /// 测试 NUM_CPU 设置正确
-    test_case!(test_num_cpu, {
+    #[test_case]
+    fn test_num_cpu() {
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
-        kassert!(num_cpu >= 1);
-        kassert!(num_cpu <= crate::config::MAX_CPU_COUNT);
-    });
+        assert!(num_cpu >= 1);
+        assert!(num_cpu <= crate::config::MAX_CPU_COUNT);
+    }
 
     /// 测试 CPU 上线掩码（多核环境）
-    test_case!(test_cpu_online_mask, {
+    #[test_case]
+    fn test_cpu_online_mask() {
         use core::sync::atomic::Ordering;
 
         let num_cpu = unsafe { crate::kernel::NUM_CPU };
@@ -373,18 +395,18 @@ mod tests {
         let expected_mask = (1 << num_cpu) - 1;
 
         // 验证所有 CPU 都已上线
-        kassert!(actual_mask == expected_mask);
+        assert!(actual_mask == expected_mask);
 
         // 验证主核已上线
-        kassert!((actual_mask & 1) != 0);
+        assert!((actual_mask & 1) != 0);
 
         // 如果是多核，验证从核也已上线
         if num_cpu > 1 {
             for hartid in 1..num_cpu {
-                kassert!((actual_mask & (1 << hartid)) != 0);
+                assert!((actual_mask & (1 << hartid)) != 0);
             }
         }
-    });
+    }
 }
 
 /// 从核入口函数

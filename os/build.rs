@@ -8,6 +8,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
+    // Switching between `cargo build` and `make test` toggles TEST=1.
+    // Make sure Cargo re-runs this build script when that env changes,
+    // otherwise EXT4_FS_IMAGE may keep pointing at the dummy image.
+    println!("cargo:rerun-if-env-changed=TEST");
+
     // 获取环境变量
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
