@@ -60,9 +60,35 @@
 4. 单个任务/对象实例锁
 5. 对象内部子字段锁
 
+## 锁顺序与死锁预防（项目常见锁层级）
+
+上面的顺序是“经验规则”。在内核代码里，为了让规则可执行、可落地，我们额外给出一份**常见锁**的参考层级表（从高到低）。
+
+注意：
+
+- 这不是“完整枚举”，而是覆盖最常见的 `Task/WaitQueue/Scheduler` 相关路径。
+- 当前调度器是 **per-CPU** 的 `current_scheduler()` / `scheduler_of()`（不是单一全局 `SCHEDULER`）。
+- CPU 本地状态本身不是“锁”，但访问 `current_cpu()` 需要通过 `PreemptGuard` 保证不发生任务迁移；如果同时需要“禁抢占 + 多把锁”，通常建议先进入 `PreemptGuard`，再按锁顺序获取其它锁。
+
+| 层级（高→低） | 锁（示例） | 保护对象 / 备注 |
+|---|---|---|
+| 1 | `TASK_MANAGER`（全局 `SpinLock`） | 全局任务表、TID 分配、跨进程/跨任务查找等 |
+| 2 | `WaitQueue` 相关锁（外层 `SpinLock<WaitQueue>`，以及内部 `WaitQueue.lock: RawSpinLock`） | 等待队列的 sleep/wake；**唤醒路径可能进入调度器** |
+| 3 | 调度器锁（`current_scheduler()` / `scheduler_of()` 的 `SpinLock`） | per-CPU runqueue；与任务状态切换强相关 |
+| 4 | 单个任务实例锁（`task.lock()` / `SpinLock<TaskStruct>`） | 任务状态、上下文、资源引用等；常出现在唤醒/切换路径中 |
+| 5 | 任务内部字段锁（例如 `children`、`wait_child` 等） | 更细粒度的共享字段；应尽量放在最后获取 |
+
+强约束（推荐写成“硬规则”去遵守）：
+
+- 不要在持有“低层级锁”（例如 `task.lock()`、任务字段锁）时再去获取“高层级锁”（例如 `TASK_MANAGER`）。
+- `WaitQueue` 的 `wake_up_*` / `sleep_*` 可能触达调度器与任务状态，尽量避免在持有调度器锁时调用等待队列操作，除非你非常清楚其锁链。
+
+可参考的真实锁链（源码里已有注释解释其安全性）：
+
+- `os/src/kernel/task/mod.rs` 中 `notify_parent()` 的注释对典型路径做了锁链拆解（涉及 `TASK_MANAGER`、父任务锁、`wait_child`、调度器与父任务再次加锁）。
+
 额外建议：
 
 - 尽量缩短持有“全局锁”的时间
 - 避免在持有自旋锁时调用可能再次获取锁的复杂路径（尤其是隐式分配/日志等）
 - 需要嵌套锁时，优先通过封装（API 约束）让调用者很难写出逆序代码
-
