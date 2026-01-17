@@ -281,11 +281,28 @@ pub fn main(hartid: usize) {
     earlyprintln!("[Boot] Hello, world!");
     earlyprintln!("[Boot] LoongArch CPU {} is up!", hartid);
 
-    // 注册 mm crate 的配置和架构操作（必须在 mm::init() 之前）
+    // 注册 mm crate 的配置和架构操作（必须在 phase1_early_parse() 之前，因为需要地址转换）
     unsafe {
         crate::config::register_mm_config();
         crate::arch::mm::register_mm_ops();
     }
+
+    // ========== Phase 1: 早期设备树解析（无堆分配）==========
+    unsafe {
+        crate::device::device_tree::phase1_early_parse();
+    }
+
+    // 从 Phase 1 数据设置 NUM_CPU 和 CLOCK_FREQ
+    unsafe {
+        crate::kernel::NUM_CPU = crate::device::device_tree::early_num_cpus();
+        crate::kernel::CLOCK_FREQ = crate::device::device_tree::early_clock_freq();
+    }
+
+    earlyprintln!(
+        "[Boot] Early DT: {} CPU(s), {} Hz",
+        unsafe { crate::kernel::NUM_CPU },
+        unsafe { crate::kernel::CLOCK_FREQ }
+    );
 
     let kernel_space = mm::init();
 
