@@ -113,6 +113,8 @@ def _run_step(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 bufsize=1,
             )
             assert p.stdout is not None
