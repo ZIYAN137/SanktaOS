@@ -56,9 +56,7 @@ pub fn init() -> Ppn {
     let start = ekernel_paddr.div_ceil(PAGE_SIZE) * PAGE_SIZE; // 页对齐
 
     // 优先使用设备树中的内存信息，否则使用配置中的 MEMORY_END
-    let end = if let Some((dram_start, dram_size)) =
-        crate::device::device_tree::early_dram_info()
-    {
+    let end = if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
         let dram_end = dram_start.saturating_add(dram_size);
         earlyprintln!(
             "[MM] Using DRAM from device tree: {:#X} - {:#X} (size: {:#X})",
