@@ -58,7 +58,7 @@ pub fn clock_freq() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-use crate::println;
+    use crate::println;
     #[test_case]
     fn test_set_next_trigger() {
         let current_time = get_time();
@@ -66,7 +66,6 @@ use crate::println;
         let next_time = get_time();
         assert!(next_time > current_time);
     }
-
 
     #[test_case]
     fn test_get_time() {

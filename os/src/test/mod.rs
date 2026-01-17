@@ -1,5 +1,5 @@
-pub mod net_test;
 pub mod assert;
+pub mod net_test;
 use crate::arch::intr::{are_interrupts_enabled, disable_interrupts, enable_interrupts};
 
 /// 可运行的测试用例。

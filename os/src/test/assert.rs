@@ -21,7 +21,8 @@ impl FailedAssertion {
 
 pub const FAILED_LIST_CAPACITY: usize = 32;
 
-pub static mut FAILED_LIST: [Option<FailedAssertion>; FAILED_LIST_CAPACITY] = [None; FAILED_LIST_CAPACITY];
+pub static mut FAILED_LIST: [Option<FailedAssertion>; FAILED_LIST_CAPACITY] =
+    [None; FAILED_LIST_CAPACITY];
 pub static mut FAILED_INDEX: usize = 0;
 
 /// Total number of failed assertions across all tests.
@@ -46,4 +47,3 @@ pub fn record_failed_assertion(assertion: FailedAssertion) {
         );
     }
 }
-

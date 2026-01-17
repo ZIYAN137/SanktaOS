@@ -400,9 +400,7 @@ mod tests {
     // use alloc::vec::Vec;
 
     use super::*;
-    use crate::{
-        kernel::task::{SharedTask, TASK_MANAGER},
-    };
+    use crate::kernel::task::{SharedTask, TASK_MANAGER};
     // use core::sync::atomic::Ordering;
 
     // 创建一个简单的空函数作为 kernel 线程入口

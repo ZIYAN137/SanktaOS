@@ -238,9 +238,7 @@ impl Scheduler for RRScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        kernel::{cpu::current_cpu, task::TaskStruct},
-    };
+    use crate::kernel::{cpu::current_cpu, task::TaskStruct};
 
     fn mk_task(tid: u32) -> SharedTask {
         TaskStruct::new_dummy_task(tid).into_shared()

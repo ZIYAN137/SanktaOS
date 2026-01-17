@@ -89,7 +89,7 @@ impl Drop for SumGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-use crate::println;
+    use crate::println;
 
     // 测试 SumGuard::new() 是否成功设置 SUM 位
     #[test_case]
