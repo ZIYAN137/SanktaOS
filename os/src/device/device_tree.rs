@@ -1,4 +1,21 @@
-//! 设备树模块
+//! 设备树（FDT）解析与设备探测
+//!
+//! 本模块负责从引导程序提供的设备树中解析平台信息，并按 `compatible` 触发各类设备的初始化。
+//!
+//! # 关键对象
+//!
+//! - `DTP`：由引导程序设置的 DTB 指针（物理地址经转换后用于解析）。
+//! - `FDT`：解析后的设备树对象。
+//! - `DEVICE_TREE_REGISTRY`：`compatible` → 探测函数的注册表，驱动通过各自的 `driver_init()` 注册。
+//! - `DEVICE_TREE_INTC`：`phandle` → 中断控制器驱动的映射表（用于设备解析中断相关属性时查询）。
+//!
+//! # 初始化顺序（现状）
+//!
+//! `init()` 会做两轮遍历：
+//! 1) 仅初始化 `interrupt-controller` 节点（例如 PLIC），保证后续设备注册中断时中断控制器已就绪；
+//! 2) 初始化其余设备节点（例如 virtio-mmio、rtc、net 等）。
+//!
+//! 其中 `early_init()` 仅解析 CPU 数量与时钟频率，供启动早期使用。
 
 use crate::{
     device::{CMDLINE, irq::IntcDriver},

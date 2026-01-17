@@ -1,6 +1,12 @@
 //! 文件描述符表
 //!
 //! 该模块实现了进程级的文件描述符管理，提供 POSIX 兼容的文件描述符操作。
+//!
+//! 约定与语义（与用户态常见预期保持一致）：
+//!
+//! - `alloc()` 通常分配“最小可用 fd”（0/1/2 在用户进程中多用于 stdio）
+//! - `dup/dup2` 等操作会共享底层 `Arc<dyn File>`（因此可能共享 offset）
+//! - `FD_CLOEXEC` 用于控制 exec 时是否关闭 fd（由 `FdFlags` 表示）
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;

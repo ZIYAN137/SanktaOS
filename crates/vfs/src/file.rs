@@ -2,6 +2,11 @@
 //!
 //! 该模块定义了统一的文件操作接口 [`File`] trait，支持普通文件、管道、字符设备等多种文件类型。
 //! 所有打开的文件以 `Arc<dyn File>` 形式存储在进程的文件描述符表中。
+//!
+//! 与 [`crate::Inode`] 的区别：
+//!
+//! - `File` 通常是“有状态”的（例如维护当前 offset），适合实现 `read/write/lseek` 语义。
+//! - `Inode` 更偏“无状态存储接口”，用于提供底层随机访问与元数据操作。
 
 use alloc::sync::Arc;
 use uapi::fcntl::{OpenFlags, SeekWhence};

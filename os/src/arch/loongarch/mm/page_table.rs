@@ -5,9 +5,9 @@
 //! # 页表结构
 //!
 //! LoongArch64 使用 3 级页表（39 位虚拟地址）：
-//! - Level 2 (Dir3/PUD): 虚拟地址 bits [38:30]，9 位索引
-//! - Level 1 (Dir2/PMD): 虚拟地址 bits [29:21]，9 位索引
-//! - Level 0 (Dir1/PT):  虚拟地址 bits [20:12]，9 位索引
+//! - Level 2 (Dir3/PUD): 虚拟地址 bits \[38:30\]，9 位索引
+//! - Level 1 (Dir2/PMD): 虚拟地址 bits \[29:21\]，9 位索引
+//! - Level 0 (Dir1/PT):  虚拟地址 bits \[20:12\]，9 位索引
 //!
 //! 每级页表有 512 个条目（2^9），每个条目 8 字节。
 
@@ -481,10 +481,10 @@ impl PageTableInner {
     /// 从 VPN 计算指定级别的索引
     ///
     /// 每级 9 位索引：
-    /// - Level 3: bits [35:27] of VPN (对应 VA bits [47:39])
-    /// - Level 2: bits [26:18] of VPN (对应 VA bits [38:30])
-    /// - Level 1: bits [17:9] of VPN  (对应 VA bits [29:21])
-    /// - Level 0: bits [8:0] of VPN   (对应 VA bits [20:12])
+    /// - Level 3: bits \[35:27\] of VPN (对应 VA bits \[47:39\])
+    /// - Level 2: bits \[26:18\] of VPN (对应 VA bits \[38:30\])
+    /// - Level 1: bits \[17:9\] of VPN  (对应 VA bits \[29:21\])
+    /// - Level 0: bits \[8:0\] of VPN   (对应 VA bits \[20:12\])
     #[inline]
     fn vpn_index(vpn: usize, level: usize) -> usize {
         (vpn >> (9 * level)) & 0x1ff

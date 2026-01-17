@@ -38,12 +38,16 @@ pub trait ContentGenerator: Send + Sync {
     fn generate(&self) -> Result<Vec<u8>, FsError>;
 }
 
+/// ProcFS 中的 inode 节点。
+///
+/// 通过 [`ProcInodeContent`] 表示文件/目录/符号链接等不同内容形态。
 pub struct ProcInode {
     kind: ProcInodeKind,
     metadata: SpinLock<InodeMetadata>,
     content: ProcInodeContent,
 }
 
+/// ProcFS inode 的内容类型。
 pub enum ProcInodeContent {
     /// 静态文件（内容固定）
     Static(Vec<u8>),
@@ -61,6 +65,7 @@ pub enum ProcInodeContent {
 static NEXT_INODE_NO: AtomicUsize = AtomicUsize::new(1);
 
 impl ProcInode {
+    /// 创建 `/proc` 根目录 inode。
     pub fn new_proc_root_directory(mode: FileMode) -> Arc<Self> {
         Self::new_directory_with_inode_no(mode, None, ProcInodeKind::Root)
     }

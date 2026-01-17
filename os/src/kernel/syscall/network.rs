@@ -1,4 +1,11 @@
 //! 网络相关的系统调用实现
+//!
+//! 该文件主要把 POSIX socket 风格接口映射到 `crates/net`：
+//! - 通过 `SocketFile` 把 socket 暴露为 `fd`；
+//! - 使用 `SOCKET_SET` 管理底层 `smoltcp` socket；
+//! - 在需要时通过网络轮询推进收发，并处理 `O_NONBLOCK`/`poll` 等基础语义。
+//!
+//! 说明：实现语义以代码为准（部分行为为兼容用户态工具而做了简化/折中）。
 
 use core::ffi::{CStr, c_char};
 use core::sync::atomic::{AtomicU16, Ordering};

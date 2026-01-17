@@ -1,4 +1,4 @@
-//! /proc/[pid]/maps 生成器
+//! `/proc/[pid]/maps` 生成器
 
 use alloc::{format, string::String, vec::Vec};
 
@@ -6,12 +6,13 @@ use crate::ops::fs_ops;
 use crate::proc::ContentGenerator;
 use vfs::FsError;
 
-/// /proc/[pid]/maps 生成器
+/// `/proc/[pid]/maps` 生成器
 pub struct MapsGenerator {
     pid: u32,
 }
 
 impl MapsGenerator {
+    /// 创建生成器（绑定到指定 pid）。
     pub fn new(pid: u32) -> Self {
         Self { pid }
     }

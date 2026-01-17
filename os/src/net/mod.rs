@@ -1,4 +1,9 @@
-//! 网络协议栈模块（re-export from net crate）
+//! 网络协议栈模块（OS 侧包装）
+//!
+//! `os::net` 负责在 OS 启动早期把运行时依赖注册到 `crates/net`（见 [`init_net_ops`]），
+//! 其余网络能力主要由 `crates/net` 提供，并在系统调用层对外暴露：
+//! - 系统调用实现：`os/src/kernel/syscall/network.rs`
+//! - 协议栈与 socket：`crates/net/src/`
 
 pub use net::*;
 

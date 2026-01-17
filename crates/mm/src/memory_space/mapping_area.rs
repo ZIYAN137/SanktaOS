@@ -27,20 +27,34 @@ pub enum MapType {
 /// 内存区域的类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AreaType {
-    KernelText,   // 内核代码段
-    KernelRodata, // 内核只读数据段
-    KernelData,   // 内核数据段
-    KernelStack,  // 内核栈
-    KernelBss,    // 内核 BSS 段
-    KernelHeap,   // 内核堆
-    KernelMmio,   // 内核内存映射 I/O
-    UserText,     // 用户代码段
-    UserRodata,   // 用户只读数据段
-    UserData,     // 用户数据段
-    UserBss,      // 用户 BSS 段
-    UserStack,    // 用户栈
-    UserHeap,     // 用户堆
-    UserMmap,     // 用户 mmap 匿名映射
+    /// 内核代码段
+    KernelText,
+    /// 内核只读数据段
+    KernelRodata,
+    /// 内核数据段
+    KernelData,
+    /// 内核栈
+    KernelStack,
+    /// 内核 BSS 段
+    KernelBss,
+    /// 内核堆
+    KernelHeap,
+    /// 内核内存映射 I/O 区域（MMIO）
+    KernelMmio,
+    /// 用户代码段
+    UserText,
+    /// 用户只读数据段
+    UserRodata,
+    /// 用户数据段
+    UserData,
+    /// 用户 BSS 段
+    UserBss,
+    /// 用户栈
+    UserStack,
+    /// 用户堆
+    UserHeap,
+    /// 用户 mmap 匿名映射区域
+    UserMmap,
 }
 
 /// 内存空间中的一个内存映射区域
@@ -61,22 +75,27 @@ pub struct MappingArea {
 }
 
 impl MappingArea {
+    /// 返回该区域覆盖的虚拟页号范围。
     pub fn vpn_range(&self) -> VpnRange {
         self.vpn_range
     }
 
+    /// 返回该区域当前权限标志。
     pub fn permission(&self) -> UniversalPTEFlag {
         self.permission.clone()
     }
 
+    /// 设置该区域权限标志。
     pub fn set_permission(&mut self, perm: UniversalPTEFlag) {
         self.permission = perm;
     }
 
+    /// 返回该区域的映射策略（直接映射/帧映射/保留）。
     pub fn map_type(&self) -> MapType {
         self.map_type
     }
 
+    /// 返回该区域的语义类型（内核段/用户段等）。
     pub fn area_type(&self) -> AreaType {
         self.area_type
     }
@@ -108,6 +127,7 @@ impl MappingArea {
         })
     }
 
+    /// 创建一个新的映射区域描述符。
     pub fn new(
         vpn_range: VpnRange,
         area_type: AreaType,

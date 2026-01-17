@@ -1,4 +1,29 @@
 //! 内存空间核心实现
+//!
+//! [`MemorySpace`] 表示一个地址空间：由一个页表（`PT`）和若干映射区域（[`MappingArea`]）组成。
+//! 典型用法是在 `os` crate 中为每个进程/任务维护一个 `MemorySpace`，并在系统调用路径中
+//! 执行 `mmap/munmap/brk` 等操作。
+//!
+//! ## 映射区域（MappingArea）
+//!
+//! 每个 [`MappingArea`] 描述一段虚拟页区间（[`VpnRange`]）及其映射方式：
+//!
+//! - [`MapType::Direct`]：直接映射（通常用于内核映射）
+//! - [`MapType::Framed`]：按需分配物理页帧并映射
+//! - [`MapType::Reserved`]：仅“保留虚拟地址范围”，不建立页表映射（便于延迟分配或占位）
+//!
+//! [`AreaType`] 用于标注区域用途（内核 text/data/heap、用户 stack/heap 等），
+//! 便于在 fork/clone、权限控制等场景做策略判断。
+//!
+//! ## 跨页读写
+//!
+//! 为支持系统调用在用户地址空间中跨页读写，本模块提供 `read_bytes_at`/`write_bytes_at`
+//! 等 helper：它们会逐页翻译虚拟地址并进行拷贝，自动处理页边界。
+//!
+//! ## 文件映射与回写
+//!
+//! 若映射区域绑定了文件（[`MmapFile`]），可通过 `sync_all_file_mappings` 将共享映射的脏页回写。
+//!（具体回写逻辑在 `mapping_area.rs` 中实现。）
 
 use core::cmp::Ordering;
 use core::marker::PhantomData;

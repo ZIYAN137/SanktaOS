@@ -4,6 +4,8 @@
 
 #![no_std]
 #![allow(dead_code)]
+// uapi 中包含大量与 Linux 兼容的常量/结构体字段定义；逐项补 `///` 噪声较大。
+#![allow(missing_docs)]
 
 pub mod cred;
 pub mod errno;

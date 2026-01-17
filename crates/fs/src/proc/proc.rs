@@ -6,6 +6,7 @@ use crate::ops::fs_ops;
 use crate::proc::ProcInode;
 use vfs::{FileMode, FileSystem, FsError, Inode, StatFs};
 
+/// ProcFS 文件系统对象（提供 `/proc` 目录树）。
 pub struct ProcFS {
     root_inode: Arc<ProcInode>,
 }
