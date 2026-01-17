@@ -2,6 +2,15 @@
 
 本项目的 API 参考以 rustdoc 为准。你可以在本地生成并查看：
 
+## 在线查看（站点部署）
+
+文档站点会同时部署两套 API 文档：
+
+- RISC-V：`api/riscv/index.html`
+- LoongArch64：`api/loongarch/index.html`
+
+## 本地生成
+
 ```bash
 # 生成整个 workspace 的 API 文档（不包含依赖）
 cargo doc --workspace --no-deps
