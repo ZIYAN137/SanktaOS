@@ -52,11 +52,9 @@ pub fn create_test_file(name: &str, inode: Arc<dyn Inode>, flags: OpenFlags) -> 
 pub mod blk_dev_file;
 pub mod char_dev_file;
 pub mod dentry;
-pub mod devno;
 pub mod fd_table;
 pub mod file;
 pub mod mount;
-pub mod path;
 pub mod pipe;
 pub mod stdio;
 pub mod trait_file;

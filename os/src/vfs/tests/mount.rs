@@ -103,3 +103,36 @@ fn test_umount_root_should_fail() {
     let result = MOUNT_TABLE.umount("/");
     assert!(result.is_err());
 }
+
+// P4 跨文件系统 lookup 测试
+
+#[test_case]
+fn test_lookup_across_mount_point() {
+    // 让测试可重复执行：如果该挂载点曾经残留，先尽力卸载干净。
+    while MOUNT_TABLE.umount("/mnt_lookup_test").is_ok() {}
+
+    // 创建一个测试文件系统
+    let fs = create_test_fs();
+
+    // 在文件系统内创建一个文件
+    let root = fs.root_inode();
+    let create_result = root.create("testfile", FileMode::from_bits_truncate(0o644));
+    assert!(create_result.is_ok());
+
+    // 挂载到 /mnt_lookup_test
+    let mount_result = MOUNT_TABLE.mount(fs.clone(), "/mnt_lookup_test", MountFlags::empty(), None);
+    assert!(mount_result.is_ok());
+
+    // 获取挂载点
+    let mount_point = MOUNT_TABLE.find_mount("/mnt_lookup_test");
+    assert!(mount_point.is_some());
+
+    if let Some(mp) = mount_point {
+        // 从挂载点的根开始查找文件
+        let lookup_result = vfs_lookup_from(mp.root.clone(), "testfile");
+        assert!(lookup_result.is_ok());
+    }
+
+    // 清理
+    while MOUNT_TABLE.umount("/mnt_lookup_test").is_ok() {}
+}
