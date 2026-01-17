@@ -156,9 +156,9 @@ SanktaOS 内核的 MM（Memory Management）子系统采用分层架构设计，
                       ▼
 ┌────────────────────────────────────────────────────────────┐
 │  2. mm::init()                                              │
-│     ├─ 获取可用物理内存范围 [ekernel, MEMORY_END)          │
-│     ├─ 初始化物理帧分配器                                   │
 │     ├─ 初始化内核堆分配器 (talc)                            │
+│     ├─ 获取可用物理内存范围 [ekernel, MEMORY_END)          │
+│     ├─ 初始化物理帧分配器（需要堆分配来创建位图）           │
 │     └─ 创建并激活内核地址空间                               │
 └─────────────────────┬──────────────────────────────────────┘
                       │
@@ -166,7 +166,7 @@ SanktaOS 内核的 MM（Memory Management）子系统采用分层架构设计，
       │               │               │
       ▼               ▼               ▼
 ┌──────────┐  ┌──────────────┐  ┌──────────────────┐
-│ 物理帧   │  │  内核堆      │  │  内核页表        │
+│ 内核堆   │  │  物理帧      │  │  内核页表        │
 │ 分配器   │  │  分配器      │  │  创建与激活      │
 │ 就绪     │  │  就绪        │  │  就绪            │
 └──────────┘  └──────────────┘  └──────────────────┘
@@ -174,10 +174,24 @@ SanktaOS 内核的 MM（Memory Management）子系统采用分层架构设计，
 
 ### 详细步骤
 
-#### 第一步：物理帧分配器初始化
+#### 第一步：内核堆分配器初始化
 
 ```rust
-// os/src/mm/mod.rs:36-41
+// os/src/mm/mod.rs:50
+init_heap();
+```
+
+**作用**：
+- 初始化 talc 全局堆分配器
+- 注册内核堆区域 `[sheap, eheap)`（由链接器脚本定义）
+- 此时可以使用 `alloc` crate 进行动态内存分配（Vec、Box 等）
+
+**注意**：堆分配器必须在帧分配器之前初始化，因为位图分配器需要使用 Vec 来存储位图。
+
+#### 第二步：物理帧分配器初始化
+
+```rust
+// os/src/mm/mod.rs:55-77
 let ekernel_paddr = unsafe { vaddr_to_paddr(ekernel as usize) };
 let start = Ppn::from_addr_ceil(Paddr::new(ekernel_paddr));
 let end = Ppn::from_addr_floor(Paddr::new(MEMORY_END));
@@ -189,26 +203,30 @@ init_frame_allocator(start, end);
 - 初始化全局帧分配器 `FRAME_ALLOCATOR`
 - 此时可以开始分配物理帧
 
-#### 第二步：内核堆分配器初始化
+**分配策略（位图）**：
 
-```rust
-// os/src/mm/mod.rs:44
-init_heap();
-```
+分配器使用位图（bitmap）跟踪每个物理帧的分配状态：
 
-**作用**：
-- 初始化 talc 全局堆分配器
-- 注册内核堆区域 `[sheap, eheap)`（由链接脚本定义）
-- 此时可以使用 `alloc` crate 进行动态内存分配（Vec、Box 等）
+- 每个 bit 表示一个物理帧（0=空闲，1=已分配）
+- 使用 Vec<u64> 存储位图，利用 64 位操作优化查找
+- 位图在 init() 方法中分配（此时堆分配器已可用）
+
+**优势**：
+- O(1) 释放操作（无需排序）
+- 可重用任意位置的空闲帧（减少碎片）
+- 精确的内存统计（allocated_count 实时维护）
+- 支持快速查找连续空闲帧
+
+**实现细节**：
+- 单帧分配：使用 last_alloc_hint 优化局部性，利用 trailing_zeros 快速查找
+- 连续帧分配：逐 u64 扫描，利用全 0/全 1 快速跳过
+- 对齐分配：从对齐边界开始查找连续空闲区域
 
 #### 第三步：内核地址空间创建
 
 ```rust
-// os/src/mm/mod.rs:47-51
-#[cfg(target_arch = "riscv64")] {
-    let root_ppn = with_kernel_space(|space| space.root_ppn());
-    crate::arch::mm::PageTableInner::activate(root_ppn);
-}
+// os/src/mm/mod.rs:81-85
+let root_ppn = kernel_root_ppn();
 ```
 
 **作用**：

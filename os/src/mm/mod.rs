@@ -39,14 +39,17 @@ unsafe extern "C" {
 /// 初始化内存管理子系统
 ///
 /// 此函数执行所有内存管理组件的初始化工作：
-/// 1. 初始化物理帧分配器。
-/// 2. 初始化内核堆分配器。
+/// 1. 初始化内核堆分配器。
+/// 2. 初始化物理帧分配器（需要堆分配来创建位图）。
 /// 3. 内核地址空间由 lazy_static KERNEL_SPACE 自动创建。
 ///
 /// # 返回值
 /// 返回内核根页表的 PPN，调用者需要在合适时机激活它。
 pub fn init() -> Ppn {
-    // 1. 初始化物理帧分配器
+    // 1. 初始化堆分配器（使用链接器脚本定义的静态堆区域）
+    init_heap();
+
+    // 2. 初始化物理帧分配器
 
     // ekernel 是一个虚拟地址，需要转换为物理地址，以确定可分配物理内存的起始点。
     let ekernel_paddr = unsafe { vaddr_to_paddr(ekernel as usize) };
@@ -70,11 +73,8 @@ pub fn init() -> Ppn {
         MEMORY_END
     };
 
-    // 初始化物理帧分配器
+    // 初始化物理帧分配器（需要堆分配来创建位图）
     init_frame_allocator(start, end);
-
-    // 2. 初始化堆分配器
-    init_heap();
 
     // 3. 内核地址空间由 lazy_static KERNEL_SPACE 自动创建
     // 这里只需要获取根页表 PPN
