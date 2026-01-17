@@ -8,7 +8,7 @@ pub fn init() {
     bus::virtio_mmio::driver_init();
     irq::plic::driver_init();
     rtc::rtc_goldfish::driver_init();
-    device_tree::init();
+    device_tree::phase2_full_init();
     console::init();
 }
 

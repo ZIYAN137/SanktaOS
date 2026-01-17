@@ -9,13 +9,18 @@
 //! - `DEVICE_TREE_REGISTRY`：`compatible` → 探测函数的注册表，驱动通过各自的 `driver_init()` 注册。
 //! - `DEVICE_TREE_INTC`：`phandle` → 中断控制器驱动的映射表（用于设备解析中断相关属性时查询）。
 //!
-//! # 初始化顺序（现状）
+//! # 两阶段初始化
 //!
-//! `init()` 会做两轮遍历：
+//! ## Phase 1: 早期解析（无堆分配）
+//! `phase1_early_parse()` 在 `mm::init()` 之前调用，直接解析设备树二进制数据：
+//! - 提取 CPU 数量、时钟频率
+//! - 提取内存区域信息
+//! - 存储到固定大小的静态数组（不使用堆分配）
+//!
+//! ## Phase 2: 完整初始化（可用堆分配）
+//! `phase2_full_init()` 在 `mm::init()` 之后调用，执行完整的设备驱动初始化：
 //! 1) 仅初始化 `interrupt-controller` 节点（例如 PLIC），保证后续设备注册中断时中断控制器已就绪；
 //! 2) 初始化其余设备节点（例如 virtio-mmio、rtc、net 等）。
-//!
-//! 其中 `early_init()` 仅解析 CPU 数量与时钟频率，供启动早期使用。
 
 use crate::{
     device::{CMDLINE, irq::IntcDriver},
@@ -29,6 +34,42 @@ use fdt::{Fdt, node::FdtNode};
 /// 指向设备树的指针，在启动时由引导程序设置
 #[unsafe(no_mangle)]
 pub static mut DTP: usize = 0x114514; // 占位地址，实际由引导程序设置
+
+/// Phase 1 提取的内存区域信息（最多支持 8 个区域）
+const MAX_MEMORY_REGIONS: usize = 8;
+
+/// 内存区域描述
+#[derive(Copy, Clone)]
+struct MemoryRegion {
+    start: usize,
+    size: usize,
+}
+
+/// Phase 1 提取的早期设备树信息
+struct EarlyDtInfo {
+    /// CPU 核心数量
+    num_cpus: usize,
+    /// 时钟频率
+    clock_freq: usize,
+    /// 内存区域数量
+    memory_region_count: usize,
+    /// 内存区域列表
+    memory_regions: [MemoryRegion; MAX_MEMORY_REGIONS],
+}
+
+impl EarlyDtInfo {
+    const fn empty() -> Self {
+        Self {
+            num_cpus: 1,
+            clock_freq: 12_500_000,
+            memory_region_count: 0,
+            memory_regions: [MemoryRegion { start: 0, size: 0 }; MAX_MEMORY_REGIONS],
+        }
+    }
+}
+
+/// Phase 1 提取的信息（静态存储，无需堆分配）
+static mut EARLY_DT_INFO: EarlyDtInfo = EarlyDtInfo::empty();
 
 lazy_static::lazy_static! {
     /// 设备树
@@ -54,9 +95,109 @@ lazy_static::lazy_static! {
         RwLock::new(BTreeMap::new());
 }
 
+/// Phase 1: 早期设备树解析（无堆分配）
+///
+/// 在 mm::init() 之前调用，直接解析设备树二进制数据
+/// 提取 CPU 数量、时钟频率、内存区域等关键信息
+///
+/// # Safety
+/// 必须在单核环境下调用，且 DTP 已被正确设置
+pub unsafe fn phase1_early_parse() {
+    let dtb_ptr = Paddr::to_vaddr(&Paddr::from_usize(DTP)).as_usize() as *const u8;
+
+    // 直接使用 fdt crate 的 no-alloc API 解析
+    let fdt = match fdt::Fdt::from_ptr(dtb_ptr) {
+        Ok(fdt) => fdt,
+        Err(_) => {
+            // 解析失败，使用默认值
+            EARLY_DT_INFO = EarlyDtInfo::empty();
+            return;
+        }
+    };
+
+    // 提取 CPU 数量
+    let num_cpus = fdt.cpus().count();
+    EARLY_DT_INFO.num_cpus = if num_cpus > 0 { num_cpus } else { 1 };
+
+    // 提取时钟频率
+    if let Some(cpu) = fdt.cpus().next() {
+        let timebase = cpu
+            .property("timebase-frequency")
+            .or_else(|| cpu.property("clock-frequency"))
+            .and_then(|p| match p.value.len() {
+                4 => Some(u32::from_be_bytes(p.value[..4].try_into().ok()?) as usize),
+                8 => Some(u64::from_be_bytes(p.value[..8].try_into().ok()?) as usize),
+                _ => None,
+            });
+        if let Some(freq) = timebase {
+            EARLY_DT_INFO.clock_freq = freq;
+        }
+    }
+
+    // 提取内存区域信息
+    let mut count = 0;
+    for region in fdt.memory().regions() {
+        if count >= MAX_MEMORY_REGIONS {
+            break;
+        }
+        let size = region.size.unwrap_or(0) as usize;
+        if size > 0 {
+            EARLY_DT_INFO.memory_regions[count] = MemoryRegion {
+                start: region.starting_address as usize,
+                size,
+            };
+            count += 1;
+        }
+    }
+    EARLY_DT_INFO.memory_region_count = count;
+}
+
+/// 获取 Phase 1 提取的 CPU 数量
+pub fn early_num_cpus() -> usize {
+    unsafe { EARLY_DT_INFO.num_cpus }
+}
+
+/// 获取 Phase 1 提取的时钟频率
+pub fn early_clock_freq() -> usize {
+    unsafe { EARLY_DT_INFO.clock_freq }
+}
+
+/// 获取 Phase 1 提取的 DRAM 信息（起始地址和总大小）
+pub fn early_dram_info() -> Option<(usize, usize)> {
+    unsafe {
+        if EARLY_DT_INFO.memory_region_count == 0 {
+            return None;
+        }
+
+        let mut start = usize::MAX;
+        let mut end = 0usize;
+
+        for i in 0..EARLY_DT_INFO.memory_region_count {
+            let region = &EARLY_DT_INFO.memory_regions[i];
+            let s = region.start;
+            let e = s.saturating_add(region.size);
+            if s < start {
+                start = s;
+            }
+            if e > end {
+                end = e;
+            }
+        }
+
+        if start < end {
+            Some((start, end - start))
+        } else {
+            None
+        }
+    }
+}
+
 /// 早期初始化: 只解析 CPU 数量和时钟频率
 ///
 /// 此函数在堆分配器初始化之前调用,因此不能使用任何需要堆分配的操作。
+///
+/// 注意：此函数已被 phase1_early_parse() 取代，保留仅为兼容性
+#[deprecated(note = "使用 phase1_early_parse() 代替")]
 pub fn early_init() {
     let cpus = FDT.cpus().count();
     // SAFETY: 这里是在单核初始化阶段设置 CPU 数量
@@ -83,8 +224,10 @@ pub fn early_init() {
     }
 }
 
-/// 初始化设备树
-pub fn init() {
+/// Phase 2: 完整设备树初始化（可使用堆分配）
+///
+/// 在 mm::init() 之后调用，执行完整的设备驱动初始化
+pub fn phase2_full_init() {
     let model = FDT
         .root()
         .property("model")
@@ -93,18 +236,26 @@ pub fn init() {
         .unwrap_or("unknown");
     pr_info!("[Device] devicetree of {} is initialized", model);
 
-    // 设置 NUM_CPU 和 CLOCK_FREQ
-    early_init();
+    // 从 Phase 1 数据设置全局变量
+    unsafe {
+        NUM_CPU = EARLY_DT_INFO.num_cpus;
+        CLOCK_FREQ = EARLY_DT_INFO.clock_freq;
+    }
+
     pr_info!("[Device] now has {} CPU(s)", unsafe { NUM_CPU });
     pr_info!("[Device] CLOCK_FREQ set to {} Hz", unsafe { CLOCK_FREQ });
 
-    FDT.memory().regions().for_each(|region| {
-        pr_info!(
-            "[Device] Memory Region: Start = {:#X}, Size = {:#X}",
-            region.starting_address as usize,
-            region.size.unwrap() as usize
-        );
-    });
+    // 打印内存区域（使用 Phase 1 数据）
+    unsafe {
+        for i in 0..EARLY_DT_INFO.memory_region_count {
+            let region = &EARLY_DT_INFO.memory_regions[i];
+            pr_info!(
+                "[Device] Memory Region: Start = {:#X}, Size = {:#X}",
+                region.start,
+                region.size
+            );
+        }
+    }
 
     if let Some(bootargs) = FDT.chosen().bootargs() {
         if !bootargs.is_empty() {
@@ -116,6 +267,13 @@ pub fn init() {
     // 首先初始化中断控制器
     walk_dt(&FDT, true);
     walk_dt(&FDT, false);
+}
+
+/// 初始化设备树
+///
+/// 注意：此函数已被 phase2_full_init() 取代，保留仅为兼容性
+pub fn init() {
+    phase2_full_init();
 }
 
 /// 遍历设备树，查找并初始化 virtio 设备

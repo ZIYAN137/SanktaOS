@@ -14,7 +14,7 @@ pub fn init() {
     crate::device::serial::uart16550::driver_init();
     crate::device::bus::virtio_mmio::driver_init();
     crate::device::rtc::rtc_goldfish::driver_init();
-    crate::device::device_tree::init();
+    crate::device::device_tree::phase2_full_init();
     crate::device::bus::pcie::init_virtio_pci();
     crate::device::console::init();
 }
