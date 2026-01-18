@@ -887,7 +887,7 @@ pub fn parse_sockaddr_in(addr: *const u8, addrlen: u32) -> Result<IpEndpoint, ()
 
         let port = u16::from_be(core::ptr::read_unaligned(addr.add(2) as *const u16));
         let ip_bytes = core::slice::from_raw_parts(addr.add(4), 4);
-        let ip = Ipv4Address::from_octets([ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]]);
+        let ip = Ipv4Address::new(ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]);
 
         // Note: Loopback addresses (127.0.0.1) are handled by smoltcp internally
         // No need to map to external IP
