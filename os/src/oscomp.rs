@@ -310,7 +310,7 @@ fn spawn_user_and_wait(
         let mut t = task.lock();
         t.exe_path = Some(program.to_string());
         t.execve(
-            space.clone(),
+            space,
             prepared.initial_pc,
             prepared.user_sp_high,
             argv,
@@ -334,7 +334,7 @@ fn spawn_user_and_wait(
     let target_cpu = pick_cpu();
     task.lock().on_cpu = Some(target_cpu);
     TASK_MANAGER.lock().add_task(task.clone());
-    scheduler_of(target_cpu).lock().add_task(task.clone());
+    scheduler_of(target_cpu).lock().add_task(task);
     let cur_cpu = crate::arch::kernel::cpu::cpu_id();
     if target_cpu != cur_cpu {
         crate::arch::ipi::send_reschedule_ipi(target_cpu);
