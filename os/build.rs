@@ -251,11 +251,11 @@ fn create_empty_ext4_image(path: &PathBuf, size_mb: usize) {
 
 /// 创建完整的 ext4 镜像 (包含 data/)
 fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, _project_root: &Path) {
-    const IMG_SIZE_MB: usize = 4096; // 4GB
+    const IMG_SIZE_MB: usize = 512; // 512MB
     const BLOCK_SIZE: usize = 1024 * 1024;
 
     println!(
-        "cargo:warning=[build.rs] Creating {}MB (4GB) full ext4 image at {}",
+        "cargo:warning=[build.rs] Creating {}MB full ext4 image at {}",
         IMG_SIZE_MB,
         path.display()
     );
@@ -314,7 +314,7 @@ fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, _project_root: &Path)
     // 5. 清理临时目录
     fs::remove_dir_all(&temp_root).ok();
 
-    println!("cargo:warning=[build.rs] Full ext4 image created successfully (1GB).");
+    println!("cargo:warning=[build.rs] Full ext4 image created successfully ({}MB).", IMG_SIZE_MB);
 }
 
 /// 递归复制目录
