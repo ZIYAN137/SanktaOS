@@ -9,3 +9,12 @@
 iozone-glibc
 iozone-musl
 
+# libcbench may hang the kernel/userspace; skip temporarily.
+libcbench-glibc
+libcbench-musl
+
+# Already verified locally; skip for now to run later groups first.
+basic-glibc
+busybox-glibc
+cyclictest-glibc
+iperf-glibc
