@@ -127,3 +127,10 @@ secondary_stacks_bottom:
     .space 65536 * 8        # 8 核 × 64KB
     .globl secondary_stacks_top
 secondary_stacks_top:
+
+    # IMPORTANT:
+    # This file is included via Rust `global_asm!`. If we leave the current
+    # section as SHT_NOBITS, subsequent compiler-emitted instructions (or other
+    # inline asm in the same codegen unit) may be placed into `.bss`, causing
+    # "SHT_NOBITS section ... cannot have instructions" build errors.
+    .section .text

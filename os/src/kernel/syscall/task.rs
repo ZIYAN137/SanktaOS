@@ -163,9 +163,35 @@ pub fn clone(
     if !requested_flags.is_supported() {
         return -ENOSYS;
     }
+
+    // Emulate vfork() conservatively:
+    // - Accept CLONE_VFORK from userland (e.g. BusyBox), but treat it as fork() to avoid
+    //   sharing an address space without properly suspending the parent (true vfork semantics).
+    let mut requested_flags = requested_flags;
+    if requested_flags.contains(CloneFlags::VFORK) {
+        requested_flags.remove(CloneFlags::VFORK);
+        requested_flags.remove(CloneFlags::VM);
+    }
     // 根据 clone(2) 的 man page，当指定 CLONE_VM 标志时，必须为子进程提供一个新的栈
     // 否则父子进程将共享同一个栈，导致栈污染和程序崩溃
     if requested_flags.contains(CloneFlags::VM) && stack == 0 {
+        return -EINVAL;
+    }
+
+    // Linux ABI: some flags require non-null userspace pointers.
+    // Userland (e.g. pthread_create / iperf) relies on these, and writing through a null
+    // pointer would page-fault in S-mode.
+    if requested_flags.contains(CloneFlags::CHILD_SETTID)
+        || requested_flags.contains(CloneFlags::CHILD_CLEARTID)
+    {
+        if ctid.is_null() {
+            return -EINVAL;
+        }
+    }
+    if requested_flags.contains(CloneFlags::PARENT_SETTID) && ptid.is_null() {
+        return -EINVAL;
+    }
+    if requested_flags.contains(CloneFlags::SETTLS) && tls.is_null() {
         return -EINVAL;
     }
     let tid = { TASK_MANAGER.lock().allocate_tid() };
@@ -271,14 +297,12 @@ pub fn clone(
     );
 
     if requested_flags.contains(CloneFlags::CHILD_SETTID) {
-        unsafe {
-            write_to_user(ctid, tid as c_int);
-        }
+        // SAFETY: we validated ctid != NULL above.
+        unsafe { write_to_user(ctid, tid as c_int) };
     }
     if requested_flags.contains(CloneFlags::PARENT_SETTID) {
-        unsafe {
-            write_to_user(ptid, tid as c_int);
-        }
+        // SAFETY: we validated ptid != NULL above.
+        unsafe { write_to_user(ptid, tid as c_int) };
     }
 
     let tf = child_task.trap_frame_ptr.load(Ordering::SeqCst);

@@ -425,16 +425,14 @@ pub fn getdents64(fd: usize, dirp: *mut u8, count: usize) -> isize {
             // 计算下一个 entry 的 offset (index + 1)
             let current_off = (start_index + items_written + 1) as i64;
 
-            // 写入 dirent 头部
-            let dirent_ptr = dirp.add(written) as *mut LinuxDirent64;
-            core::ptr::write(
-                dirent_ptr,
-                LinuxDirent64 {
-                    d_ino: entry.inode_no as u64,
-                    d_off: current_off,
-                    d_reclen: dirent_len as u16,
-                    d_type: inode_type_to_d_type(entry.inode_type),
-                },
+            // 写入 dirent 头部（只写 Linux ABI 定义的 19 字节，避免把 Rust padding 漏到用户态）
+            let base = dirp.add(written);
+            core::ptr::write_unaligned(base as *mut u64, entry.inode_no as u64);
+            core::ptr::write_unaligned(base.add(8) as *mut i64, current_off);
+            core::ptr::write_unaligned(base.add(16) as *mut u16, dirent_len as u16);
+            core::ptr::write_unaligned(
+                base.add(18) as *mut u8,
+                inode_type_to_d_type(entry.inode_type),
             );
 
             // 写入文件名

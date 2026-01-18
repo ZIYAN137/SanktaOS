@@ -360,10 +360,31 @@ impl MemorySpace {
             UniversalPTEFlag::kernel_rw(),
         )?;
 
-        // 5. 映射物理内存（从 ekernel 到 MEMORY_END 的直接映射）
+        // 5. 映射物理内存（从 ekernel 到物理内存末端的直接映射）
+        //
+        // RISC-V QEMU judge may use a larger `-m` (e.g. 1G/4G). The DTB is placed near the end
+        // of RAM (e.g. 0xbf00_0000 for 1G). If we only map up to the compile-time `MEMORY_END`,
+        // dereferencing the DTB after paging is enabled will fault.
+        let mut phys_mem_end_paddr =
+            if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
+                dram_start.saturating_add(dram_size)
+            } else {
+                MEMORY_END
+            };
         let ekernel_paddr = unsafe { vaddr_to_paddr(ekernel as usize) };
+
+        // LoongArch virt reports a very large RAM window in DTB, and mapping it with 4K pages
+        // is extremely slow. Cap the "direct-mapped physical memory" window so we can boot fast
+        // on the judge, and keep allocations within the mapped range (allocator is capped too).
+        #[cfg(target_arch = "loongarch64")]
+        {
+            const MAX_KERNEL_DIRECT_MAP_BYTES: usize = 1024 * 1024 * 1024; // 1GiB
+            let cap_end = ekernel_paddr.saturating_add(MAX_KERNEL_DIRECT_MAP_BYTES);
+            phys_mem_end_paddr = phys_mem_end_paddr.min(cap_end);
+        }
+
         let phys_mem_start_vaddr = paddr_to_vaddr(ekernel_paddr);
-        let phys_mem_end_vaddr = paddr_to_vaddr(MEMORY_END);
+        let phys_mem_end_vaddr = paddr_to_vaddr(phys_mem_end_paddr);
 
         let phys_mem_start = Vpn::from_addr_ceil(Vaddr::from_usize(phys_mem_start_vaddr));
         let phys_mem_end = Vpn::from_addr_floor(Vaddr::from_usize(phys_mem_end_vaddr));
@@ -377,6 +398,27 @@ impl MemorySpace {
 
         phys_mem_area.map(&mut self.page_table)?;
         self.areas.push(phys_mem_area);
+
+        // Ensure DTB is mapped even if we capped the physical-memory direct map window.
+        //
+        // RISC-V depends on page-table direct mapping for the DTB; LoongArch uses DMW and does
+        // not require mapping DTB into the SV39-like page tables here.
+        #[cfg(not(target_arch = "loongarch64"))]
+        {
+            let dtb_paddr = unsafe { crate::device::device_tree::DTP };
+            if dtb_paddr != 0 {
+                let dtb_start = dtb_paddr & !(PAGE_SIZE - 1);
+                // Only add a dedicated mapping if DTB isn't within the (possibly capped) physmem map.
+                if dtb_start < ekernel_paddr || dtb_start >= phys_mem_end_paddr {
+                    let dtb_vaddr = paddr_to_vaddr(dtb_start);
+                    let vpn = Vpn::from_addr_floor(Vaddr::from_usize(dtb_vaddr));
+                    if self.find_area(vpn).is_none() {
+                        // 2MiB is plenty for the DTB (normally < 1MiB) and keeps alignment simple.
+                        self.map_mmio_region(dtb_vaddr, 2 * 1024 * 1024)?;
+                    }
+                }
+            }
+        }
 
         // 暂时移除自动 MMIO 映射
         // // 6. 映射 MMIO 区域
@@ -1361,6 +1403,18 @@ impl MemorySpace {
 
     /// 进程手动映射MMIO区域
     pub fn map_mmio(&mut self, paddr: Paddr, size: usize) -> Result<Vaddr, PagingError> {
+        // LoongArch uses DMW (direct mapping window) for MMIO (typically vseg=0x8). These
+        // addresses are not part of the normal paged VA space (SV39-like page tables here),
+        // and attempting to map them into the kernel page table can alias with existing
+        // mappings and fail spuriously. Just return the DMW virtual address.
+        #[cfg(target_arch = "loongarch64")]
+        {
+            let _ = size; // keep signature consistent
+            return Ok(Vaddr::from_usize(
+                crate::arch::mm::MMIO_VADDR_START | paddr.as_usize(),
+            ));
+        }
+
         // 将物理地址转换为虚拟地址
         let vaddr_usize = paddr_to_vaddr(paddr.as_usize());
         let vaddr = Vaddr::from_usize(vaddr_usize);

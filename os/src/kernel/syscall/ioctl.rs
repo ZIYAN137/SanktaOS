@@ -82,12 +82,8 @@ pub fn ioctl(fd: i32, request: u32, arg: usize) -> isize {
             match file.ioctl(request, arg) {
                 Ok(ret) => ret,
                 Err(FsError::NotSupported) => {
-                    pr_warn!(
-                        "ioctl: fd={}, terminal request {:#x} ({}) not supported by file type",
-                        fd,
-                        request,
-                        request
-                    );
+                    // Userland frequently probes terminal ioctls on non-tty fds (pipes/files).
+                    // Returning ENOTTY is expected; don't spam the kernel log.
                     -ENOTTY as isize
                 }
                 Err(e) => fs_error_to_errno(e),

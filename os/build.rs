@@ -76,16 +76,19 @@ fn main() {
         } else {
             project_root.join("data").join("risc-v_musl")
         };
+        // NOTE: OUT_DIR changes across profiles/features, so this stamp may be missing even if the
+        // already-built fs image is still up-to-date. Missing stamp must NOT force a rebuild.
         let arch_stamp = PathBuf::from(&out_dir).join(format!("fs_img_arch_{}.txt", arch_key));
 
         // 检查依赖
         println!("cargo:rerun-if-changed={}", data_dir.display());
         let dependencies = vec![data_dir.clone()];
 
-        let force_rebuild = match fs::read_to_string(&arch_stamp) {
-            Ok(saved) => saved.trim() != arch_key,
-            Err(_) => true,
-        };
+        let saved_arch = fs::read_to_string(&arch_stamp).ok();
+        let force_rebuild = saved_arch
+            .as_deref()
+            .map(|s| s.trim() != arch_key)
+            .unwrap_or(false);
         if force_rebuild {
             println!(
                 "cargo:warning=[build.rs] Arch changed ({}), forcing fs.img rebuild.",
@@ -108,6 +111,11 @@ fn main() {
                 "cargo:warning=[build.rs] {} is up to date, skipping regeneration.",
                 fs_img_name
             );
+            // Stamp may be missing when OUT_DIR changes across builds; write it to avoid
+            // accidental rebuilds next time.
+            if saved_arch.is_none() {
+                let _ = fs::write(&arch_stamp, format!("{}\n", arch_key));
+            }
         }
     }
 }

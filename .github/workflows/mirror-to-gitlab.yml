@@ -1,0 +1,183 @@
+name: Mirror to GitLab (vendored)
+
+on:
+  # Run after prerequisite GitHub workflows finish on `main`,
+  # then mirror the repo to GitLab with vendored Rust deps.
+  workflow_run:
+    workflows:
+      - Run tests & Code Quality Checks
+      - 部署文档网站
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: gitlab-mirror-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    # Only mirror if the triggering workflow succeeded.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate (main push + wait for other workflows)
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          REQUIRED_WORKFLOWS_JSON: >-
+            ["Run tests & Code Quality Checks","部署文档网站"]
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+          
+          sha = os.environ["SHA"]
+          head_branch = os.environ.get("HEAD_BRANCH", "")
+          trigger_event = os.environ.get("TRIGGER_EVENT", "")
+          required = json.loads(os.environ["REQUIRED_WORKFLOWS_JSON"])
+          
+          out_path = os.environ["GITHUB_OUTPUT"]
+          
+          def write_output(**kvs):
+              with open(out_path, "a", encoding="utf-8") as f:
+                  for k, v in kvs.items():
+                      f.write(f"{k}={v}\n")
+          
+          # Only mirror push events targeting main.
+          if head_branch != "main" or trigger_event != "push":
+              write_output(should_run="false", reason=f"skip: branch={head_branch} event={trigger_event}")
+              sys.exit(0)
+          
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          
+          url = f"https://api.github.com/repos/{repo}/actions/runs?per_page=100&head_sha={sha}"
+          req = urllib.request.Request(
+              url,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "gitlab-mirror-workflow",
+              },
+          )
+          with urllib.request.urlopen(req) as resp:
+              data = json.loads(resp.read().decode("utf-8"))
+          
+          runs = data.get("workflow_runs", [])
+          # Consider only push runs on main (PR runs should not gate the mirror).
+          runs = [r for r in runs if r.get("event") == "push" and r.get("head_branch") == "main"]
+          
+          by_name = {name: [] for name in required}
+          for r in runs:
+              name = r.get("name")
+              if name in by_name:
+                  by_name[name].append(r)
+          
+          waiting = []
+          failed = []
+          for name, rs in by_name.items():
+              if not rs:
+                  # Workflow wasn't triggered for this SHA (e.g. path filters); treat as not required.
+                  continue
+              # Pick the latest run for that workflow+sha.
+              r = sorted(rs, key=lambda x: x.get("run_number", 0), reverse=True)[0]
+              status = r.get("status")
+              conclusion = r.get("conclusion")
+              if status != "completed":
+                  waiting.append(name)
+              elif conclusion != "success":
+                  failed.append(f"{name}={conclusion}")
+          
+          if failed:
+              # Fail loudly: do NOT mirror if any prerequisite workflow failed/cancelled.
+              print("Not mirroring; prerequisite workflow(s) not successful:", ", ".join(failed))
+              sys.exit(1)
+          
+          if waiting:
+              # Another prerequisite workflow is still running; skip this run.
+              write_output(should_run="false", reason=f"waiting: {','.join(waiting)}")
+              sys.exit(0)
+          
+          write_output(should_run="true", reason="ok")
+          PY
+
+      - name: Checkout (exact SHA)
+        if: ${{ steps.gate.outputs.should_run == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain (for cargo vendor)
+        if: ${{ steps.gate.outputs.should_run == 'true' }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly-2025-10-28
+
+      - name: Prepare mirror commit (vendor + README swap)
+        if: ${{ steps.gate.outputs.should_run == 'true' }}
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b gitlab-mirror
+          
+          # 1) README for GitLab (if provided)
+          if [ -f README_gitlab.md ]; then
+            cp -f README_gitlab.md README.md
+          elif [ -f README-gitlab.md ]; then
+            cp -f README-gitlab.md README.md
+          fi
+          
+          # 2) Vendor Rust deps for offline builds on the judge.
+          #    Store the Cargo config snippet in a non-hidden file so the judge won't filter it out.
+          pushd os >/dev/null
+          rm -rf vendor cargo-vendor-config.toml
+          cargo vendor vendor --locked > cargo-vendor-config.toml
+          printf '\n[net]\noffline = true\n' >> cargo-vendor-config.toml
+          test -d vendor
+          test -f cargo-vendor-config.toml
+          popd >/dev/null
+          
+          git add -f README.md os/vendor os/cargo-vendor-config.toml
+          git commit -m "Mirror to GitLab (vendored) for ${SHA}"
+
+      - name: Push to GitLab (HTTP)
+        if: ${{ steps.gate.outputs.should_run == 'true' }}
+        env:
+          GITLAB_REMOTE_URL: ${{ secrets.GITLAB_REMOTE_URL }}
+          GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_BRANCH: ${{ secrets.GITLAB_BRANCH }}
+        run: |
+          set -euo pipefail
+          
+          if [ -z "${GITLAB_REMOTE_URL:-}" ] || [ -z "${GITLAB_USERNAME:-}" ] || [ -z "${GITLAB_TOKEN:-}" ]; then
+            echo "Missing secrets: GITLAB_REMOTE_URL / GITLAB_USERNAME / GITLAB_TOKEN"
+            exit 1
+          fi
+          
+          branch="${GITLAB_BRANCH:-main}"
+          
+          if ! git remote get-url gitlab >/dev/null 2>&1; then
+            git remote add gitlab "${GITLAB_REMOTE_URL}"
+          else
+            git remote set-url gitlab "${GITLAB_REMOTE_URL}"
+          fi
+          
+          auth="$(printf '%s:%s' "${GITLAB_USERNAME}" "${GITLAB_TOKEN}" | base64 -w0)"
+          # Remote URL has no credentials; auth is provided via HTTP header.
+          git -c http.extraHeader="Authorization: Basic ${auth}" push --force gitlab HEAD:"${branch}"

@@ -1,4 +1,5 @@
-use core::ffi::{c_uint, c_ulong};
+use core::ffi::{c_long, c_uint, c_ulong};
+use core::mem::size_of;
 
 /// 系统信息结构体
 /// 对应 Linux 的 `struct sysinfo`
@@ -6,7 +7,7 @@ use core::ffi::{c_uint, c_ulong};
 #[derive(Debug, Clone, Copy)]
 pub struct SysInfo {
     /// 系统启动后经过的时间，单位为秒
-    pub uptime: c_ulong,
+    pub uptime: c_long,
     /// 1 分钟、5 分钟和 15 分钟的平均负载
     pub loads: [c_ulong; 3],
     /// 总内存大小，单位为字节
@@ -23,33 +24,28 @@ pub struct SysInfo {
     pub freeswap: c_ulong,
     /// 当前进程数
     pub procs: u16,
+    /// 显式 padding（与 Linux UAPI 一致，历史上用于 m68k）
+    pub pad: u16,
     /// 高端内存总大小，单位为字节
     pub totalhigh: c_ulong,
     /// 高端可用内存大小，单位为字节
     pub freehigh: c_ulong,
     /// 内存单位大小，单位为字节
     pub mem_unit: c_uint,
-    /// 保留字段，供未来使用
-    pub _reserved: [u8; 256],
+    /// Padding: libc5 uses this. See `include/uapi/linux/sysinfo.h`.
+    pub _f: [u8; Self::F_LEN],
 }
 
 impl SysInfo {
-    /// 创建一个新的 SysInfo 实例，所有字段初始化为零
+    // `include/uapi/linux/sysinfo.h`:
+    //   char _f[20-2*sizeof(__kernel_ulong_t)-sizeof(__u32)];
+    // For 64-bit this is 0, but keep it generic for completeness.
+    const F_LEN: usize = 20 - 2 * size_of::<c_ulong>() - size_of::<c_uint>();
+
+    /// 创建一个新的 SysInfo 实例，所有字段（包括 padding）初始化为零
     pub fn new() -> Self {
-        Self {
-            uptime: 0,
-            loads: [0; 3],
-            totalram: 0,
-            freeram: 0,
-            sharedram: 0,
-            bufferram: 0,
-            totalswap: 0,
-            freeswap: 0,
-            procs: 0,
-            totalhigh: 0,
-            freehigh: 0,
-            mem_unit: 0,
-            _reserved: [0; 256],
-        }
+        // SAFETY: all-zero is a valid bit-pattern for SysInfo, and it ensures
+        // we don't leak uninitialized padding to userspace when copying out.
+        unsafe { core::mem::zeroed() }
     }
 }

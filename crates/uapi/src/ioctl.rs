@@ -238,16 +238,13 @@ pub const NCCS: usize = 19;
 
 /// 终端属性结构（用于 TCGETS/TCSETS）
 ///
-/// 这是 Linux asm-generic/termbits.h 中定义的标准 termios 结构。
-/// RISC-V 架构使用 asm-generic 定义，NCCS=19。
+/// **注意**：Linux `TCGETS/TCSETS` 使用的是 `include/uapi/asm-generic/termbits.h` 里的
+/// `struct termios`（不包含 ispeed/ospeed 字段），大小为 **36 字节**：
+/// - 4 * u32 flags = 16
+/// - c_line(u8) + c_cc[19] = 20
 ///
-/// 内存布局：
-/// - offset 0-15:  c_iflag, c_oflag, c_cflag, c_lflag (4 * u32 = 16 bytes)
-/// - offset 16:    c_line (u8 = 1 byte)
-/// - offset 17-35: c_cc\[19\] (19 * u8 = 19 bytes)
-/// - offset 36-39: c_ispeed (u32 = 4 bytes, 对齐到4字节边界)
-/// - offset 40-43: c_ospeed (u32 = 4 bytes)
-/// 总大小：44字节
+/// 如果这里误加了 `c_ispeed/c_ospeed`，会导致内核 ioctl 向用户栈写出 44 字节，从而触发
+/// glibc/busybox 的 `*** stack smashing detected ***`。
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Termios {
@@ -263,10 +260,6 @@ pub struct Termios {
     pub c_line: u8,
     /// 特殊控制字符 [NCCS=19]
     pub c_cc: [u8; NCCS],
-    /// 输入波特率（注意：musl 在此之前有3字节padding使其对齐到4字节边界）
-    pub c_ispeed: u32,
-    /// 输出波特率
-    pub c_ospeed: u32,
 }
 
 impl Termios {
@@ -309,9 +302,6 @@ impl Termios {
             0,   // 17: 保留
             0,   // 18: 保留
         ],
-        // 波特率：38400 (B38400 = 0x0000000f)
-        c_ispeed: 0x0000000f,
-        c_ospeed: 0x0000000f,
     };
 }
 

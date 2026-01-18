@@ -114,6 +114,7 @@ mod vfs;
 #[macro_use]
 mod log;
 mod net;
+mod oscomp;
 
 use crate::arch::lib::sbi::shutdown;
 #[cfg(target_arch = "loongarch64")]

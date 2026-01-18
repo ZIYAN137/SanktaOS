@@ -84,8 +84,8 @@ fn handle_one_signal(sig_flag: SignalFlags, action: SignalAction, task: &SharedT
 
     match unsafe { action.sa_handler() } as isize {
         SIG_DFL => match sig_num {
-            NUM_SIGQUIT | NUM_SIGILL | NUM_SIGABRT | NUM_SIGBUS | NUM_SIGFPE | NUM_SIGSEGV
-            | NUM_SIGSYS | NUM_SIGXCPU | NUM_SIGXFSZ => sig_dump(sig_num), // 致命错误，调用退出系统调用或内核退出函数
+            NUM_SIGQUIT | NUM_SIGILL | NUM_SIGTRAP | NUM_SIGABRT | NUM_SIGBUS | NUM_SIGFPE
+            | NUM_SIGSEGV | NUM_SIGSYS | NUM_SIGXCPU | NUM_SIGXFSZ => sig_dump(sig_num), // 致命错误，调用退出系统调用或内核退出函数
 
             NUM_SIGHUP | NUM_SIGINT | NUM_SIGPIPE | NUM_SIGALRM | NUM_SIGTERM | NUM_SIGUSR1
             | NUM_SIGUSR2 | NUM_SIGSTKFLT | NUM_SIGPROF | NUM_SIGPWR => sig_terminate(sig_num), // 默认终止

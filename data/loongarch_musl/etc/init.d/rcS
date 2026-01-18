@@ -51,5 +51,150 @@ echo "Mounting file systems via fstab..."
 
 echo "System initialization finished."
 
+# 打印启动图标和标题
+if [ -f /etc/icon2.txt ]; then
+    /bin/cat /etc/icon2.txt
+fi
+if [ -f /etc/title.txt ]; then
+    /bin/cat /etc/title.txt
+fi
+
+run_oscomp_tests_if_present() {
+    # OSCOMP test image is mounted at /tests by the kernel (init_oscomp_filesystems()).
+    # If we detect official test scripts, run them non-interactively and power off.
+    [ -d /tests ] || return 1
+
+    # The official test binaries hard-code the ELF interpreter path (e.g. /lib/ld-linux-*.so.*).
+    # Our rootfs is musl-based, so make glibc's loader/libs from the test image visible in /lib.
+    if [ -d /tests/glibc/lib ]; then
+        [ -d /lib ] || /bin/mkdir -p /lib
+
+        for f in /tests/glibc/lib/ld-linux-*.so.*; do
+            [ -f "$f" ] || continue
+            base="${f##*/}"
+            [ -e "/lib/$base" ] || /bin/ln -s "$f" "/lib/$base"
+        done
+
+        for base in libc.so.6 libm.so.6 libpthread.so.0 libdl.so.2 librt.so.1 libresolv.so.2; do
+            if [ -f "/tests/glibc/lib/$base" ] && [ ! -e "/lib/$base" ]; then
+                /bin/ln -s "/tests/glibc/lib/$base" "/lib/$base"
+            fi
+        done
+    fi
+
+    # Optional skip list: one token per line, e.g. "iozone-glibc" or "iozone-musl".
+    # Blank lines and lines starting with '#' are ignored.
+    #
+    # This is useful to temporarily skip known-problematic test groups while keeping
+    # the START/END markers for the judge log parser.
+    OSCOMP_SKIP_FILE="/etc/oscomp_skip_tests"
+    OSCOMP_CR="$(/bin/busybox printf '\r')"
+
+    oscomp_group_tag_for_script() {
+        # $1: full path to *_testcode.sh
+        f="$1"
+        base="${f##*/}"
+        group="${base%_testcode.sh}"
+        abi=""
+        case "$f" in
+            */glibc/*) abi="glibc" ;;
+            */musl/*)  abi="musl" ;;
+        esac
+        if [ -n "$abi" ]; then
+            echo "${group}-${abi}"
+        else
+            echo "${group}"
+        fi
+    }
+
+    oscomp_should_skip_group() {
+        # $1: group tag
+        g="$1"
+        [ -f "$OSCOMP_SKIP_FILE" ] || return 1
+        g_base="${g%%-*}"
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Trim CRLF + surrounding whitespace without external filters (avoid SIGPIPE noise).
+            line="${line%$OSCOMP_CR}"
+            # Strip leading whitespace
+            line="${line#"${line%%[![:space:]]*}"}"
+            # Strip trailing whitespace
+            line="${line%"${line##*[![:space:]]}"}"
+            case "$line" in
+                ""|\#*) continue ;;
+            esac
+            [ "$line" = "$g" ] && return 0
+            # Allow skipping the whole group regardless of ABI by writing just the base name.
+            [ "$line" = "$g_base" ] && return 0
+        done < "$OSCOMP_SKIP_FILE"
+        return 1
+    }
+
+    scripts=""
+    add_script() {
+        # Cheap de-dup for pathological VFS behaviors (e.g., /tests exposing itself as /tests/tests).
+        case " $scripts " in
+            *" $1 "*) return 0 ;;
+        esac
+        scripts="$scripts $1"
+    }
+
+    # 1) Scripts directly under /tests.
+    for f in /tests/*_testcode.sh; do
+        [ -f "$f" ] || continue
+        add_script "$f"
+    done
+
+    # 2) One-level deep: /tests/*/*. This matches the official images layout:
+    #    /tests/glibc/*.sh and /tests/musl/*.sh.
+    for d in /tests/*; do
+        [ -d "$d" ] || continue
+        # Avoid infinite recursion if the mount table/dentry cache accidentally exposes /tests as /tests/tests.
+        [ "$d" = "/tests/tests" ] && continue
+        for f in "$d"/*_testcode.sh; do
+            [ -f "$f" ] || continue
+            add_script "$f"
+        done
+    done
+    [ -n "$scripts" ] || return 1
+
+    echo "[OSCOMP] detected test scripts under /tests; running in rcS"
+    export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/tests"
+    export HOME="/"
+
+    for f in $scripts; do
+        dir="${f%/*}"
+        base="${f##*/}"
+        group_tag="$(oscomp_group_tag_for_script "$f")"
+
+        if oscomp_should_skip_group "$group_tag"; then
+            echo "[OSCOMP] skipping $f (group=$group_tag)"
+            bb="/bin/busybox"
+            [ -x "$bb" ] || bb="/tests/glibc/busybox"
+            [ -x "$bb" ] || bb="/tests/musl/busybox"
+            "$bb" echo "#### OS COMP TEST GROUP START ${group_tag} ####"
+            "$bb" echo "#### OS COMP TEST GROUP END ${group_tag} ####"
+            continue
+        fi
+
+        echo "[OSCOMP] running $f"
+        (
+            cd "$dir" || exit 1
+            # Use "." to avoid relying on kernel shebang/ENOEXEC behavior; avoid stdin blocking.
+            . "./$base" </dev/null
+        )
+        rc=$?
+        echo "[OSCOMP] finished $f (rc=$rc)"
+    done
+
+    echo "[OSCOMP] all tests finished; powering off"
+    /sbin/poweroff -f || /sbin/reboot -f || true
+    echo "[OSCOMP] poweroff returned unexpectedly; sleeping"
+    while true; do sleep 3600; done
+}
+
+if run_oscomp_tests_if_present; then
+    exit 0
+fi
+
 echo "rcS finished; spawning shell on ttyS0 via inittab"
 exit 0

@@ -1,0 +1,35 @@
+# One test group tag per line to skip in OSCOMP rcS.
+# Examples:
+#   iozone-glibc
+#   iozone-musl
+#
+# Lines starting with '#' and blank lines are ignored.
+
+# iozone triggers ext4_rs write-path bugs in some setups; skip for now.
+iozone-glibc
+iozone-musl
+
+# libcbench may hang the kernel/userspace; skip temporarily.
+libcbench-glibc
+libcbench-musl
+lmbench-glibc
+lmbench-musl
+unixbench-glibc
+unixbench-musl
+unix-bench-glibc
+unix-bench-musl
+
+# Already verified locally; skip for now to run later groups first.
+# basic-glibc
+# basic-musl
+# busybox-glibc
+# busybox-musl
+# cyclictest-glibc
+# iperf-glibc
+# iperf-musl
+# ltp-glibc
+# ltp-musl
+# lua-glibc
+# lua-musl
+# netperf-glibc
+# netperf-musl

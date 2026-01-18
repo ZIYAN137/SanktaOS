@@ -37,8 +37,19 @@ testsuits-for-oskernel/
 # Logs
 os/loongarch.log
 
+# Cargo vendor (generated for GitLab mirror / offline judge builds)
+os/vendor/
+os/cargo-vendor-config.toml
+
 # Local notes
 os/可能的改进.md
 
 # Local test reports
 test-reports/
+
+# binary kernel
+kernel-la 
+kernel-rv 
+
+# test sdcards
+*.xz
