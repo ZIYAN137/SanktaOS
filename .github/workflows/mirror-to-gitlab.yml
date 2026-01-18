@@ -187,4 +187,4 @@ jobs:
           
           auth="$(printf '%s:%s' "${GITLAB_USERNAME}" "${GITLAB_TOKEN}" | base64 -w0)"
           # Remote URL has no credentials; auth is provided via HTTP header.
-          git -c http.extraHeader="Authorization: Basic ${auth}" push --force gitlab HEAD:"${branch}"
+          git -c http.extraHeader="Authorization: Basic ${auth}" push gitlab HEAD:"${branch}"
