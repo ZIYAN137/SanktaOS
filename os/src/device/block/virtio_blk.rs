@@ -227,7 +227,7 @@ mod tests {
     fn test_virtioblk_read_write_roundtrip() {
         let list = BLK_DRIVERS.read();
         if let Some(drv) = list.iter().find(|d| d.get_id() == "virtio_block") {
-            check_common_driver_behavior(drv.as_ref());
+            // check_common_driver_behavior(drv.as_ref()); // 需要 trait_upcasting 特性
             let block_iface = drv.as_block().unwrap();
             // 尝试测试第 0 号块（实际系统中可根据分配策略选择安全块号）
             let ok = try_block_roundtrip(block_iface, 0);

@@ -121,7 +121,7 @@ jobs:
         if: ${{ steps.gate.outputs.should_run == 'true' }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2025-10-28
+          toolchain: nightly-2025-01-18
 
       - name: Prepare mirror commit (vendor + README swap)
         if: ${{ steps.gate.outputs.should_run == 'true' }}
