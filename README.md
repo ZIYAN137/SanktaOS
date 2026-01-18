@@ -94,6 +94,28 @@ make fmt
 
 架构选择：`ARCH=riscv`（默认）或 `ARCH=loongarch`
 
+## GitLab 提交流程（自动镜像）
+
+本仓库包含一个 GitHub Actions 流程，会在 `main` 分支的前置 CI 全部成功后，将代码镜像推送到 GitLab（仅 HTTP），并为评测环境准备离线构建所需文件。
+
+- 触发条件：`main` 分支 `push`，且以下 workflow 均成功：
+  - `Run tests & Code Quality Checks`
+  - `部署文档网站`
+- 执行内容（仅在镜像分支/镜像提交中生效，不会改动 GitHub 的 `main` 历史）：
+  - Rust 依赖离线化：运行 `cargo vendor` 生成 `os/vendor/`，并生成 `os/cargo-vendor-config.toml`
+  - README 替换：若存在 `README_gitlab.md`，则覆盖 `README.md`（用于 GitLab/评测平台展示）
+  - 推送方式：通过 HTTP Basic 认证 header 推送到 GitLab（不使用 SSH）
+- 评测机隐藏目录过滤说明：
+  - 评测机 clone 时会过滤掉隐藏目录（如 `.cargo`）。本项目的根 `Makefile` 在 `make all` 时会重建 `os/.cargo/config.toml`；
+  - 若存在 `os/cargo-vendor-config.toml`（由镜像流程生成并提交到 GitLab），`make all` 会自动将其追加到 `.cargo/config.toml`，确保 Cargo 使用 vendored 依赖并离线构建。
+
+需要在 GitHub 仓库 Secrets 中配置：
+
+- `GITLAB_REMOTE_URL`：GitLab 仓库 HTTP/HTTPS 地址（不包含用户名/密码）
+- `GITLAB_USERNAME`
+- `GITLAB_TOKEN`：具有 push 权限的 token（PAT / deploy token 均可）
+- 可选：`GITLAB_BRANCH`：推送到 GitLab 的目标分支名（默认 `main`）
+
 ## 文档
 
 - 设计文档：[docs/README.md](docs/README.md)

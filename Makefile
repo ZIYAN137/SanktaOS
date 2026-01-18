@@ -119,6 +119,12 @@ os-cargo-config:
 		'[target.loongarch64-unknown-none]' \
 		'rustflags = ["-Clink-arg=-Tsrc/loongarch_linker.ld", "-Cforce-frame-pointers=yes"]' \
 		> $(OS_DIR)/.cargo/config.toml
+	@# Optional: when `os/cargo-vendor-config.toml` exists (e.g., GitLab mirror),
+	@# append it so Cargo uses the vendored sources without relying on hidden files.
+	@if [ -f "$(OS_DIR)/cargo-vendor-config.toml" ]; then \
+		printf '\n' >> "$(OS_DIR)/.cargo/config.toml"; \
+		cat "$(OS_DIR)/cargo-vendor-config.toml" >> "$(OS_DIR)/.cargo/config.toml"; \
+	fi
 
 # The judge will run `make all` with no extra variables; force OSCOMP mode here.
 all: os-cargo-config kernel-rv kernel-la disk.img disk-la.img
