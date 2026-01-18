@@ -115,9 +115,7 @@ fn pick_tests_root() -> &'static str {
     // In the intended judge setup, test scripts live in the root of the x0 disk mounted at /tests.
     // If /tests isn't mounted for any reason, fall back to scanning "/".
     if let Ok(d) = vfs_lookup("/tests") {
-        if d.inode.metadata().map(|m| m.inode_type).ok()
-            == Some(crate::vfs::InodeType::Directory)
-        {
+        if d.inode.metadata().map(|m| m.inode_type).ok() == Some(crate::vfs::InodeType::Directory) {
             return "/tests";
         }
     }
@@ -244,9 +242,17 @@ fn spawn_user_and_wait(
 
     crate::earlyprintln!("[OSCOMP] spawn: preparing {}", program);
     let prepared = prepare_exec_image_from_path(program).map_err(|e| {
-        crate::pr_warn!("[OSCOMP] prepare_exec_image_from_path({}) failed: {:?}", program, e);
+        crate::pr_warn!(
+            "[OSCOMP] prepare_exec_image_from_path({}) failed: {:?}",
+            program,
+            e
+        );
     })?;
-    crate::earlyprintln!("[OSCOMP] spawn: prepared {}, entry={:#x}", program, prepared.initial_pc);
+    crate::earlyprintln!(
+        "[OSCOMP] spawn: prepared {}, entry={:#x}",
+        program,
+        prepared.initial_pc
+    );
 
     let space = alloc::sync::Arc::new(SpinLock::new(prepared.space));
 
@@ -259,7 +265,9 @@ fn spawn_user_and_wait(
 
     let root = get_root_dentry().ok();
     let cwd_dentry = vfs_lookup(cwd).ok().or_else(|| root.clone());
-    let fs = alloc::sync::Arc::new(SpinLock::new(crate::kernel::FsStruct::new(cwd_dentry, root)));
+    let fs = alloc::sync::Arc::new(SpinLock::new(crate::kernel::FsStruct::new(
+        cwd_dentry, root,
+    )));
 
     let tid = TASK_MANAGER.lock().allocate_tid();
     let pid = tid;
@@ -331,7 +339,11 @@ fn spawn_user_and_wait(
     if target_cpu != cur_cpu {
         crate::arch::ipi::send_reschedule_ipi(target_cpu);
     }
-    crate::earlyprintln!("[OSCOMP] spawn: child scheduled (pid={}, cpu={})", pid, target_cpu);
+    crate::earlyprintln!(
+        "[OSCOMP] spawn: child scheduled (pid={}, cpu={})",
+        pid,
+        target_cpu
+    );
 
     // Wait until the child exits, then reap it via the existing wait4 implementation.
     //
@@ -368,12 +380,12 @@ fn spawn_user_and_wait(
         // Not exited yet.
         if let Some(deadline) = deadline {
             if crate::arch::timer::get_time() >= deadline {
-            crate::pr_warn!(
-                "[OSCOMP] timeout waiting for pid {} (program: {}); continuing",
-                pid,
-                program
-            );
-            return Ok(-1);
+                crate::pr_warn!(
+                    "[OSCOMP] timeout waiting for pid {} (program: {}); continuing",
+                    pid,
+                    program
+                );
+                return Ok(-1);
             }
         }
         yield_task();
@@ -413,10 +425,7 @@ pub fn init() -> ! {
     }
 
     // Use a minimal env; scripts usually rely on PATH.
-    let envp = [
-        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/tests",
-        "HOME=/",
-    ];
+    let envp = ["PATH=/bin:/sbin:/usr/bin:/usr/sbin:/tests", "HOME=/"];
 
     for (dir, name) in scripts {
         // Use "-c" to force a known working directory even if initial cwd setup fails in the FS layer.

@@ -365,13 +365,12 @@ impl MemorySpace {
         // RISC-V QEMU judge may use a larger `-m` (e.g. 1G/4G). The DTB is placed near the end
         // of RAM (e.g. 0xbf00_0000 for 1G). If we only map up to the compile-time `MEMORY_END`,
         // dereferencing the DTB after paging is enabled will fault.
-        let mut phys_mem_end_paddr = if let Some((dram_start, dram_size)) =
-            crate::device::device_tree::early_dram_info()
-        {
-            dram_start.saturating_add(dram_size)
-        } else {
-            MEMORY_END
-        };
+        let mut phys_mem_end_paddr =
+            if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
+                dram_start.saturating_add(dram_size)
+            } else {
+                MEMORY_END
+            };
         let ekernel_paddr = unsafe { vaddr_to_paddr(ekernel as usize) };
 
         // LoongArch virt reports a very large RAM window in DTB, and mapping it with 4K pages

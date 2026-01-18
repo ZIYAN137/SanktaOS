@@ -61,7 +61,9 @@ pub fn init_ext4_from_block_device() -> Result<(), FsError> {
     pr_info!("[Ext4] Using block device: {}", block_driver.get_id());
 
     let ext4_block_size = EXT4_BLOCK_SIZE;
-    let device_bytes = block_driver.total_blocks().saturating_mul(block_driver.block_size());
+    let device_bytes = block_driver
+        .total_blocks()
+        .saturating_mul(block_driver.block_size());
     let total_blocks = device_bytes / ext4_block_size;
 
     pr_info!(
@@ -138,8 +140,7 @@ pub fn init_oscomp_filesystems() -> Result<(), FsError> {
             Some(alloc::format!("virtio-blk{}", idx)),
         )?;
         set_current_task_root_cwd_to_vfs_root()?;
-        if crate::vfs::vfs_lookup("/bin/sh").is_ok() || crate::vfs::vfs_lookup("/bin/ash").is_ok()
-        {
+        if crate::vfs::vfs_lookup("/bin/sh").is_ok() || crate::vfs::vfs_lookup("/bin/ash").is_ok() {
             pr_info!(
                 "[OSCOMP][Ext4] Selected rootfs: virtio-blk{} (device_bytes={} MB)",
                 idx,

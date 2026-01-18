@@ -18,7 +18,9 @@ mod riscv;
 
 // 导出架构特定的子模块
 #[cfg(target_arch = "loongarch64")]
-pub use loongarch::{boot, constant, info, intr, ipi, kernel, lib, mm, platform, syscall, timer, trap};
+pub use loongarch::{
+    boot, constant, info, intr, ipi, kernel, lib, mm, platform, syscall, timer, trap,
+};
 
 #[cfg(target_arch = "riscv64")]
 pub use riscv::{boot, constant, info, intr, ipi, kernel, lib, mm, platform, syscall, timer, trap};

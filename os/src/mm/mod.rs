@@ -62,12 +62,12 @@ pub fn init() -> Ppn {
     let mut end =
         if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
             let dram_end = dram_start.saturating_add(dram_size);
-        earlyprintln!(
-            "[MM] Using DRAM from device tree: {:#X} - {:#X} (size: {:#X})",
-            dram_start,
-            dram_end,
-            dram_size
-        );
+            earlyprintln!(
+                "[MM] Using DRAM from device tree: {:#X} - {:#X} (size: {:#X})",
+                dram_start,
+                dram_end,
+                dram_size
+            );
             dram_end
         } else {
             earlyprintln!("[MM] Using MEMORY_END from config: {:#X}", MEMORY_END);

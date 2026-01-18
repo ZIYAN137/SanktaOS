@@ -7,8 +7,8 @@ use core::{
 
 use crate::{
     arch::{
-        lib::sbi::shutdown,
         constant::USER_TOP,
+        lib::sbi::shutdown,
         timer::{TICKS_PER_SEC, TIMER_TICKS, clock_freq},
         trap::SumGuard,
     },
