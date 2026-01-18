@@ -177,6 +177,23 @@ pub fn clone(
     if requested_flags.contains(CloneFlags::VM) && stack == 0 {
         return -EINVAL;
     }
+
+    // Linux ABI: some flags require non-null userspace pointers.
+    // Userland (e.g. pthread_create / iperf) relies on these, and writing through a null
+    // pointer would page-fault in S-mode.
+    if requested_flags.contains(CloneFlags::CHILD_SETTID)
+        || requested_flags.contains(CloneFlags::CHILD_CLEARTID)
+    {
+        if ctid.is_null() {
+            return -EINVAL;
+        }
+    }
+    if requested_flags.contains(CloneFlags::PARENT_SETTID) && ptid.is_null() {
+        return -EINVAL;
+    }
+    if requested_flags.contains(CloneFlags::SETTLS) && tls.is_null() {
+        return -EINVAL;
+    }
     let tid = { TASK_MANAGER.lock().allocate_tid() };
     let (
         c_pid,
@@ -280,14 +297,12 @@ pub fn clone(
     );
 
     if requested_flags.contains(CloneFlags::CHILD_SETTID) {
-        unsafe {
-            write_to_user(ctid, tid as c_int);
-        }
+        // SAFETY: we validated ctid != NULL above.
+        unsafe { write_to_user(ctid, tid as c_int) };
     }
     if requested_flags.contains(CloneFlags::PARENT_SETTID) {
-        unsafe {
-            write_to_user(ptid, tid as c_int);
-        }
+        // SAFETY: we validated ptid != NULL above.
+        unsafe { write_to_user(ptid, tid as c_int) };
     }
 
     let tf = child_task.trap_frame_ptr.load(Ordering::SeqCst);
