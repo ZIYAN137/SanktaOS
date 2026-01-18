@@ -1052,13 +1052,10 @@ pub fn udp_attach_fd_to_port(
                 sockets.remove(h);
                 return Err(());
             }
-            ports.insert(
-                port,
-                UdpPortEntry {
-                    handle: h,
-                    sockets: alloc::vec::Vec::new(),
-                },
-            );
+            ports.insert(port, UdpPortEntry {
+                handle: h,
+                sockets: alloc::vec::Vec::new(),
+            });
             h
         }
     };

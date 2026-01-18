@@ -141,24 +141,18 @@ mod tests {
     #[test]
     fn test_parse_path_components() {
         assert_eq!(parse_path("/"), vec![PathComponent::Root]);
-        assert_eq!(
-            parse_path("/a/b/./c/.."),
-            vec![
-                PathComponent::Root,
-                PathComponent::Normal(String::from("a")),
-                PathComponent::Normal(String::from("b")),
-                PathComponent::Current,
-                PathComponent::Normal(String::from("c")),
-                PathComponent::Parent,
-            ]
-        );
-        assert_eq!(
-            parse_path("a//b"),
-            vec![
-                PathComponent::Normal(String::from("a")),
-                PathComponent::Normal(String::from("b")),
-            ]
-        );
+        assert_eq!(parse_path("/a/b/./c/.."), vec![
+            PathComponent::Root,
+            PathComponent::Normal(String::from("a")),
+            PathComponent::Normal(String::from("b")),
+            PathComponent::Current,
+            PathComponent::Normal(String::from("c")),
+            PathComponent::Parent,
+        ]);
+        assert_eq!(parse_path("a//b"), vec![
+            PathComponent::Normal(String::from("a")),
+            PathComponent::Normal(String::from("b")),
+        ]);
     }
 
     #[test]
