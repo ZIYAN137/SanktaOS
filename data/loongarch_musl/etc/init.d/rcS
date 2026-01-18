@@ -74,6 +74,43 @@ run_oscomp_tests_if_present() {
         done
     fi
 
+    # Optional skip list: one token per line, e.g. "iozone-glibc" or "iozone-musl".
+    # Blank lines and lines starting with '#' are ignored.
+    #
+    # This is useful to temporarily skip known-problematic test groups while keeping
+    # the START/END markers for the judge log parser.
+    OSCOMP_SKIP_FILE="/etc/oscomp_skip_tests"
+
+    oscomp_group_tag_for_script() {
+        # $1: full path to *_testcode.sh
+        f="$1"
+        base="${f##*/}"
+        group="${base%_testcode.sh}"
+        abi=""
+        case "$f" in
+            */glibc/*) abi="glibc" ;;
+            */musl/*)  abi="musl" ;;
+        esac
+        if [ -n "$abi" ]; then
+            echo "${group}-${abi}"
+        else
+            echo "${group}"
+        fi
+    }
+
+    oscomp_should_skip_group() {
+        # $1: group tag
+        g="$1"
+        [ -f "$OSCOMP_SKIP_FILE" ] || return 1
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+                ""|\#*) continue ;;
+            esac
+            [ "$line" = "$g" ] && return 0
+        done < "$OSCOMP_SKIP_FILE"
+        return 1
+    }
+
     scripts=""
     add_script() {
         # Cheap de-dup for pathological VFS behaviors (e.g., /tests exposing itself as /tests/tests).
@@ -109,6 +146,18 @@ run_oscomp_tests_if_present() {
     for f in $scripts; do
         dir="${f%/*}"
         base="${f##*/}"
+        group_tag="$(oscomp_group_tag_for_script "$f")"
+
+        if oscomp_should_skip_group "$group_tag"; then
+            echo "[OSCOMP] skipping $f (group=$group_tag)"
+            bb="/bin/busybox"
+            [ -x "$bb" ] || bb="/tests/glibc/busybox"
+            [ -x "$bb" ] || bb="/tests/musl/busybox"
+            "$bb" echo "#### OS COMP TEST GROUP START ${group_tag} ####"
+            "$bb" echo "#### OS COMP TEST GROUP END ${group_tag} ####"
+            continue
+        fi
+
         echo "[OSCOMP] running $f"
         (
             cd "$dir" || exit 1

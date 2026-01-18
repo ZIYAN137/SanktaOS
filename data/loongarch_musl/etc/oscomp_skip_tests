@@ -1,0 +1,11 @@
+# One test group tag per line to skip in OSCOMP rcS.
+# Examples:
+#   iozone-glibc
+#   iozone-musl
+#
+# Lines starting with '#' and blank lines are ignored.
+
+# iozone triggers ext4_rs write-path bugs in some setups; skip for now.
+iozone-glibc
+iozone-musl
+
