@@ -135,7 +135,7 @@ pub fn set_hostname(name: *const c_char, len: usize) -> c_int {
 pub fn sysinfo(info: *mut SysInfo) -> c_int {
     // TODO: 填充更多系统信息字段
     let mut sys_info = SysInfo::new();
-    sys_info.uptime = (TIMER_TICKS.load(Ordering::SeqCst) / TICKS_PER_SEC) as c_ulong;
+    sys_info.uptime = (TIMER_TICKS.load(Ordering::SeqCst) / TICKS_PER_SEC) as c_long;
     unsafe {
         write_to_user(info, sys_info);
     }
