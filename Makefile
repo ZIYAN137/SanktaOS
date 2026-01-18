@@ -137,19 +137,25 @@ kernel-la: os-cargo-config
 disk.img: kernel-rv
 	@echo "[OSCOMP] Producing rootfs image: disk.img"
 	@test -f $(OS_DIR)/fs-riscv.img
-	@if [ -f disk.img ] && [ ! "$(OS_DIR)/fs-riscv.img" -nt disk.img ]; then \
+	@if [ "$(DISK_LINK)" = "1" ]; then \
+		echo "[OSCOMP] Linking disk.img -> $(OS_DIR)/fs-riscv.img (local fast path; do NOT use for submission)"; \
+		ln -sfn "$(OS_DIR)/fs-riscv.img" disk.img; \
+	elif [ -f disk.img ] && [ ! "$(OS_DIR)/fs-riscv.img" -nt disk.img ]; then \
 		echo "[OSCOMP] disk.img is up to date"; \
 	else \
-		cp -f $(OS_DIR)/fs-riscv.img disk.img; \
+		cp -f "$(OS_DIR)/fs-riscv.img" disk.img; \
 	fi
 
 disk-la.img: kernel-la
 	@echo "[OSCOMP] Producing rootfs image: disk-la.img"
 	@test -f $(OS_DIR)/fs-loongarch.img
-	@if [ -f disk-la.img ] && [ ! "$(OS_DIR)/fs-loongarch.img" -nt disk-la.img ]; then \
+	@if [ "$(DISK_LINK)" = "1" ]; then \
+		echo "[OSCOMP] Linking disk-la.img -> $(OS_DIR)/fs-loongarch.img (local fast path; do NOT use for submission)"; \
+		ln -sfn "$(OS_DIR)/fs-loongarch.img" disk-la.img; \
+	elif [ -f disk-la.img ] && [ ! "$(OS_DIR)/fs-loongarch.img" -nt disk-la.img ]; then \
 		echo "[OSCOMP] disk-la.img is up to date"; \
 	else \
-		cp -f $(OS_DIR)/fs-loongarch.img disk-la.img; \
+		cp -f "$(OS_DIR)/fs-loongarch.img" disk-la.img; \
 	fi
 
 # ============================================================

@@ -80,6 +80,7 @@ run_oscomp_tests_if_present() {
     # This is useful to temporarily skip known-problematic test groups while keeping
     # the START/END markers for the judge log parser.
     OSCOMP_SKIP_FILE="/etc/oscomp_skip_tests"
+    OSCOMP_CR="$(/bin/busybox printf '\r')"
 
     oscomp_group_tag_for_script() {
         # $1: full path to *_testcode.sh
@@ -102,11 +103,20 @@ run_oscomp_tests_if_present() {
         # $1: group tag
         g="$1"
         [ -f "$OSCOMP_SKIP_FILE" ] || return 1
+        g_base="${g%%-*}"
         while IFS= read -r line || [ -n "$line" ]; do
+            # Trim CRLF + surrounding whitespace without external filters (avoid SIGPIPE noise).
+            line="${line%$OSCOMP_CR}"
+            # Strip leading whitespace
+            line="${line#"${line%%[![:space:]]*}"}"
+            # Strip trailing whitespace
+            line="${line%"${line##*[![:space:]]}"}"
             case "$line" in
                 ""|\#*) continue ;;
             esac
             [ "$line" = "$g" ] && return 0
+            # Allow skipping the whole group regardless of ABI by writing just the base name.
+            [ "$line" = "$g_base" ] && return 0
         done < "$OSCOMP_SKIP_FILE"
         return 1
     }
