@@ -40,3 +40,7 @@
 评测侧会使用 QEMU 虚拟机启动内核，并挂载包含测试点的 EXT4 镜像（无分区表）。系统启动后需要扫描磁盘根目录中的 `xxxxx_testcode.sh` 等脚本并依次执行，按要求输出测试提示信息；执行完后应主动关机。
 
 本项目会在构建时生成 `disk.img` / `disk-la.img`（用于系统自带的运行时文件），评测启动 QEMU 时可能会同时挂载评测机的测试镜像与本项目的 `disk*.img`。
+
+## 演示与讲解视频
+通过网盘分享的文件：
+链接: https://pan.baidu.com/s/1RkagFa-qSt-CkAyzYlVFqA?pwd=jtd4 提取码: jtd4 复制这段内容后打开百度网盘手机App，操作更方便哦
