@@ -98,7 +98,8 @@ fn main() {
 
         if force_rebuild || should_rebuild(&fs_img_path, &dependencies) {
             println!(
-                "cargo:warning=[build.rs] Creating full ext4 runtime image (4GB) at fs.img..."
+                "cargo:warning=[build.rs] Creating full ext4 runtime image at {}...",
+                fs_img_name
             );
             create_full_ext4_image(&fs_img_path, &data_dir, &project_root);
             let _ = fs::write(&arch_stamp, format!("{}\n", arch_key));
@@ -299,11 +300,13 @@ fn create_full_ext4_image(path: &PathBuf, data_dir: &Path, _project_root: &Path)
         .arg("4096")
         .arg("-m")
         .arg("0")
+        .arg("-g")
+        .arg("512") // 每组 512 块 (2MB)，确保生成多个块组以避免 ext4_rs bug
+        .arg("-N")
+        .arg("65536") // 显式指定 inode 数量，避免小镜像 inode 不足
         .arg("-d")
         .arg(&temp_root) // 使用临时目录作为根
         .arg(path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
         .status()
         .expect("Failed to execute mkfs.ext4");
 
