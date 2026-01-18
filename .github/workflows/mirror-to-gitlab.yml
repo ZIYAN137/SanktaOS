@@ -138,6 +138,8 @@ jobs:
           # 1) README for GitLab (if provided)
           if [ -f README_gitlab.md ]; then
             cp -f README_gitlab.md README.md
+          elif [ -f README-gitlab.md ]; then
+            cp -f README-gitlab.md README.md
           fi
           
           # 2) Vendor Rust deps for offline builds on the judge.
