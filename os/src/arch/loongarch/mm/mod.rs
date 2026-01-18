@@ -35,6 +35,9 @@ use mm::{ArchMmOps, TlbBatchContextTrait, TlbBatchContextWrapper};
 /// 内核虚拟地址空间从此地址开始，通过 DMW (Direct Mapping Window) 配置。
 pub const VADDR_START: usize = 0x9000_0000_0000_0000;
 
+/// LoongArch64 MMIO 直映窗口起始地址（DMW0，通常为 Uncached）。
+pub const MMIO_VADDR_START: usize = 0x8000_0000_0000_0000;
+
 /// 物理地址掩码
 ///
 /// 用于从虚拟地址提取物理地址，保留低 48 位。

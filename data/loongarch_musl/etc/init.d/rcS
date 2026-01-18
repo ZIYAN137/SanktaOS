@@ -51,5 +51,83 @@ echo "Mounting file systems via fstab..."
 
 echo "System initialization finished."
 
+run_oscomp_tests_if_present() {
+    # OSCOMP test image is mounted at /tests by the kernel (init_oscomp_filesystems()).
+    # If we detect official test scripts, run them non-interactively and power off.
+    [ -d /tests ] || return 1
+
+    # The official test binaries hard-code the ELF interpreter path (e.g. /lib/ld-linux-*.so.*).
+    # Our rootfs is musl-based, so make glibc's loader/libs from the test image visible in /lib.
+    if [ -d /tests/glibc/lib ]; then
+        [ -d /lib ] || /bin/mkdir -p /lib
+
+        for f in /tests/glibc/lib/ld-linux-*.so.*; do
+            [ -f "$f" ] || continue
+            base="${f##*/}"
+            [ -e "/lib/$base" ] || /bin/ln -s "$f" "/lib/$base"
+        done
+
+        for base in libc.so.6 libm.so.6 libpthread.so.0 libdl.so.2 librt.so.1 libresolv.so.2; do
+            if [ -f "/tests/glibc/lib/$base" ] && [ ! -e "/lib/$base" ]; then
+                /bin/ln -s "/tests/glibc/lib/$base" "/lib/$base"
+            fi
+        done
+    fi
+
+    scripts=""
+    add_script() {
+        # Cheap de-dup for pathological VFS behaviors (e.g., /tests exposing itself as /tests/tests).
+        case " $scripts " in
+            *" $1 "*) return 0 ;;
+        esac
+        scripts="$scripts $1"
+    }
+
+    # 1) Scripts directly under /tests.
+    for f in /tests/*_testcode.sh; do
+        [ -f "$f" ] || continue
+        add_script "$f"
+    done
+
+    # 2) One-level deep: /tests/*/*. This matches the official images layout:
+    #    /tests/glibc/*.sh and /tests/musl/*.sh.
+    for d in /tests/*; do
+        [ -d "$d" ] || continue
+        # Avoid infinite recursion if the mount table/dentry cache accidentally exposes /tests as /tests/tests.
+        [ "$d" = "/tests/tests" ] && continue
+        for f in "$d"/*_testcode.sh; do
+            [ -f "$f" ] || continue
+            add_script "$f"
+        done
+    done
+    [ -n "$scripts" ] || return 1
+
+    echo "[OSCOMP] detected test scripts under /tests; running in rcS"
+    export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/tests"
+    export HOME="/"
+
+    for f in $scripts; do
+        dir="${f%/*}"
+        base="${f##*/}"
+        echo "[OSCOMP] running $f"
+        (
+            cd "$dir" || exit 1
+            # Use "." to avoid relying on kernel shebang/ENOEXEC behavior; avoid stdin blocking.
+            . "./$base" </dev/null
+        )
+        rc=$?
+        echo "[OSCOMP] finished $f (rc=$rc)"
+    done
+
+    echo "[OSCOMP] all tests finished; powering off"
+    /sbin/poweroff -f || /sbin/reboot -f || true
+    echo "[OSCOMP] poweroff returned unexpectedly; sleeping"
+    while true; do sleep 3600; done
+}
+
+if run_oscomp_tests_if_present; then
+    exit 0
+fi
+
 echo "rcS finished; spawning shell on ttyS0 via inittab"
 exit 0

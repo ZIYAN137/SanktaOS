@@ -42,3 +42,10 @@ os/可能的改进.md
 
 # Local test reports
 test-reports/
+
+# binary kernel
+kernel-la 
+kernel-rv 
+
+# test sdcards
+*.xz

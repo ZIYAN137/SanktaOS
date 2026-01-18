@@ -44,6 +44,10 @@ mod sys;
 mod task;
 mod util;
 
+// Allow in-kernel components (e.g. oscomp runner) to reuse wait4 logic without going through
+// the trapframe-based sys_* wrappers.
+pub(crate) use task::wait4 as wait4_kernel;
+
 use core::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 
 use crate::{

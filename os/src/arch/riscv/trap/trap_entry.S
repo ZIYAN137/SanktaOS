@@ -54,6 +54,11 @@ trap_entry:
         # 保存 a0
         csrr t0, sscratch
         sd t0, 80(a0)
+        # IMPORTANT: sscratch must keep pointing to the TrapFrame while we're in S-mode.
+        # The csrrw above leaves sscratch holding the old a0 (user/kern), which can be an
+        # unmapped user VA. If another exception happens before __restore rewrites sscratch,
+        # trap_entry would recurse and fault while saving regs.
+        csrw sscratch, a0
 
         # 保存 sepc
         csrr t0, sepc

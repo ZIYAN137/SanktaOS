@@ -232,18 +232,22 @@ fn user_panic(estat: usize, era: usize, trap_frame: &TrapFrame) {
         core::arch::asm!("csrrd {0}, {csr}", out(reg) badv, csr = const CSR_BADV, options(nostack, preserves_flags));
         core::arch::asm!("csrrd {0}, {csr}", out(reg) badi, csr = const CSR_BADI, options(nostack, preserves_flags));
     }
+    let ecode = (estat >> 16) & 0x3f;
     earlyprintln!("\n===============================================");
     earlyprintln!("   UNEXPECTED TRAP IN USER MODE (PLV>0)");
     earlyprintln!("===============================================");
+    earlyprintln!("ecode: {:#x}", ecode);
     earlyprintln!("estat: {:#x}", estat);
     earlyprintln!("era  : {:#x}", era);
     earlyprintln!("badv : {:#x}", badv);
     earlyprintln!("badi : {:#x}", badi);
     earlyprintln!("regs : {:#x?}", trap_frame.regs);
-    panic!(
-        "Unexpected trap in user mode: estat={:#x}, era={:#x}, badv={:#x}, badi={:#x}",
-        estat, era, badv, badi
-    );
+
+    // Do not panic on user-mode exceptions; terminate the current task/process and continue.
+    // We intentionally keep the mapping conservative here: most unexpected user traps are
+    // treated as SIGILL. (Specific ecode->signal mappings can be refined as needed.)
+    let sig = uapi::signal::NUM_SIGILL;
+    crate::kernel::terminate_task(128 + sig);
 }
 
 /// 处理时钟中断

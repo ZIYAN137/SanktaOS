@@ -84,6 +84,9 @@ const CURRENTLY_SUPPORTED_FLAGS: CloneFlags = CloneFlags::from_bits_truncate(
         | CloneFlags::SIGHAND.bits()
         | CloneFlags::SYSVSEM.bits()
         | CloneFlags::SETTLS.bits()
+        // Many userlands (e.g. BusyBox) implement `vfork()` via `clone(CLONE_VM|CLONE_VFORK|SIGCHLD)`.
+        // We accept the flag and emulate it conservatively in the kernel.
+        | CloneFlags::VFORK.bits()
         | CloneFlags::PARENT.bits()
         | CloneFlags::THREAD.bits()
         | CloneFlags::PARENT_SETTID.bits()

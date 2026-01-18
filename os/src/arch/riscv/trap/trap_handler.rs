@@ -6,6 +6,7 @@ use core::sync::atomic::Ordering;
 
 use crate::earlyprintln;
 use crate::ipc::check_signal;
+use core::sync::atomic::AtomicUsize;
 use riscv::register::scause::{self, Trap};
 use riscv::register::sstatus::SPP;
 use riscv::register::{sepc, sscratch, sstatus, stval};
@@ -16,6 +17,8 @@ use crate::arch::timer::{TIMER_TICKS, clock_freq, get_time};
 use crate::arch::trap::restore;
 use crate::device::IRQ_MANAGER;
 use crate::kernel::{TIMER, TIMER_QUEUE, schedule, send_signal_process, wake_up_with_block};
+
+static FIRST_USER_TIMER_TICK: AtomicUsize = AtomicUsize::new(0);
 
 /// 陷阱处理程序
 /// 从中断处理入口跳转到这里时，
@@ -76,9 +79,18 @@ pub fn user_trap(
             // 处理系统调用
             dispatch_syscall(trap_frame);
         }
+        Trap::Exception(3) => {
+            // Breakpoint (EBREAK / C.EBREAK) in U-mode.
+            // Many libc implementations use this for abort/trap paths; do not panic the kernel.
+            crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGTRAP);
+        }
         Trap::Interrupt(5) => {
             // 处理时钟中断
             crate::arch::timer::set_next_trigger();
+            // Debug aid: confirm user-mode timer interrupts are firing at least once.
+            if FIRST_USER_TIMER_TICK.fetch_add(1, Ordering::Relaxed) == 0 {
+                crate::earlyprintln!("[OSCOMP][DBG] first user timer tick");
+            }
             check_timer();
         }
         Trap::Interrupt(1) => {
@@ -239,6 +251,7 @@ pub fn user_trap(
             // TODO: 进一步完善为向进程投递对应信号（SIGILL/SIGSEGV/...），并支持 core dump 等。
             let sig = match scause.cause() {
                 Trap::Exception(2) => uapi::signal::NUM_SIGILL, // Illegal Instruction
+                Trap::Exception(3) => uapi::signal::NUM_SIGTRAP, // Breakpoint (EBREAK / C.EBREAK)
                 Trap::Exception(12) | Trap::Exception(13) | Trap::Exception(15) => {
                     uapi::signal::NUM_SIGSEGV
                 }

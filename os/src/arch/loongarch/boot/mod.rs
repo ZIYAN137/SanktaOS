@@ -57,6 +57,20 @@ pub fn rest_init() {
     let cwd = get_root_dentry().ok();
     let root = cwd.clone();
     let fs = Arc::new(SpinLock::new(FsStruct::new(cwd, root)));
+
+    // In OSCOMP mode, present a Linux-like uname() to satisfy official test binaries
+    // (some abort with "FATAL: kernel too old" if release is not >= 4.15.0).
+    let uts = {
+        #[cfg(feature = "oscomp")]
+        {
+            crate::oscomp::oscomp_uts_namespace()
+        }
+        #[cfg(not(feature = "oscomp"))]
+        {
+            UtsNamespace::with_arch(crate::arch::constant::ARCH)
+        }
+    };
+
     let mut task = TaskStruct::ktask_create(
         tid,
         tid,
@@ -67,9 +81,7 @@ pub fn rest_init() {
         Arc::new(SpinLock::new(SignalHandlerTable::new())),
         SignalFlags::empty(),
         Arc::new(SpinLock::new(SignalPending::empty())),
-        Arc::new(SpinLock::new(UtsNamespace::with_arch(
-            crate::arch::constant::ARCH,
-        ))),
+        Arc::new(SpinLock::new(uts)),
         Arc::new(SpinLock::new(RlimitStruct::new(INIT_RLIMITS))),
         Arc::new(fd_table),
         fs,
@@ -196,27 +208,35 @@ fn init() {
 
     create_kthreadd();
 
-    // 初始化 Ext4 文件系统（从真实块设备）
-    // 必须在任务上下文中进行,因为 VFS 需要 current_task()
-    if let Err(e) = crate::fs::init_ext4_from_block_device() {
-        pr_err!(
-            "[Init] Warning: Failed to initialize Ext4 filesystem: {:?}",
-            e
-        );
-        pr_info!("[Init] Continuing without filesystem...");
+    #[cfg(feature = "oscomp")]
+    {
+        if let Err(e) = crate::fs::init_oscomp_filesystems() {
+            pr_err!(
+                "[Init][OSCOMP] Warning: Failed to initialize filesystems: {:?}",
+                e
+            );
+            pr_info!("[Init][OSCOMP] Continuing without filesystem...");
+        }
+    }
+    #[cfg(not(feature = "oscomp"))]
+    {
+        // 初始化 Ext4 文件系统（从真实块设备）
+        // 必须在任务上下文中进行,因为 VFS 需要 current_task()
+        if let Err(e) = crate::fs::init_ext4_from_block_device() {
+            pr_err!(
+                "[Init] Warning: Failed to initialize Ext4 filesystem: {:?}",
+                e
+            );
+            pr_info!("[Init] Continuing without filesystem...");
+        }
     }
 
     // /dev(/proc,/sys,/tmp) 的挂载交给用户态 rcS：
     // - rcS 会执行 `mount -t tmpfs none /dev` 等
     // - 内核在 mount("/dev") 的系统调用里会自动 init_dev() 创建设备节点
-    #[cfg(feature = "oscomp")]
-    {
-        crate::oscomp::init();
-    }
-    #[cfg(not(feature = "oscomp"))]
-    {
-        kernel_execve("/sbin/init", &["/sbin/init"], &[]);
-    }
+    // Always enter user-space BusyBox init. In OSCOMP mode, /tests is mounted by
+    // init_oscomp_filesystems() and rcS is responsible for running the test scripts.
+    kernel_execve("/sbin/init", &["/sbin/init"], &[]);
 }
 
 /// 内核守护线程
@@ -311,10 +331,12 @@ pub fn main(hartid: usize) {
         unsafe { crate::kernel::CLOCK_FREQ }
     );
 
-    let kernel_space = mm::init();
+    // Initialize MM subsystem (heap, frame allocator, kernel page tables).
+    mm::init();
 
-    // 激活内核地址空间并设置 current_memory_space（供 rest_init/current_memory_space 使用）
+    // Activate kernel address space and set current_memory_space (needed by rest_init/current_memory_space).
     {
+        let kernel_space = crate::mm::get_global_kernel_space();
         let _guard = crate::sync::PreemptGuard::new();
         current_cpu().switch_space(kernel_space);
     }

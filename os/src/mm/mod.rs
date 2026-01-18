@@ -59,19 +59,28 @@ pub fn init() -> Ppn {
     let start = ekernel_paddr.div_ceil(PAGE_SIZE) * PAGE_SIZE; // 页对齐
 
     // 优先使用设备树中的内存信息，否则使用配置中的 MEMORY_END
-    let end = if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
-        let dram_end = dram_start.saturating_add(dram_size);
+    let mut end =
+        if let Some((dram_start, dram_size)) = crate::device::device_tree::early_dram_info() {
+            let dram_end = dram_start.saturating_add(dram_size);
         earlyprintln!(
             "[MM] Using DRAM from device tree: {:#X} - {:#X} (size: {:#X})",
             dram_start,
             dram_end,
             dram_size
         );
-        dram_end
-    } else {
-        earlyprintln!("[MM] Using MEMORY_END from config: {:#X}", MEMORY_END);
-        MEMORY_END
-    };
+            dram_end
+        } else {
+            earlyprintln!("[MM] Using MEMORY_END from config: {:#X}", MEMORY_END);
+            MEMORY_END
+        };
+
+    // LoongArch virt exposes a huge RAM window in DTB; don't initialize the frame allocator with
+    // a multi-gigabyte range unless we also map/need it. Keep boot fast and allocations safe.
+    #[cfg(target_arch = "loongarch64")]
+    {
+        const MAX_USABLE_PHYS_BYTES: usize = 1024 * 1024 * 1024; // 1GiB
+        end = end.min(start.saturating_add(MAX_USABLE_PHYS_BYTES));
+    }
 
     // 初始化物理帧分配器（需要堆分配来创建位图）
     init_frame_allocator(start, end);
