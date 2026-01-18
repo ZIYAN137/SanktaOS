@@ -51,6 +51,14 @@ echo "Mounting file systems via fstab..."
 
 echo "System initialization finished."
 
+# 打印启动图标和标题
+if [ -f /etc/icon2.txt ]; then
+    /bin/cat /etc/icon2.txt
+fi
+if [ -f /etc/title.txt ]; then
+    /bin/cat /etc/title.txt
+fi
+
 run_oscomp_tests_if_present() {
     # OSCOMP test image is mounted at /tests by the kernel (init_oscomp_filesystems()).
     # If we detect official test scripts, run them non-interactively and power off.
