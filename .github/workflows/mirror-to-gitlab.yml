@@ -9,6 +9,8 @@ on:
       - 部署文档网站
     types:
       - completed
+  # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,17 +22,17 @@ concurrency:
 
 jobs:
   mirror:
-    # Only mirror if the triggering workflow succeeded.
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Only mirror if the triggering workflow succeeded, or if manually triggered
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Gate (main push + wait for other workflows)
         id: gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event || github.event_name }}
           REQUIRED_WORKFLOWS_JSON: >-
             ["Run tests & Code Quality Checks","部署文档网站"]
         run: |
@@ -39,19 +41,24 @@ jobs:
           import os
           import sys
           import urllib.request
-          
+
           sha = os.environ["SHA"]
           head_branch = os.environ.get("HEAD_BRANCH", "")
           trigger_event = os.environ.get("TRIGGER_EVENT", "")
           required = json.loads(os.environ["REQUIRED_WORKFLOWS_JSON"])
-          
+
           out_path = os.environ["GITHUB_OUTPUT"]
-          
+
           def write_output(**kvs):
               with open(out_path, "a", encoding="utf-8") as f:
                   for k, v in kvs.items():
                       f.write(f"{k}={v}\n")
-          
+
+          # If manually triggered, skip all checks
+          if trigger_event == "workflow_dispatch":
+              write_output(should_run="true", reason="manual trigger")
+              sys.exit(0)
+
           # Only mirror push events targeting main.
           if head_branch != "main" or trigger_event != "push":
               write_output(should_run="false", reason=f"skip: branch={head_branch} event={trigger_event}")
