@@ -1294,7 +1294,7 @@ impl MemorySpace {
     /// - 地址必须页对齐
     /// - 范围必须完全在现有映射区域内
     /// - 如果 mprotect 只应用于区域的一部分，会自动分割区域
-    /// - 只能修改 Framed 类型的映射区域
+    /// - 只能修改 Framed/Lazy/Reserved 类型的映射区域
     pub fn mprotect(
         &mut self,
         start: usize,
@@ -1324,7 +1324,9 @@ impl MemorySpace {
             if area.vpn_range().overlaps(&change_range) {
                 // 只处理 Framed / Reserved，Direct 映射不允许修改权限
                 match area.map_type() {
-                    MapType::Framed | MapType::Reserved => affected_indices.push(idx),
+                    MapType::Framed | MapType::Lazy | MapType::Reserved => {
+                        affected_indices.push(idx)
+                    }
                     MapType::Direct => return Err(PagingError::UnsupportedMapType),
                 }
             }
@@ -1340,7 +1342,10 @@ impl MemorySpace {
             let vpn = Vpn::from_usize(vpn);
             let found = self.areas.iter().any(|area| {
                 area.vpn_range().contains(vpn)
-                    && matches!(area.map_type(), MapType::Framed | MapType::Reserved)
+                    && matches!(
+                        area.map_type(),
+                        MapType::Framed | MapType::Lazy | MapType::Reserved
+                    )
             });
             if !found {
                 return Err(PagingError::InvalidAddress);
@@ -1385,7 +1390,7 @@ impl MemorySpace {
                     new_area.map(&mut new_space.page_table)?;
                     new_space.areas.push(new_area);
                 }
-                MapType::Framed => {
+                MapType::Framed | MapType::Lazy => {
                     // 帧映射：深层复制数据
                     let new_area = area.clone_with_data(&mut new_space.page_table)?;
                     new_space.areas.push(new_area);

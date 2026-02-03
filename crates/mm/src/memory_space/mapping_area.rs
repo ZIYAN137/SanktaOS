@@ -22,6 +22,11 @@ pub enum MapType {
     /// - mmap(PROT_NONE) 需要"成功占位"但不应该映射可访问页表项
     /// - mprotect(PROT_NONE) 会把原有页表映射解除并转为 Reserved
     Reserved,
+    /// 延迟分配（Demand Paging）：先保留虚拟地址范围，首次访问再分配物理页并建立映射。
+    ///
+    /// 与 [`MapType::Reserved`] 不同，Lazy 区域有“可访问的权限语义”，只是尚未 materialize
+    /// 具体页表项；缺页时应按权限分配/装载对应页。
+    Lazy,
 }
 
 /// 内存区域的类型
@@ -103,7 +108,7 @@ impl MappingArea {
     /// 已实际映射的页数（仅对 Framed 有意义）
     pub fn mapped_pages(&self) -> usize {
         match self.map_type {
-            MapType::Framed => self
+            MapType::Framed | MapType::Lazy => self
                 .frames
                 .values()
                 .map(|t| match t {
@@ -161,13 +166,20 @@ impl MappingArea {
         vpn: Vpn,
         batch: Option<&mut TlbBatchContextWrapper>,
     ) -> Result<(), page_table::PagingError> {
+        // For demand paging, mapping the same page twice should be a no-op.
+        if matches!(self.map_type, MapType::Framed | MapType::Lazy)
+            && self.frames.contains_key(&vpn)
+        {
+            return Ok(());
+        }
+
         let ppn = match self.map_type {
             MapType::Direct => {
                 let vaddr = vpn.start_addr();
                 let paddr = unsafe { arch_ops().vaddr_to_paddr(vaddr.as_usize()) };
                 Ppn::from_addr_floor(Paddr::from_usize(paddr))
             }
-            MapType::Framed => {
+            MapType::Framed | MapType::Lazy => {
                 let frame = alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?;
                 let ppn = frame.ppn();
                 self.frames.insert(vpn, TrackedFrames::Single(frame));
@@ -187,6 +199,11 @@ impl MappingArea {
         &mut self,
         page_table: &mut PT,
     ) -> Result<(), page_table::PagingError> {
+        if matches!(self.map_type, MapType::Reserved | MapType::Lazy) {
+            // Reserved: never map.
+            // Lazy: mappings are created on-demand via page fault handling.
+            return Ok(());
+        }
         TlbBatchContextWrapper::execute(|batch| {
             for vpn in self.vpn_range {
                 self.map_one_with_batch(page_table, vpn, Some(batch))?;
@@ -214,9 +231,12 @@ impl MappingArea {
         if self.map_type == MapType::Reserved {
             return Ok(());
         }
+        if self.map_type == MapType::Lazy && !self.frames.contains_key(&vpn) {
+            return Ok(());
+        }
         page_table.unmap_with_batch(vpn, batch)?;
 
-        if self.map_type == MapType::Framed {
+        if matches!(self.map_type, MapType::Framed | MapType::Lazy) {
             self.frames.remove(&vpn);
         }
         Ok(())
@@ -303,7 +323,7 @@ impl MappingArea {
         page_table: &mut PT,
     ) -> Result<Self, page_table::PagingError> {
         let mut new_area = self.clone_metadata();
-        if self.map_type != MapType::Framed {
+        if !matches!(self.map_type, MapType::Framed | MapType::Lazy) {
             return Err(page_table::PagingError::UnsupportedMapType);
         }
 
@@ -529,7 +549,11 @@ impl MappingArea {
             middle_range,
             self.area_type,
             if wants_mapping {
-                MapType::Framed
+                if self.map_type == MapType::Lazy {
+                    MapType::Lazy
+                } else {
+                    MapType::Framed
+                }
             } else {
                 MapType::Reserved
             },
@@ -551,10 +575,14 @@ impl MappingArea {
 
         match self.map_type {
             MapType::Direct => return Err(page_table::PagingError::UnsupportedMapType),
-            MapType::Framed => {
+            MapType::Framed | MapType::Lazy => {
                 if wants_mapping {
                     TlbBatchContextWrapper::execute(|batch| {
                         for vpn in VpnRange::new(change_start, change_end) {
+                            // Lazy may not have a PTE for this vpn yet.
+                            if self.map_type == MapType::Lazy && !self.frames.contains_key(&vpn) {
+                                continue;
+                            }
                             page_table.update_flags_with_batch(
                                 vpn,
                                 middle_area.permission.clone(),
