@@ -14,7 +14,7 @@
 //! - 使用原子操作避免锁竞争
 //! - 支持批量发送减少 SBI 调用次数
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use crate::config::MAX_CPU_COUNT;
 
@@ -36,6 +36,28 @@ pub enum IpiType {
 ///
 /// 每个 CPU 一个原子变量，存储待处理的 IPI 类型位掩码
 static IPI_PENDING: [AtomicU32; MAX_CPU_COUNT] = [const { AtomicU32::new(0) }; MAX_CPU_COUNT];
+
+// ============================================================================
+// TLB shootdown acknowledgements (SMP correctness)
+// ============================================================================
+//
+// Rationale:
+// - Page table changes (especially unmap / permission drop) can free physical pages.
+// - If we don't wait for other CPUs to flush their TLBs, a remote CPU may keep using
+//   a stale translation to a page whose frame has been returned to the allocator and
+//   potentially re-used, causing memory corruption.
+//
+// We implement a simple "coalescing" sequence protocol:
+// - The sender assigns a monotonically increasing seq for each broadcast.
+// - Each target CPU records the latest requested seq in TLB_FLUSH_REQ[cpu].
+// - When handling the TlbFlush IPI, the CPU flushes and then sets TLB_FLUSH_ACK[cpu]
+//   to the latest request value (thus coalescing multiple pending requests).
+// - The sender waits until all target CPUs' ACK >= seq.
+//
+// This is intentionally minimal and does not require locks in interrupt context.
+static TLB_FLUSH_GLOBAL_SEQ: AtomicU64 = AtomicU64::new(0);
+static TLB_FLUSH_REQ: [AtomicU64; MAX_CPU_COUNT] = [const { AtomicU64::new(0) }; MAX_CPU_COUNT];
+static TLB_FLUSH_ACK: [AtomicU64; MAX_CPU_COUNT] = [const { AtomicU64::new(0) }; MAX_CPU_COUNT];
 
 /// 发送 IPI 到指定 CPU
 ///
@@ -114,6 +136,66 @@ pub fn send_tlb_flush_ipi_all() {
     }
 }
 
+/// Broadcast a TLB flush and wait for acknowledgements from all other CPUs.
+///
+/// This is used by page table operations that can remove permissions/unmap pages,
+/// where freeing physical frames before remote TLBs are flushed is unsafe.
+pub fn send_tlb_flush_ipi_all_sync() {
+    let current_cpu_id = super::kernel::cpu::cpu_id();
+    let num_cpu = unsafe { crate::kernel::NUM_CPU };
+    let mask = ((1 << num_cpu) - 1) & !(1 << current_cpu_id);
+
+    if mask == 0 {
+        return;
+    }
+
+    // Monotonic seq starting from 1.
+    let seq = TLB_FLUSH_GLOBAL_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
+
+    // Publish the requested seq for each target CPU before raising the IPI.
+    for cpu in 0..num_cpu {
+        if (mask & (1 << cpu)) != 0 {
+            TLB_FLUSH_REQ[cpu].store(seq, Ordering::Release);
+        }
+    }
+
+    send_ipi_many(mask, IpiType::TlbFlush);
+
+    // Wait until all target CPUs have ACKed.
+    //
+    // Important: we may be called with interrupts disabled (e.g. in a trap or while holding
+    // locks). To avoid "mutual wait" deadlocks (CPU A waits for CPU B, while CPU B waits for
+    // CPU A), we opportunistically service incoming IPIs if SSIP is pending.
+    while !tlb_flush_acked(mask, seq) {
+        if ssip_pending() {
+            handle_ipi();
+        }
+        core::hint::spin_loop();
+    }
+}
+
+#[inline]
+fn tlb_flush_acked(mask: usize, seq: u64) -> bool {
+    let num_cpu = unsafe { crate::kernel::NUM_CPU };
+    for cpu in 0..num_cpu {
+        if (mask & (1 << cpu)) == 0 {
+            continue;
+        }
+        if TLB_FLUSH_ACK[cpu].load(Ordering::Acquire) < seq {
+            return false;
+        }
+    }
+    true
+}
+
+#[inline]
+fn ssip_pending() -> bool {
+    let sip: usize;
+    unsafe { core::arch::asm!("csrr {}, sip", out(reg) sip) };
+    // SSIP is bit 1.
+    (sip & (1 << 1)) != 0
+}
+
 /// 处理 IPI（在软件中断处理中调用）
 ///
 /// 读取并清除当前 CPU 的待处理标志，执行相应操作
@@ -148,6 +230,9 @@ pub fn handle_ipi() {
         unsafe {
             core::arch::asm!("sfence.vma");
         }
+        // Ack the latest requested seq (coalescing multiple pending flushes).
+        let seq = TLB_FLUSH_REQ[cpu].load(Ordering::Acquire);
+        TLB_FLUSH_ACK[cpu].store(seq, Ordering::Release);
     }
 
     // 处理停止 IPI

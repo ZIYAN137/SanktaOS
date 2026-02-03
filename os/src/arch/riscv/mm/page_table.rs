@@ -1,6 +1,6 @@
 // TODO: 这个模块的安全性论证没有完成
 use super::PageTableEntry;
-use crate::arch::ipi::send_tlb_flush_ipi_all;
+use crate::arch::ipi::{send_tlb_flush_ipi_all, send_tlb_flush_ipi_all_sync};
 use alloc::vec::Vec;
 use mm::TlbBatchContextWrapper;
 use mm::address::{ConvertablePaddr, Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn};
@@ -426,7 +426,9 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
         if batch.is_none() {
             let num_cpu = unsafe { crate::kernel::NUM_CPU };
             if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
+                // Mapping does not free frames, but keeping a synchronous shootdown avoids
+                // subtle permission/caching issues when mappings are modified concurrently.
+                send_tlb_flush_ipi_all_sync();
             }
         }
         Ok(())
@@ -445,7 +447,9 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
         if batch.is_none() {
             let num_cpu = unsafe { crate::kernel::NUM_CPU };
             if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
+                // Unmap can lead to freeing physical frames. Wait for remote ACKs to avoid
+                // stale TLB entries accessing re-used frames.
+                send_tlb_flush_ipi_all_sync();
             }
         }
         Ok(())
@@ -465,7 +469,9 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
         if batch.is_none() {
             let num_cpu = unsafe { crate::kernel::NUM_CPU };
             if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
+                // Permission updates must become visible to other CPUs that might be running
+                // threads of the same address space (CLONE_VM).
+                send_tlb_flush_ipi_all_sync();
             }
         }
         Ok(())
@@ -536,7 +542,10 @@ impl TlbBatchContext {
             // 发送一次 IPI 到所有其他 CPU
             let num_cpu = unsafe { crate::kernel::NUM_CPU };
             if num_cpu > 1 {
-                send_tlb_flush_ipi_all();
+                // Batched flush is typically used by bulk map/unmap/update operations.
+                // Use the synchronous shootdown to avoid freeing frames before remote CPUs
+                // have flushed their stale translations.
+                send_tlb_flush_ipi_all_sync();
             }
             self.enabled = false;
         }
