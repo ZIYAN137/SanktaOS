@@ -6,7 +6,7 @@ use crate::arch::trap::SumGuard;
 use crate::kernel::current_task;
 use crate::vfs::FsError;
 use crate::{pr_debug, pr_err, pr_warn};
-use uapi::errno::{EBADF, EINVAL, ENOTTY, EOPNOTSUPP};
+use uapi::errno::{EBADF, EFAULT, EINVAL, ENOTTY, EOPNOTSUPP};
 use uapi::ioctl::*;
 
 /// ioctl - 设备特定的输入/输出控制
@@ -232,8 +232,8 @@ fn handle_tiocgpgrp(
     let pgid = task.lock().pgid as i32;
     pr_debug!("ioctl: TIOCGPGRP writing pgid={} to {:#x}", pgid, arg);
 
-    unsafe {
-        crate::util::user_buffer::write_to_user(arg as *mut i32, pgid);
+    if crate::util::user_buffer::write_to_user(arg as *mut i32, pgid).is_err() {
+        return -(EFAULT as isize);
     }
 
     pr_debug!("ioctl: TIOCGPGRP completed");
@@ -245,21 +245,21 @@ fn handle_tiocspgrp(
     task: &alloc::sync::Arc<crate::sync::SpinLock<crate::kernel::task::TaskStruct>>,
     arg: usize,
 ) -> isize {
-    unsafe {
-        let _guard = SumGuard::new();
-        let pid_ptr = arg as *const i32;
-        if pid_ptr.is_null() {
-            return -EINVAL as isize;
-        }
-
-        let pgid = core::ptr::read_volatile(pid_ptr);
-
-        // 设置当前任务的进程组 ID
-        task.lock().pgid = pgid as u32;
-
-        pr_debug!("ioctl: TIOCSPGRP set pgid={}", pgid);
-        0
+    let pid_ptr = arg as *const i32;
+    if pid_ptr.is_null() {
+        return -EINVAL as isize;
     }
+
+    let pgid = match crate::util::user_buffer::read_from_user(pid_ptr) {
+        Ok(v) => v,
+        Err(_) => return -(EFAULT as isize),
+    };
+
+    // 设置当前任务的进程组 ID
+    task.lock().pgid = pgid as u32;
+
+    pr_debug!("ioctl: TIOCSPGRP set pgid={}", pgid);
+    0
 }
 
 /// TIOCSCTTY - 设置控制终端

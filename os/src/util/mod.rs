@@ -3,6 +3,7 @@
 pub mod address;
 pub mod ring_buffer;
 pub mod stdio;
+pub mod user_access;
 pub mod user_buffer;
 
 mod str;

@@ -16,7 +16,7 @@ use crate::{
     },
     sync::SpinLock,
     uapi::{
-        errno::{EAGAIN, EINTR, EINVAL, ENOMEM, ENOSYS, ESRCH},
+        errno::{EAGAIN, EFAULT, EINTR, EINVAL, ENOMEM, ENOSYS, ESRCH},
         signal::{
             MINSIGSTKSZ, NSIG, RtSigFrame, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGSET_SIZE,
             SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, SaFlags, SigInfoT, SignalAction, SignalFlags,
@@ -50,13 +50,16 @@ pub fn rt_sigprocmask(
 
     if !oset.is_null() {
         let old_set = t.blocked.bits() as c_ulong;
-        unsafe {
-            write_to_user(oset, old_set);
+        if write_to_user(oset, old_set).is_err() {
+            return -EFAULT;
         }
     }
 
     if !set.is_null() {
-        let new_set = unsafe { read_from_user(set) };
+        let new_set = match read_from_user(set) {
+            Ok(v) => v,
+            Err(_) => return -EFAULT,
+        };
         let new_flags = if let Some(flag) = SignalFlags::from_bits(new_set as usize) {
             flag
         } else {
@@ -90,8 +93,8 @@ pub fn rt_sigpending(uset: *mut SigSetT, sigsetsize: c_uint) -> c_int {
         return -EINVAL;
     }
     let pending = do_sigpending();
-    unsafe {
-        write_to_user(uset, pending.bits() as SigSetT);
+    if write_to_user(uset, pending.bits() as SigSetT).is_err() {
+        return -EFAULT;
     }
     0
 }
@@ -114,13 +117,16 @@ pub fn rt_sigaction(signum: c_int, act: *const SignalAction, oldact: *mut Signal
 
     if !oldact.is_null() {
         let current_action = t.signal_handlers.lock().actions[signum as usize].clone();
-        unsafe {
-            write_to_user(oldact, current_action);
+        if write_to_user(oldact, current_action).is_err() {
+            return -EFAULT;
         }
     }
 
     if !act.is_null() {
-        let mut new_action = unsafe { read_from_user(act) };
+        let mut new_action = match read_from_user(act) {
+            Ok(v) => v,
+            Err(_) => return -EFAULT,
+        };
         // Linux ABI compatibility:
         // - libc may pass SA_RESTORER and/or reserved bits.
         // - Rejecting unknown bits causes musl netperf to fail with EINVAL.
@@ -157,7 +163,10 @@ pub fn rt_sigtimedwait(
         return -EINVAL;
     }
 
-    let wait_set_bits = unsafe { read_from_user(set) };
+    let wait_set_bits = match read_from_user(set) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     let wait_set = if let Some(flags) = SignalFlags::from_bits(wait_set_bits as usize) {
         flags
     } else {
@@ -165,7 +174,10 @@ pub fn rt_sigtimedwait(
     };
 
     let timeout_opt = if !timeout.is_null() {
-        let ts = unsafe { read_from_user(timeout) };
+        let ts = match read_from_user(timeout) {
+            Ok(v) => v,
+            Err(_) => return -EFAULT,
+        };
         Some(ts)
     } else {
         None
@@ -174,8 +186,8 @@ pub fn rt_sigtimedwait(
     match wait_for_signal(current_task(), wait_set, timeout_opt) {
         Ok((sig_num, sig_info)) => {
             if !info.is_null() {
-                unsafe {
-                    write_to_user(info, sig_info);
+                if write_to_user(info, sig_info).is_err() {
+                    return -EFAULT;
                 }
             }
             sig_num as c_int
@@ -199,7 +211,10 @@ pub fn rt_sigsuspend(unewset: *const SigSetT, sigsetsize: c_uint) -> c_int {
     if sigsetsize as usize != SIGSET_SIZE {
         return -EINVAL;
     }
-    let new_set_bits = unsafe { read_from_user(unewset) };
+    let new_set_bits = match read_from_user(unewset) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     let new_set = if let Some(flags) = SignalFlags::from_bits(new_set_bits as usize) {
         flags
     } else {
@@ -231,7 +246,10 @@ pub fn rt_sigreturn() -> ! {
     // Linux ABI: SP points to rt_sigframe { siginfo, ucontext }.
     let frame_addr = tf.get_sp();
     let ucontext_addr = frame_addr + core::mem::offset_of!(RtSigFrame, uc);
-    let ucontext: UContextT = unsafe { read_from_user(ucontext_addr as *const UContextT) };
+    let ucontext: UContextT = match read_from_user(ucontext_addr as *const UContextT) {
+        Ok(v) => v,
+        Err(_) => crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGSEGV),
+    };
 
     // Restore blocked mask from saved ucontext.
     {
@@ -258,13 +276,16 @@ pub fn signal_stack(uss: *const StackT, uoss: *mut StackT) -> c_int {
 
     if !uoss.is_null() {
         let old_ss = t.signal_stack.lock().clone();
-        unsafe {
-            write_to_user(uoss, old_ss);
+        if write_to_user(uoss, old_ss).is_err() {
+            return -EFAULT;
         }
     }
 
     if !uss.is_null() {
-        let new_ss = unsafe { read_from_user(uss) };
+        let new_ss = match read_from_user(uss) {
+            Ok(v) => v,
+            Err(_) => return -EFAULT,
+        };
         if new_ss.ss_size < MINSIGSTKSZ as u64 {
             return -ENOMEM;
         }

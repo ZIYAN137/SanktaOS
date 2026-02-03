@@ -151,17 +151,15 @@ pub fn getresuid(ruid: *mut u32, euid: *mut u32, suid: *mut u32) -> isize {
     let task_inner = task.lock();
     let cred = &task_inner.credential;
 
-    // 安全地写入用户空间
-    unsafe {
-        if !ruid.is_null() {
-            write_to_user(ruid, cred.uid);
-        }
-        if !euid.is_null() {
-            write_to_user(euid, cred.euid);
-        }
-        if !suid.is_null() {
-            write_to_user(suid, cred.suid);
-        }
+    // 安全地写入用户空间（地址区间校验 + 页表翻译校验）
+    if !ruid.is_null() && write_to_user(ruid, cred.uid).is_err() {
+        return -(EFAULT as isize);
+    }
+    if !euid.is_null() && write_to_user(euid, cred.euid).is_err() {
+        return -(EFAULT as isize);
+    }
+    if !suid.is_null() && write_to_user(suid, cred.suid).is_err() {
+        return -(EFAULT as isize);
     }
     0
 }
@@ -196,17 +194,14 @@ pub fn getresgid(rgid: *mut u32, egid: *mut u32, sgid: *mut u32) -> isize {
     let task_inner = task.lock();
     let cred = &task_inner.credential;
 
-    // 安全地写入用户空间
-    unsafe {
-        if !rgid.is_null() {
-            write_to_user(rgid, cred.gid);
-        }
-        if !egid.is_null() {
-            write_to_user(egid, cred.egid);
-        }
-        if !sgid.is_null() {
-            write_to_user(sgid, cred.sgid);
-        }
+    if !rgid.is_null() && write_to_user(rgid, cred.gid).is_err() {
+        return -(EFAULT as isize);
+    }
+    if !egid.is_null() && write_to_user(egid, cred.egid).is_err() {
+        return -(EFAULT as isize);
+    }
+    if !sgid.is_null() && write_to_user(sgid, cred.sgid).is_err() {
+        return -(EFAULT as isize);
     }
     0
 }

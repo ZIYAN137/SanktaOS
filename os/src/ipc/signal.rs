@@ -194,8 +194,12 @@ fn install_user_signal_trap_frame(
         let sig_info_addr = sp + core::mem::offset_of!(RtSigFrame, info);
         let ucontext_addr = sp + core::mem::offset_of!(RtSigFrame, uc);
 
-        write_to_user(sig_info_addr as *mut SigInfoT, siginfo);
-        write_to_user(ucontext_addr as *mut UContextT, uc);
+        if write_to_user(sig_info_addr as *mut SigInfoT, siginfo).is_err() {
+            crate::kernel::terminate_task(128 + NUM_SIGSEGV);
+        }
+        if write_to_user(ucontext_addr as *mut UContextT, uc).is_err() {
+            crate::kernel::terminate_task(128 + NUM_SIGSEGV);
+        }
 
         // 更新 blocked（跳过不可屏蔽信号）
         if sig_num != NUM_SIGKILL && sig_num != NUM_SIGSTOP {

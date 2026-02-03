@@ -74,11 +74,10 @@ impl Pipe {
             }
         }
         let n = data.len();
-        // Safety:
-        // - sys_read 调用处构造的 UserBuffer 已验证其指针在用户空间且长度为 n；
-        // - data 是内核侧 Vec，与用户缓冲不重叠；
-        // - 拷贝内部会临时开启 SUM。
-        unsafe { buf.copy_to_user(&data) };
+        // Best-effort copyout. This kernel object pipe is not the primary pipe2 implementation.
+        if buf.copy_to_user(&data).is_err() {
+            return 0;
+        }
         n
     }
 
@@ -88,10 +87,10 @@ impl Pipe {
         if buf.is_empty() {
             return 0;
         }
-        // Safety:
-        // - sys_write 调用处构造的 UserBuffer 已验证其指针在用户空间且长度 buf.len()；
-        // - 读取源是用户空间只读区域；内部会临时开启 SUM。
-        let data = unsafe { buf.copy_from_user() };
+        let data = match buf.copy_from_user() {
+            Ok(v) => v,
+            Err(_) => return 0,
+        };
         let mut wrote = 0;
         {
             let mut rb = self.buffer.lock();

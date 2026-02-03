@@ -120,11 +120,8 @@ fn clear_child_tid_and_wake() {
         return;
     };
 
-    // 1) write 0 to userspace tid address
-    unsafe {
-        let _guard = SumGuard::new();
-        write_to_user(clear_addr as *mut c_int, 0);
-    }
+    // 1) write 0 to userspace tid address (best-effort)
+    let _ = write_to_user(clear_addr as *mut c_int, 0);
 
     // 2) futex wake
     let Some(paddr) = memory_space
@@ -297,12 +294,15 @@ pub fn clone(
     );
 
     if requested_flags.contains(CloneFlags::CHILD_SETTID) {
-        // SAFETY: we validated ctid != NULL above.
-        unsafe { write_to_user(ctid, tid as c_int) };
+        // ctid validity (non-null) is checked above; mapping/writeability can still fail.
+        if write_to_user(ctid, tid as c_int).is_err() {
+            return -EFAULT;
+        }
     }
     if requested_flags.contains(CloneFlags::PARENT_SETTID) {
-        // SAFETY: we validated ptid != NULL above.
-        unsafe { write_to_user(ptid, tid as c_int) };
+        if write_to_user(ptid, tid as c_int).is_err() {
+            return -EFAULT;
+        }
     }
 
     let tf = child_task.trap_frame_ptr.load(Ordering::SeqCst);
@@ -602,8 +602,8 @@ pub fn wait4(pid: c_int, wstatus: *mut c_int, options: c_int, _rusage: *mut Rusa
 
     // wstatus 允许为 NULL（例如 waitpid(-1, NULL, 0)），此时不写回状态
     if !wstatus.is_null() {
-        unsafe {
-            write_to_user(wstatus, status.raw());
+        if write_to_user(wstatus, status.raw()).is_err() {
+            return -EFAULT;
         }
     }
 
@@ -729,11 +729,10 @@ pub fn getrlimit(resource: c_int, rlim: *mut Rlimit) -> c_int {
         return -EINVAL;
     }
     let rlimit = current_task().lock().rlimit.lock().limits[resource as usize];
-    unsafe {
-        write_to_user(rlim, rlimit);
+    if write_to_user(rlim, rlimit).is_err() {
+        return -EFAULT;
     }
     0
-    // TODO: EPERM 和 EFAULT
 }
 
 /// 设置资源限制
@@ -746,7 +745,10 @@ pub fn setrlimit(resource: c_int, rlim: *const Rlimit) -> c_int {
     if resource as usize >= RLIM_NLIMITS {
         return -EINVAL;
     }
-    let new_limit = unsafe { read_from_user(rlim) };
+    let new_limit = match read_from_user(rlim) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     if new_limit.rlim_cur > new_limit.rlim_max {
         return -EINVAL;
     }
@@ -755,7 +757,6 @@ pub fn setrlimit(resource: c_int, rlim: *const Rlimit) -> c_int {
         rlimit_lock.lock().limits[resource as usize] = new_limit;
     }
     0
-    // TODO: EPERM, EPERM 和 EFAULT
 }
 
 /// 获取或设置资源限制
@@ -787,13 +788,16 @@ pub fn prlimit(
 
     if !old_limit.is_null() {
         let rlimit = target_task.lock().rlimit.lock().limits[resource as usize];
-        unsafe {
-            write_to_user(old_limit, rlimit);
+        if write_to_user(old_limit, rlimit).is_err() {
+            return -EFAULT;
         }
     }
 
     if !new_limit.is_null() {
-        let new_rlim = unsafe { read_from_user(new_limit) };
+        let new_rlim = match read_from_user(new_limit) {
+            Ok(v) => v,
+            Err(_) => return -EFAULT,
+        };
         if new_rlim.rlim_cur > new_rlim.rlim_max {
             return -EINVAL;
         }
@@ -802,7 +806,6 @@ pub fn prlimit(
     }
 
     0
-    // TODO: EPERM, EPERM 和 EFAULT
 }
 
 /// 高精度睡眠（纳秒级别）
@@ -812,7 +815,10 @@ pub fn prlimit(
 /// # 返回值
 /// - 成功返回 0, 失败返回负错误码
 pub fn nanosleep(duration: *const TimeSpec, rem: *mut TimeSpec) -> c_int {
-    let req = unsafe { read_from_user(duration) };
+    let req = match read_from_user(duration) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     if req.tv_sec == 0 && req.tv_nsec == 0 {
         return 0;
     }
@@ -844,8 +850,8 @@ pub fn nanosleep(duration: *const TimeSpec, rem: *mut TimeSpec) -> c_int {
             0
         };
         let rem_ts = TimeSpec::from_freq(remaining_ticks, clock_freq());
-        unsafe {
-            write_to_user(rem, rem_ts);
+        if write_to_user(rem, rem_ts).is_err() {
+            return -EFAULT;
         }
     }
 
@@ -871,7 +877,10 @@ pub fn clock_nanosleep(
     req: *const TimeSpec,
     rem: *mut TimeSpec,
 ) -> c_int {
-    let time_req = unsafe { read_from_user(req) };
+    let time_req = match read_from_user(req) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     let is_abstime = (flags & TIMER_ABSTIME) != 0;
     let sleep_ticks = time_req.into_freq(clock_freq());
     let trigger = if is_abstime {
@@ -908,8 +917,8 @@ pub fn clock_nanosleep(
             0
         };
         let rem_ts = TimeSpec::from_freq(remaining_ticks, clock_freq());
-        unsafe {
-            write_to_user(rem, rem_ts);
+        if write_to_user(rem, rem_ts).is_err() {
+            return -EFAULT;
         }
     }
 
@@ -953,8 +962,8 @@ pub fn getitimer(which: c_int, curr_value: *mut Itimerval) -> c_int {
             it_interval,
         };
     }
-    unsafe {
-        write_to_user(curr_value, val);
+    if write_to_user(curr_value, val).is_err() {
+        return -EFAULT;
     }
     0
 }
@@ -1005,7 +1014,10 @@ pub fn setitimer(which: c_int, new_value: *const Itimerval, old_value: *mut Itim
     // Disarm any existing timers for this (task, sig) so we don't accumulate duplicates.
     while binding.remove_entry(&owner, sig).is_some() {}
 
-    let new_itimer = unsafe { read_from_user(new_value) };
+    let new_itimer = match read_from_user(new_value) {
+        Ok(v) => v,
+        Err(_) => return -EFAULT,
+    };
     if !new_itimer.it_value.is_zero() {
         let trigger = get_time() + new_itimer.it_value.into_freq(clock_freq());
         let interval = new_itimer.it_interval.to_timespec();
@@ -1017,8 +1029,8 @@ pub fn setitimer(which: c_int, new_value: *const Itimerval, old_value: *mut Itim
         binding.push(trigger, entry);
     }
     if !old_value.is_null() {
-        unsafe {
-            write_to_user(old_value, old);
+        if write_to_user(old_value, old).is_err() {
+            return -EFAULT;
         }
     }
 
@@ -1051,7 +1063,10 @@ pub fn futex(
     match op as u32 {
         FUTEX_WAIT => {
             // 必须保证获 取锁 → 读取用户数据 → 比较 → 释放锁 整个序列是原子的
-            let user_val = unsafe { read_from_user(uaddr) };
+            let user_val = match read_from_user(uaddr as *const u32) {
+                Ok(v) => v,
+                Err(_) => return -EFAULT,
+            };
             let memory_space = current_task()
                 .lock()
                 .memory_space
@@ -1076,7 +1091,10 @@ pub fn futex(
             sleep_task_with_block(task.clone(), true);
 
             if !timeout.is_null() {
-                let ts = unsafe { read_from_user(timeout) };
+                let ts = match read_from_user(timeout) {
+                    Ok(v) => v,
+                    Err(_) => return -EFAULT,
+                };
                 if ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec > 999999999 {
                     return -EINVAL;
                 }
@@ -1186,9 +1204,11 @@ pub fn get_robust_list(pid: c_int, head_ptr: *mut *mut RobustListHead, sizep: *m
         let size = size_of::<RobustListHead>() as SizeT;
         (head, size)
     };
-    unsafe {
-        write_to_user(head_ptr, head);
-        write_to_user(sizep, size);
+    if write_to_user(head_ptr, head).is_err() {
+        return -EFAULT;
+    }
+    if write_to_user(sizep, size).is_err() {
+        return -EFAULT;
     }
     0
 }

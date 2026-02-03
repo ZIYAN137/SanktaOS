@@ -24,7 +24,7 @@ use crate::{
     pr_alert,
     security::{BiogasPoll, EntropyPool},
     uapi::{
-        errno::{EINVAL, ENOSYS},
+        errno::{EFAULT, EINVAL, ENOSYS},
         log::SyslogAction,
         reboot::{
             REBOOT_CMD_POWER_OFF, REBOOT_MAGIC1, REBOOT_MAGIC2, REBOOT_MAGIC2A, REBOOT_MAGIC2B,
@@ -40,7 +40,7 @@ use crate::{
     },
     util::{
         cstr_copy,
-        user_buffer::{UserBuffer, write_to_user},
+        user_buffer::{UserBuffer, read_from_user, write_to_user},
     },
     vfs::TimeSpec,
 };
@@ -94,11 +94,10 @@ pub fn uname(buf: *mut UtsNamespace) -> c_int {
         t.uts_namespace.clone()
     };
     let uts_lock = uts.lock();
-    unsafe {
-        write_to_user(buf, uts_lock.clone());
+    if write_to_user(buf, uts_lock.clone()).is_err() {
+        return -(EFAULT as c_int);
     }
     0
-    // TODO: EPERM 和 EFAULT
 }
 
 /// 设置主机名系统调用
@@ -117,13 +116,15 @@ pub fn set_hostname(name: *const c_char, len: usize) -> c_int {
         t.uts_namespace.clone()
     };
     let name_buf = UserBuffer::new(name as *mut _, len);
-    let name = unsafe { name_buf.copy_from_user() };
+    let name = match name_buf.copy_from_user() {
+        Ok(v) => v,
+        Err(_) => return -(EFAULT as c_int),
+    };
     {
         let mut uts_lock = uts.lock();
         cstr_copy(name.as_ptr(), &mut uts_lock.nodename, len);
     }
     0
-    // TODO: EPERM 和 EFAULT
 }
 
 /// 获取系统信息系统调用
@@ -136,8 +137,8 @@ pub fn sysinfo(info: *mut SysInfo) -> c_int {
     // TODO: 填充更多系统信息字段
     let mut sys_info = SysInfo::new();
     sys_info.uptime = (TIMER_TICKS.load(Ordering::SeqCst) / TICKS_PER_SEC) as c_long;
-    unsafe {
-        write_to_user(info, sys_info);
+    if write_to_user(info, sys_info).is_err() {
+        return -(EFAULT as c_int);
     }
     0
 }
@@ -163,8 +164,8 @@ pub fn clock_gettime(clk_id: c_int, tp: *mut TimeSpec) -> c_int {
         }
     };
 
-    unsafe {
-        write_to_user(tp, ts);
+    if write_to_user(tp, ts).is_err() {
+        return -(EFAULT as c_int);
     }
 
     0
@@ -180,7 +181,10 @@ pub fn clock_gettime(clk_id: c_int, tp: *mut TimeSpec) -> c_int {
 pub fn clock_settime(clk_id: c_int, tp: *const TimeSpec) -> c_int {
     match clk_id {
         CLOCK_REALTIME | CLOCK_REALTIME_COARSE => {
-            let ts: TimeSpec = unsafe { core::ptr::read(tp) };
+            let ts: TimeSpec = match read_from_user(tp) {
+                Ok(v) => v,
+                Err(_) => return -(EFAULT as c_int),
+            };
             update_realtime(&ts);
             0
         }
@@ -218,8 +222,8 @@ pub fn clock_getres(clk_id: c_int, tp: *mut TimeSpec) -> c_int {
         }
     };
 
-    unsafe {
-        write_to_user(tp, res);
+    if write_to_user(tp, res).is_err() {
+        return -(EFAULT as c_int);
     }
 
     0
@@ -265,9 +269,6 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
             let buf_len = len as usize;
             let mut total_written = 0;
 
-            // 开启用户空间访问
-            let _guard = SumGuard::new();
-
             while total_written < buf_len {
                 // TODO: 暂时移除，等待信号系统实现
                 /*
@@ -302,18 +303,14 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
                 }
 
                 // 复制到用户空间
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        bytes.as_ptr(),
-                        bufp.add(total_written),
-                        bytes.len(),
-                    );
+                if crate::util::user_access::copy_to_user(bufp as usize + total_written, bytes)
+                    .is_err()
+                {
+                    return -(EFAULT as isize);
                 }
 
                 total_written += bytes.len();
             }
-
-            // 关闭用户空间访问
 
             total_written as isize
         }
@@ -329,9 +326,6 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
             // 获取当前可读范围
             let start_index = log_reader_index();
             let end_index = log_writer_index();
-
-            // 开启用户空间访问
-            let _guard = SumGuard::new();
 
             // 遍历所有可用的日志条目
             let mut current_index = start_index;
@@ -361,19 +355,15 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
                     break;
                 }
 
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        bytes.as_ptr(),
-                        bufp.add(total_written),
-                        bytes.len(),
-                    );
+                if crate::util::user_access::copy_to_user(bufp as usize + total_written, bytes)
+                    .is_err()
+                {
+                    return -(EFAULT as isize);
                 }
 
                 total_written += bytes.len();
                 current_index += 1;
             }
-
-            // 关闭用户空间访问
 
             total_written as isize
         }
@@ -382,8 +372,6 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
             // 先读取所有日志（使用与 ReadAll 相同的逻辑）
             let buf_len = len as usize;
             let mut total_written = 0;
-
-            let _guard = SumGuard::new();
 
             while total_written < buf_len {
                 let entry = match read_log() {
@@ -398,12 +386,10 @@ pub fn syslog(type_: i32, bufp: *mut u8, len: i32) -> isize {
                     break;
                 }
 
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        bytes.as_ptr(),
-                        bufp.add(total_written),
-                        bytes.len(),
-                    );
+                if crate::util::user_access::copy_to_user(bufp as usize + total_written, bytes)
+                    .is_err()
+                {
+                    return -(EFAULT as isize);
                 }
 
                 total_written += bytes.len();
@@ -525,9 +511,11 @@ pub fn getrandom(buf: *mut c_void, len: SizeT, _flags: c_uint) -> c_int {
         if pool.try_fill(&mut tmp[..n]).is_err() {
             return -EINVAL;
         }
-        // Copy into user memory with SUM enabled.
-        unsafe {
-            UserBuffer::new((buf as *mut u8).add(offset), n).copy_to_user(&tmp[..n]);
+        if UserBuffer::new(unsafe { (buf as *mut u8).add(offset) }, n)
+            .copy_to_user(&tmp[..n])
+            .is_err()
+        {
+            return -(EFAULT as c_int);
         }
         offset += n;
     }
