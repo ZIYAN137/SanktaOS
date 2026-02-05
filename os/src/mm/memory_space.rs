@@ -15,7 +15,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
-use mm::page_table::{PageTableInner, PagingError, UniversalPTEFlag};
+use mm::page_table::{PageSize, PageTableInner, PagingError, UniversalPTEFlag};
 use uapi::mm::MapFlags;
 
 // 内核链接器符号
@@ -606,6 +606,17 @@ impl MemorySpace {
                     {
                         let area = &mut self.areas[idx];
                         area.map_one(&mut self.page_table, vpn)?;
+                        #[cfg(feature = "thp")]
+                        {
+                            // THP (policy A): opportunistic collapse after fault-in.
+                            let base = Vpn::from_usize(vpn.as_usize() & !(512 - 1));
+                            let _ = area.try_collapse_2m(
+                                &mut self.page_table,
+                                base,
+                                400,
+                                cfg!(feature = "cow"),
+                            );
+                        }
                         Ok(())
                     }
                     #[cfg(not(feature = "demand_paging"))]
@@ -628,6 +639,16 @@ impl MemorySpace {
                             {
                                 let area = &mut self.areas[idx];
                                 area.map_one(&mut self.page_table, vpn)?;
+                                #[cfg(feature = "thp")]
+                                {
+                                    let base = Vpn::from_usize(vpn.as_usize() & !(512 - 1));
+                                    let _ = area.try_collapse_2m(
+                                        &mut self.page_table,
+                                        base,
+                                        400,
+                                        cfg!(feature = "cow"),
+                                    );
+                                }
                                 return Ok(());
                             }
                             #[cfg(not(feature = "demand_paging"))]
@@ -640,7 +661,7 @@ impl MemorySpace {
                     }
                 }
 
-                let (_ppn, _size, pte_flags) = self.page_table.walk(vpn)?;
+                let (_ppn, page_size, pte_flags) = self.page_table.walk(vpn)?;
                 if pte_flags.contains(UniversalPTEFlag::WRITEABLE) {
                     // Likely an A/D-bit fault or other transient; we currently don't emulate A/D.
                     return Err(PagingError::InvalidAddress);
@@ -650,6 +671,13 @@ impl MemorySpace {
                 {
                     // Only apply COW to private mappings.
                     if !shared && perm.contains(UniversalPTEFlag::WRITEABLE) {
+                        #[cfg(feature = "thp")]
+                        {
+                            // Split huge pages before COW, so we can remap a single 4K page.
+                            if page_size == PageSize::Size2M {
+                                self.split_huge_2m_at_vpn(vpn)?;
+                            }
+                        }
                         let area = &mut self.areas[idx];
                         area.resolve_cow_write_fault(&mut self.page_table, vpn)?;
                         return Ok(());
@@ -659,6 +687,57 @@ impl MemorySpace {
                 Err(PagingError::InvalidAddress)
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // THP: split helpers (2MiB huge pages)
+    // -------------------------------------------------------------------------
+
+    /// Split a 2MiB huge leaf mapping covering `vpn` into 512 4KiB leaf mappings.
+    ///
+    /// No-op if `vpn` is not backed by a 2MiB leaf mapping.
+    #[cfg(feature = "thp")]
+    fn split_huge_2m_at_vpn(&mut self, vpn: Vpn) -> Result<(), PagingError> {
+        use mm::TlbBatchContextWrapper;
+
+        const THP_2M_PAGES: usize = 512;
+        let base = Vpn::from_usize(vpn.as_usize() & !(THP_2M_PAGES - 1));
+
+        let (base_ppn, page_size, flags) = self.page_table.walk(base)?;
+        if page_size != PageSize::Size2M {
+            return Ok(());
+        }
+
+        TlbBatchContextWrapper::execute(|batch| {
+            // Remove the huge leaf.
+            self.page_table.unmap_with_batch(base, Some(batch))?;
+            // Install 512 4K leaves.
+            for i in 0..THP_2M_PAGES {
+                let v = Vpn::from_usize(base.as_usize() + i);
+                let p = Ppn::from_usize(base_ppn.as_usize() + i);
+                self.page_table
+                    .map_with_batch(v, p, PageSize::Size4K, flags, Some(batch))?;
+            }
+            Ok::<(), PagingError>(())
+        })?;
+
+        Ok(())
+    }
+
+    /// Split any huge mappings that intersect with `[start, end)`.
+    #[cfg(feature = "thp")]
+    fn split_huge_in_range(&mut self, start: Vpn, end: Vpn) -> Result<(), PagingError> {
+        const THP_2M_PAGES: usize = 512;
+        let mut base = Vpn::from_usize(start.as_usize() & !(THP_2M_PAGES - 1));
+        while base < end {
+            if let Ok((_ppn, size, _flags)) = self.page_table.walk(base) {
+                if size == PageSize::Size2M {
+                    self.split_huge_2m_at_vpn(base)?;
+                }
+            }
+            base = Vpn::from_usize(base.as_usize() + THP_2M_PAGES);
+        }
+        Ok(())
     }
 
     /// 获取所有 MMIO 映射区域（用于测试）
@@ -674,6 +753,10 @@ impl MemorySpace {
     pub fn remove_area(&mut self, vpn: Vpn) -> Result<(), PagingError> {
         if let Some(pos) = self.areas.iter().position(|a| a.vpn_range().contains(vpn)) {
             let mut area = self.areas.remove(pos);
+            #[cfg(feature = "thp")]
+            {
+                self.split_huge_in_range(area.vpn_range().start(), area.vpn_range().end())?;
+            }
             area.unmap(&mut self.page_table)?;
             Ok(())
         } else {
@@ -1116,6 +1199,10 @@ impl MemorySpace {
                     if new_end_vpn <= heap_bottom {
                         // 收缩到起始位置或更低，删除整个堆区域
                         let mut area = self.areas.remove(idx);
+                        #[cfg(feature = "thp")]
+                        {
+                            self.split_huge_in_range(area.vpn_range().start(), area.vpn_range().end())?;
+                        }
                         area.unmap(&mut self.page_table)?;
                     } else {
                         let count = old_end.as_usize() - new_end_vpn.as_usize();
@@ -1367,6 +1454,12 @@ impl MemorySpace {
         let end_vpn = Vpn::from_addr_ceil(Vaddr::from_usize(start + len));
         let unmap_range = VpnRange::new(start_vpn, end_vpn);
 
+        #[cfg(feature = "thp")]
+        {
+            // Split any huge page mappings touched by the range so per-page unmap stays correct.
+            self.split_huge_in_range(start_vpn, end_vpn)?;
+        }
+
         // 收集需要处理的区域
         // 注意：不能在迭代时修改 self.areas，所以先收集索引
         let mut affected_indices = alloc::vec::Vec::new();
@@ -1460,6 +1553,13 @@ impl MemorySpace {
         let start_vpn = Vpn::from_addr_floor(Vaddr::from_usize(start));
         let end_vpn = Vpn::from_addr_ceil(Vaddr::from_usize(start + len));
         let change_range = VpnRange::new(start_vpn, end_vpn);
+
+        #[cfg(feature = "thp")]
+        {
+            // Split any huge page mappings touched by the range so sub-range permission changes
+            // don't accidentally apply to a whole huge leaf.
+            self.split_huge_in_range(start_vpn, end_vpn)?;
+        }
 
         // 收集需要处理的区域
         // 注意：不能在迭代时修改 self.areas，所以先收集索引
@@ -1564,6 +1664,29 @@ impl MemorySpace {
 
         let mut new_space = MemorySpace::new();
         new_space.heap_start = self.heap_start;
+
+        #[cfg(feature = "thp")]
+        {
+            // Keep fork COW semantics simple: split huge pages first.
+            //
+            // This matches our write-fault strategy: split -> COW.
+            let ranges: alloc::vec::Vec<(Vpn, Vpn)> = self
+                .areas
+                .iter()
+                .filter(|a| matches!(a.map_type(), MapType::Framed | MapType::Lazy))
+                .filter(|a| {
+                    let shared = a
+                        .mmap_file()
+                        .map(|f| f.flags.contains(MapFlags::SHARED))
+                        .unwrap_or(false);
+                    !shared && a.permission().contains(UniversalPTEFlag::WRITEABLE)
+                })
+                .map(|a| (a.vpn_range().start(), a.vpn_range().end()))
+                .collect();
+            for (s, e) in ranges {
+                self.split_huge_in_range(s, e)?;
+            }
+        }
 
         for area in self.areas.iter() {
             match area.map_type() {
