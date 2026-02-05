@@ -11,6 +11,9 @@ use crate::arch::intr::{are_interrupts_enabled, disable_interrupts, enable_inter
 pub trait Testable {
     /// 运行测试，返回是否通过（本框架中：无失败断言即通过）。
     fn run(&self) -> bool;
+
+    /// 返回测试名称（用于输出与过滤）。
+    fn name(&self) -> &'static str;
 }
 
 impl<T> Testable for T
@@ -62,6 +65,10 @@ where
             false
         }
     }
+
+    fn name(&self) -> &'static str {
+        core::any::type_name::<T>()
+    }
 }
 
 /// 测试运行器。它由测试框架自动调用，并传入一个包含所有测试的切片。
@@ -74,6 +81,13 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     use core::sync::atomic::Ordering;
 
     println!("\n\x1b[33m--- Running {} tests ---\x1b[0m", tests.len());
+
+    // Compile-time filter for kernel tests.
+    //
+    // Usage (host side):
+    //   OS_TEST_FILTER=memory_space_tests TEST=1 cargo test ... --no-run
+    // The produced test ELF will only execute tests whose `type_name` contains the substring.
+    let filter = option_env!("OS_TEST_FILTER");
 
     // 重置失败计数器
     TEST_FAILED.store(0, Ordering::SeqCst);
@@ -91,6 +105,11 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     // 遍历并执行所有测试
     let mut failed_tests: usize = 0;
     for test in tests {
+        if let Some(f) = filter {
+            if !test.name().contains(f) {
+                continue;
+            }
+        }
         if !test.run() {
             failed_tests += 1;
         }
