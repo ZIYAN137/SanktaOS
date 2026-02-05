@@ -146,14 +146,12 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
 
             if current_level == level {
                 // 已到达目标级别
-                // TODO(暂时注释): 当前仅支持4K页
-                // let page_size = match level {
-                //     2 => PageSize::Size1G,
-                //     1 => PageSize::Size2M,
-                //     0 => PageSize::Size4K,
-                //     _ => unreachable!(),
-                // };
-                let page_size = PageSize::Size4K; // 仅支持4K页
+                let page_size = match level {
+                    2 => PageSize::Size1G,
+                    1 => PageSize::Size2M,
+                    0 => PageSize::Size4K,
+                    _ => unreachable!(),
+                };
                 return Some((*pte, page_size));
             }
 
@@ -168,29 +166,15 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
     fn translate(&self, vaddr: Vaddr) -> Option<Paddr> {
         // 注意：translate 必须使用 floor（页内地址应落在当前页），否则会把非对齐地址错误映射到下一页。
         let vpn = Vpn::from_addr_floor(vaddr);
-        // 页内偏移量：低 12 位
-        let offset = vaddr.as_usize() & 0xfff;
 
-        // TODO(暂时注释): 当前仅支持4K页，大页translation逻辑已禁用
         match self.walk(vpn) {
             Ok((ppn, page_size, _flags)) => {
-                let paddr_base = match page_size {
-                    PageSize::Size4K => ppn.start_addr().as_usize(),
-                    // TODO(暂时注释): 大页偏移计算
-                    // PageSize::Size2M => {
-                    //     // 对于 2M 页，保留 vaddr 的低 21 位作为页内偏移
-                    //     let offset_2m = vaddr.as_usize() & 0x1f_ffff;
-                    //     ppn.start_addr().as_usize() + offset_2m - offset
-                    // }
-                    // PageSize::Size1G => {
-                    //     // 对于 1G 页，保留 vaddr 的低 30 位作为页内偏移
-                    //     let offset_1g = vaddr.as_usize() & 0x3fff_ffff;
-                    //     ppn.start_addr().as_usize() + offset_1g - offset
-                    // }
-                    _ => ppn.start_addr().as_usize(), // 默认按 4K 页处理基地址
+                let offset = match page_size {
+                    PageSize::Size4K => vaddr.as_usize() & 0xfff,
+                    PageSize::Size2M => vaddr.as_usize() & 0x1f_ffff,
+                    PageSize::Size1G => vaddr.as_usize() & 0x3fff_ffff,
                 };
-                // 物理地址 = 物理页基地址 + 页内偏移
-                Some(Paddr::from_usize(paddr_base + offset))
+                Some(Paddr::from_usize(ppn.start_addr().as_usize() + offset))
             }
             Err(_) => None,
         }
@@ -201,7 +185,7 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
         &mut self,
         vpn: Vpn,
         ppn: Ppn,
-        _page_size: PageSize,
+        page_size: PageSize,
         flags: UniversalPTEFlag,
     ) -> PagingResult<()> {
         // 验证标志位：叶子节点必须至少有 R/W/X 之一被设置
@@ -211,14 +195,48 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
             return Err(PagingError::InvalidFlags);
         }
 
-        // TODO(暂时注释): 当前仅支持4K页，强制使用 level 0
-        // 根据页大小确定目标级别
-        // let target_level = match page_size {
-        //     PageSize::Size1G => 2,
-        //     PageSize::Size2M => 1,
-        //     PageSize::Size4K => 0,
-        // };
-        let target_level = 0; // 仅支持 4K 页
+        // Determine target level based on the page size.
+        //
+        // Note: huge page mappings are enabled only when the `thp` feature is on.
+        let target_level = match page_size {
+            PageSize::Size4K => 0,
+            PageSize::Size2M => {
+                #[cfg(feature = "thp")]
+                {
+                    1
+                }
+                #[cfg(not(feature = "thp"))]
+                {
+                    0
+                }
+            }
+            PageSize::Size1G => {
+                #[cfg(feature = "thp")]
+                {
+                    2
+                }
+                #[cfg(not(feature = "thp"))]
+                {
+                    0
+                }
+            }
+        };
+
+        // Alignment checks for huge pages.
+        if target_level == 1 {
+            // 2MiB: 512 * 4KiB pages.
+            if (vpn.as_usize() & (512 - 1)) != 0 || (ppn.as_usize() & (512 - 1)) != 0 {
+                return Err(PagingError::InvalidAddress);
+            }
+        } else if target_level == 2 {
+            // 1GiB: 512 * 2MiB pages = 262144 * 4KiB pages.
+            const ALIGN_1G_PAGES: usize = 512 * 512;
+            if (vpn.as_usize() & (ALIGN_1G_PAGES - 1)) != 0
+                || (ppn.as_usize() & (ALIGN_1G_PAGES - 1)) != 0
+            {
+                return Err(PagingError::InvalidAddress);
+            }
+        }
 
         let mut current_ppn = self.root;
         let vpn_value = vpn.as_usize();
@@ -239,7 +257,21 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
             if level == target_level {
                 // 已到达目标级别，创建叶子节点
                 if pte.is_valid() {
-                    return Err(PagingError::AlreadyMapped); // 已被映射
+                    // Existing leaf mapping.
+                    if pte.is_huge() || level == 0 {
+                        return Err(PagingError::AlreadyMapped);
+                    }
+                    // Existing lower-level page table: allow overwriting only if it's empty.
+                    let child_ppn = pte.ppn();
+                    let child_pte_array = unsafe {
+                        core::slice::from_raw_parts(
+                            child_ppn.start_addr().to_vaddr().as_usize() as *const PageTableEntry,
+                            512,
+                        )
+                    };
+                    if child_pte_array.iter().any(|e| e.is_valid()) {
+                        return Err(PagingError::HugePageConflict);
+                    }
                 }
                 // 创建新的叶子 PTE，设置 PPN 和标志位 (VALID 必须设置)
                 *pte = PageTableEntry::new_leaf(ppn, flags | UniversalPTEFlag::VALID);
@@ -392,14 +424,12 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
             // 检查是否为叶子节点
             if pte.is_huge() || level == 0 {
                 // 找到叶子节点
-                // TODO(暂时注释): 当前仅支持4K页
-                // let page_size = match level {
-                //     2 => PageSize::Size1G,
-                //     1 => PageSize::Size2M,
-                //     0 => PageSize::Size4K,
-                //     _ => unreachable!(),
-                // };
-                let page_size = PageSize::Size4K; // 仅支持 4K 页
+                let page_size = match level {
+                    2 => PageSize::Size1G,
+                    1 => PageSize::Size2M,
+                    0 => PageSize::Size4K,
+                    _ => unreachable!(),
+                };
                 return Ok((pte.ppn(), page_size, pte.flags()));
             }
 
