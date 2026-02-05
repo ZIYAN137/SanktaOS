@@ -40,6 +40,7 @@
 //! - `alloc_contig_frames_aligned`：分配带对齐要求的多个连续帧。
 
 use crate::address::{ConvertablePaddr, Paddr, PageNum, Ppn, PpnRange, UsizeConvert};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use sync::SpinLock;
@@ -129,14 +130,14 @@ impl Drop for FrameRangeTracker {
 
 /// 跟踪的物理帧集合。
 /// 用于封装单个、多个不连续或多个连续的物理帧。
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TrackedFrames {
     /// 单个物理帧。
-    Single(FrameTracker),
+    Single(Arc<FrameTracker>),
     /// 多个不连续物理帧。
-    Multiple(Vec<FrameTracker>),
+    Multiple(Vec<Arc<FrameTracker>>),
     /// 多个连续物理帧。
-    Contiguous(FrameRangeTracker),
+    Contiguous(Arc<FrameRangeTracker>),
 }
 
 // ============================================================================

@@ -1,4 +1,5 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::sync::Arc;
 use core::cmp::min;
 
 use crate::address::{Paddr, PageNum, Ppn, UsizeConvert, Vpn, VpnRange};
@@ -180,7 +181,7 @@ impl MappingArea {
                 Ppn::from_addr_floor(Paddr::from_usize(paddr))
             }
             MapType::Framed | MapType::Lazy => {
-                let frame = alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?;
+                let frame = Arc::new(alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?);
                 let ppn = frame.ppn();
                 self.frames.insert(vpn, TrackedFrames::Single(frame));
                 ppn
@@ -317,6 +318,47 @@ impl MappingArea {
         }
     }
 
+    /// 克隆区域并共享已分配的帧（用于 COW / fork 等共享语义）。
+    ///
+    /// 注意：该方法只共享 `frames` 中已 materialize 的页；Lazy 区域中未分配的页仍保持未分配状态。
+    pub fn clone_shared_frames(&self) -> Self {
+        let mut out = self.clone_metadata();
+        out.frames = self.frames.clone();
+        out
+    }
+
+    /// 返回当前区域中已 materialize 的 VPN 列表。
+    ///
+    /// - Framed：通常等于 vpn_range 的全部页
+    /// - Lazy：仅包含已被访问并分配的页
+    pub fn mapped_vpns(&self) -> alloc::vec::Vec<Vpn> {
+        self.frames.keys().copied().collect()
+    }
+
+    /// 返回该区域的文件映射信息（若存在）。
+    pub fn mmap_file(&self) -> Option<&MmapFile> {
+        self.file.as_ref()
+    }
+
+    /// 将已跟踪的物理帧映射到给定页表中（不会分配新帧，仅建立 PTE）。
+    pub fn map_tracked_frames<PT: PageTableInner<E>, E: PageTableEntry>(
+        &self,
+        page_table: &mut PT,
+        flags: UniversalPTEFlag,
+    ) -> Result<(), page_table::PagingError> {
+        for (vpn, tracked) in &self.frames {
+            let ppn = match tracked {
+                TrackedFrames::Single(frame) => frame.ppn(),
+                TrackedFrames::Multiple(frames) => frames.first().map(|f| f.ppn()).unwrap(),
+                TrackedFrames::Contiguous(_) => {
+                    return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                }
+            };
+            page_table.map(*vpn, ppn, PageSize::Size4K, flags)?;
+        }
+        Ok(())
+    }
+
     /// 克隆映射区域及其数据
     pub fn clone_with_data<PT: PageTableInner<E>, E: PageTableEntry>(
         &self,
@@ -333,8 +375,9 @@ impl MappingArea {
             for (vpn, tracked_frames) in &self.frames {
                 match tracked_frames {
                     TrackedFrames::Single(frame) => {
-                        let new_frame =
-                            alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?;
+                        let new_frame = Arc::new(
+                            alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?,
+                        );
 
                         let new_ppn = new_frame.ppn();
                         let src_ppn = frame.ppn();
@@ -366,8 +409,9 @@ impl MappingArea {
                         let mut new_frames = alloc::vec::Vec::new();
 
                         for frame in frames.iter() {
-                            let new_frame =
-                                alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?;
+                            let new_frame = Arc::new(
+                                alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?,
+                            );
                             let new_ppn = new_frame.ppn();
                             let src_ppn = frame.ppn();
 
@@ -407,6 +451,71 @@ impl MappingArea {
 
             Ok(new_area)
         })
+    }
+
+    /// Resolve a COW write fault for a single 4K page.
+    ///
+    /// This assumes:
+    /// - the VMA has logical WRITE permission (self.permission contains WRITEABLE)
+    /// - a PTE exists but is currently write-protected (WRITEABLE cleared)
+    pub fn resolve_cow_write_fault<PT: PageTableInner<E>, E: PageTableEntry>(
+        &mut self,
+        page_table: &mut PT,
+        vpn: Vpn,
+    ) -> Result<(), page_table::PagingError> {
+        if !self.permission.contains(UniversalPTEFlag::WRITEABLE) {
+            return Err(page_table::PagingError::InvalidAddress);
+        }
+
+        let tracked = self
+            .frames
+            .get(&vpn)
+            .ok_or(page_table::PagingError::NotMapped)?
+            .clone();
+
+        let page_size = mm_config().page_size();
+        let new_flags = self.permission.clone();
+
+        match tracked {
+            TrackedFrames::Single(frame) => {
+                if Arc::strong_count(&frame) == 1 {
+                    // Exclusive owner: just restore WRITE permission.
+                    page_table.update_flags_with_batch(vpn, new_flags, None)?;
+                    return Ok(());
+                }
+
+                // Shared: allocate a private copy and remap.
+                let new_frame =
+                    Arc::new(alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?);
+                let src_ppn = frame.ppn();
+                let dst_ppn = new_frame.ppn();
+
+                unsafe {
+                    let src_va = arch_ops().paddr_to_vaddr(src_ppn.start_addr().as_usize());
+                    let dst_va = arch_ops().paddr_to_vaddr(dst_ppn.start_addr().as_usize());
+                    core::ptr::copy_nonoverlapping(src_va as *const u8, dst_va as *mut u8, page_size);
+                }
+
+                TlbBatchContextWrapper::execute(|batch| {
+                    page_table.unmap_with_batch(vpn, Some(batch))?;
+                    page_table.map_with_batch(
+                        vpn,
+                        dst_ppn,
+                        PageSize::Size4K,
+                        new_flags,
+                        Some(batch),
+                    )?;
+                    Ok::<(), page_table::PagingError>(())
+                })?;
+
+                // Update ownership after we have successfully installed the new mapping.
+                self.frames.insert(vpn, TrackedFrames::Single(new_frame));
+                Ok(())
+            }
+            TrackedFrames::Multiple(_) | TrackedFrames::Contiguous(_) => {
+                Err(page_table::PagingError::HugePageSplitNotImplemented)
+            }
+        }
     }
 
     /// 拆分区域为两部分
@@ -625,8 +734,9 @@ impl MappingArea {
                 if wants_mapping {
                     TlbBatchContextWrapper::execute(|batch| {
                         for vpn in VpnRange::new(change_start, change_end) {
-                            let frame =
-                                alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?;
+                            let frame = Arc::new(
+                                alloc_frame().ok_or(page_table::PagingError::FrameAllocFailed)?,
+                            );
                             let ppn = frame.ppn();
                             middle_area.frames.insert(vpn, TrackedFrames::Single(frame));
                             page_table.map_with_batch(
