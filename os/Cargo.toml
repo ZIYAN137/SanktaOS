@@ -67,3 +67,8 @@ opt-level = 1  # 测试模式也启用基本优化
 [features]
 # Enable OS competition flow (skip BusyBox init).
 oscomp = []
+
+# Memory management features (default off).
+demand_paging = []
+cow = []
+thp = []

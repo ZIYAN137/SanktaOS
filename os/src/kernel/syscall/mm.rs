@@ -275,7 +275,23 @@ pub fn mmap(addr: *mut c_void, len: usize, prot: i32, flags: i32, fd: i32, offse
 
     // 插入映射区域（PROT_NONE 用 Reserved 占位，不建立页表映射）
     let insert_result = if wants_mapping {
-        space.insert_framed_area(vpn_range, AreaType::UserMmap, pte_flags, None, mmap_file)
+        #[cfg(feature = "demand_paging")]
+        {
+            // Demand paging is enabled only for MAP_PRIVATE anonymous mappings by default.
+            // MAP_SHARED remains eager to keep shared semantics correct without a page cache.
+            let use_lazy = map_flags.contains(MapFlags::PRIVATE)
+                && map_flags.contains(MapFlags::ANONYMOUS)
+                && !map_flags.contains(MapFlags::POPULATE);
+            if use_lazy {
+                space.insert_lazy_area(vpn_range, AreaType::UserMmap, pte_flags, mmap_file)
+            } else {
+                space.insert_framed_area(vpn_range, AreaType::UserMmap, pte_flags, None, mmap_file)
+            }
+        }
+        #[cfg(not(feature = "demand_paging"))]
+        {
+            space.insert_framed_area(vpn_range, AreaType::UserMmap, pte_flags, None, mmap_file)
+        }
     } else {
         space.insert_reserved_area(vpn_range, AreaType::UserMmap, pte_flags, mmap_file)
     };

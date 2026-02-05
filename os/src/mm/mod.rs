@@ -26,6 +26,14 @@ pub use memory_space::{
 // 从 mm crate 重新导出 mapping_area 类型
 pub use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
 
+/// Userspace fault access type (for demand paging / permission checks).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserAccessType {
+    Read,
+    Write,
+    Exec,
+}
+
 use crate::arch::mm::vaddr_to_paddr;
 use crate::config::{MEMORY_END, PAGE_SIZE};
 use crate::earlyprintln;

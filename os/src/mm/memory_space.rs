@@ -7,6 +7,7 @@ use crate::config::{
 };
 use mm::address::{Paddr, PageNum, Ppn, UsizeConvert, Vaddr, Vpn, VpnRange};
 // 从 mm crate 导入类型
+use super::UserAccessType;
 use crate::arch::mm::PageTableInner as ActivePageTableInner;
 use crate::sync::SpinLock;
 use crate::{pr_err, pr_warn};
@@ -474,6 +475,19 @@ impl MemorySpace {
         Ok(())
     }
 
+    /// 插入一个延迟分配区域（不建立页表映射，首次缺页再分配/映射）
+    pub fn insert_lazy_area(
+        &mut self,
+        vpn_range: VpnRange,
+        area_type: AreaType,
+        flags: UniversalPTEFlag,
+        file: Option<MmapFile>,
+    ) -> Result<(), PagingError> {
+        let area = MappingArea::new(vpn_range, area_type, MapType::Lazy, flags, file);
+        self.insert_area(area)?;
+        Ok(())
+    }
+
     /// 插入一个“保留”区域（不建立页表映射）
     ///
     /// 用于 mmap(PROT_NONE) / guard page 场景：需要占位并参与重叠检查，
@@ -526,6 +540,50 @@ impl MemorySpace {
         self.areas
             .iter_mut()
             .find(|area| area.vpn_range().contains(vpn))
+    }
+
+    /// Demand-paging: materialize the faulting userspace page if possible.
+    ///
+    /// When the `demand_paging` feature is disabled, this method is unused.
+    #[cfg(feature = "demand_paging")]
+    pub fn fault_in_user(
+        &mut self,
+        fault_vaddr: usize,
+        access: UserAccessType,
+    ) -> Result<(), PagingError> {
+        let vpn = Vpn::from_addr_floor(Vaddr::from_usize(fault_vaddr));
+        let idx = self
+            .areas
+            .iter()
+            .position(|a| a.vpn_range().contains(vpn))
+            .ok_or(PagingError::NotMapped)?;
+
+        let (map_type, perm) = {
+            let area = &self.areas[idx];
+            (area.map_type(), area.permission())
+        };
+
+        // Permission check against VMA metadata.
+        let ok = match access {
+            UserAccessType::Read => perm.contains(UniversalPTEFlag::READABLE),
+            UserAccessType::Write => perm.contains(UniversalPTEFlag::WRITEABLE),
+            UserAccessType::Exec => perm.contains(UniversalPTEFlag::EXECUTABLE),
+        };
+        if !ok {
+            return Err(PagingError::InvalidAddress);
+        }
+
+        match map_type {
+            MapType::Lazy => {
+                // Allocate and map a single 4K page on demand.
+                let area = &mut self.areas[idx];
+                area.map_one(&mut self.page_table, vpn)?;
+                Ok(())
+            }
+            MapType::Reserved => Err(PagingError::InvalidAddress),
+            // Not a demand-paged region. This fault is likely a protection fault.
+            MapType::Framed | MapType::Direct => Err(PagingError::InvalidAddress),
+        }
     }
 
     /// 获取所有 MMIO 映射区域（用于测试）
@@ -1004,13 +1062,25 @@ impl MemorySpace {
                     }
                 }
 
-                self.insert_framed_area(
-                    new_range,
-                    AreaType::UserHeap,
-                    UniversalPTEFlag::user_rw(),
-                    None,
-                    None, // 非文件映射
-                )?;
+                #[cfg(feature = "demand_paging")]
+                {
+                    self.insert_lazy_area(
+                        new_range,
+                        AreaType::UserHeap,
+                        UniversalPTEFlag::user_rw(),
+                        None, // 非文件映射
+                    )?;
+                }
+                #[cfg(not(feature = "demand_paging"))]
+                {
+                    self.insert_framed_area(
+                        new_range,
+                        AreaType::UserHeap,
+                        UniversalPTEFlag::user_rw(),
+                        None,
+                        None, // 非文件映射
+                    )?;
+                }
             }
         }
 

@@ -889,6 +889,13 @@ impl MappingArea {
         let old_end = self.vpn_range.end();
         let new_end = Vpn::from_usize(old_end.as_usize() + count);
 
+        if self.map_type == MapType::Lazy {
+            // Demand-paged area: only extend the virtual range. Pages will be materialized on
+            // page faults.
+            self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end);
+            return Ok(new_end);
+        }
+
         for i in 0..count {
             let vpn = Vpn::from_usize(old_end.as_usize() + i);
             self.map_one(page_table, vpn)?;
