@@ -721,6 +721,11 @@ impl MemorySpace {
             Ok::<(), PagingError>(())
         })?;
 
+        // Keep MappingArea's frame tracking consistent with the new 4K mappings.
+        if let Some(area) = self.find_area_mut(base) {
+            area.split_contiguous_2m_at(base)?;
+        }
+
         Ok(())
     }
 
@@ -1667,20 +1672,22 @@ impl MemorySpace {
 
         #[cfg(feature = "thp")]
         {
-            // Keep fork COW semantics simple: split huge pages first.
+            // Keep fork semantics simple (and make later munmap/mprotect reliable):
+            // split all 2MiB huge leaf mappings in userspace before cloning.
             //
-            // This matches our write-fault strategy: split -> COW.
+            // This also converts any `TrackedFrames::Contiguous` chunks back into per-page
+            // trackers, so the child will never share a contiguous tracker with the parent.
             let ranges: alloc::vec::Vec<(Vpn, Vpn)> = self
                 .areas
                 .iter()
                 .filter(|a| matches!(a.map_type(), MapType::Framed | MapType::Lazy))
-                .filter(|a| {
-                    let shared = a
-                        .mmap_file()
-                        .map(|f| f.flags.contains(MapFlags::SHARED))
-                        .unwrap_or(false);
-                    !shared && a.permission().contains(UniversalPTEFlag::WRITEABLE)
-                })
+                .filter(|a| matches!(a.area_type(), AreaType::UserText
+                    | AreaType::UserRodata
+                    | AreaType::UserData
+                    | AreaType::UserBss
+                    | AreaType::UserStack
+                    | AreaType::UserHeap
+                    | AreaType::UserMmap))
                 .map(|a| (a.vpn_range().start(), a.vpn_range().end()))
                 .collect();
             for (s, e) in ranges {
@@ -2772,5 +2779,147 @@ mod memory_space_tests {
         println!("  Page 2 has RW permission");
 
         println!("  mprotect partial single page test passed");
+    }
+
+    // ---------------------------------------------------------------------
+    // Demand paging / COW / THP tests (feature-gated)
+    // ---------------------------------------------------------------------
+
+    /// fork(COW): child write triggers copy, parent remains unchanged.
+    #[cfg(feature = "cow")]
+    #[test_case]
+    fn test_cow_fork_child_write_copies() {
+        println!("Testing COW fork + child write fault");
+
+        let mut parent = MemorySpace::new();
+        let vpn = Vpn::from_usize(0x20_000);
+        let vpn_range = VpnRange::new(vpn, Vpn::from_usize(vpn.as_usize() + 1));
+        parent
+            .insert_framed_area(
+                vpn_range,
+                AreaType::UserData,
+                UniversalPTEFlag::user_rw(),
+                None,
+                None,
+            )
+            .expect("insert framed area failed");
+
+        let va = vpn.start_addr().as_usize();
+        parent
+            .write_bytes_at(va, &[0x11, 0x22, 0x33, 0x44])
+            .expect("parent write failed");
+
+        // Fork: both sides are write-protected for private writable mappings.
+        let mut child = parent.clone_for_fork().expect("clone_for_fork failed");
+
+        let (_ppn_p, _sz_p, flags_p) = parent.page_table.walk(vpn).expect("parent walk failed");
+        let (_ppn_c, _sz_c, flags_c) = child.page_table.walk(vpn).expect("child walk failed");
+        assert!(!flags_p.contains(UniversalPTEFlag::WRITEABLE));
+        assert!(!flags_c.contains(UniversalPTEFlag::WRITEABLE));
+
+        // Child write: should trigger COW and remap to a private page.
+        child
+            .handle_user_page_fault(va, UserAccessType::Write)
+            .expect("child COW write fault resolve failed");
+        child
+            .write_bytes_at(va, &[0xaa])
+            .expect("child write failed");
+
+        let mut buf_parent = [0u8; 4];
+        parent
+            .read_bytes_at(va, &mut buf_parent)
+            .expect("parent read failed");
+        assert_eq!(buf_parent, [0x11, 0x22, 0x33, 0x44]);
+
+        let mut buf_child = [0u8; 4];
+        child
+            .read_bytes_at(va, &mut buf_child)
+            .expect("child read failed");
+        assert_eq!(buf_child[0], 0xaa);
+
+        let (ppn_p2, _sz_p2, _flags_p2) = parent.page_table.walk(vpn).unwrap();
+        let (ppn_c2, _sz_c2, flags_c2) = child.page_table.walk(vpn).unwrap();
+        assert_ne!(ppn_p2.as_usize(), ppn_c2.as_usize());
+        assert!(flags_c2.contains(UniversalPTEFlag::WRITEABLE));
+
+        println!("  COW fork test passed");
+    }
+
+    /// THP collapse: after faulting in >= 400 pages within a 2MiB-aligned chunk, we should
+    /// opportunistically install a 2MiB leaf mapping.
+    #[cfg(all(feature = "demand_paging", feature = "thp"))]
+    #[test_case]
+    fn test_thp_collapse_threshold() {
+        println!("Testing THP collapse threshold (400/512)");
+
+        let mut ms = MemorySpace::new();
+        const THP_2M_PAGES: usize = 512;
+        const MIN_PRESENT: usize = 400;
+
+        let base_vpn = Vpn::from_usize(0x40_000); // 2MiB-aligned by construction (multiple of 512)
+        assert_eq!(base_vpn.as_usize() & (THP_2M_PAGES - 1), 0);
+
+        let vpn_range = VpnRange::new(base_vpn, Vpn::from_usize(base_vpn.as_usize() + THP_2M_PAGES));
+        ms.insert_lazy_area(vpn_range, AreaType::UserMmap, UniversalPTEFlag::user_rw(), None)
+            .expect("insert lazy area failed");
+
+        for i in 0..MIN_PRESENT {
+            let va = Vaddr::from_usize(base_vpn.start_addr().as_usize() + i * PAGE_SIZE);
+            ms.handle_user_page_fault(va.as_usize(), UserAccessType::Read)
+                .expect("fault-in failed");
+        }
+
+        let (_ppn, sz, _flags) = ms.page_table.walk(base_vpn).expect("walk base failed");
+        assert_eq!(sz, PageSize::Size2M);
+
+        println!("  THP collapse threshold test passed");
+    }
+
+    /// THP + COW policy: split huge leaf first, then resolve a single-page write fault.
+    ///
+    /// We simulate the fork-style write-protection by clearing WRITE on the huge leaf PTE while
+    /// keeping the VMA metadata logically writable.
+    #[cfg(all(feature = "demand_paging", feature = "cow", feature = "thp"))]
+    #[test_case]
+    fn test_thp_split_before_cow_write_fault() {
+        println!("Testing THP split-before-COW write fault path");
+
+        let mut ms = MemorySpace::new();
+        const THP_2M_PAGES: usize = 512;
+        const MIN_PRESENT: usize = 400;
+
+        let base_vpn = Vpn::from_usize(0x60_000);
+        assert_eq!(base_vpn.as_usize() & (THP_2M_PAGES - 1), 0);
+        let vpn_range = VpnRange::new(base_vpn, Vpn::from_usize(base_vpn.as_usize() + THP_2M_PAGES));
+        ms.insert_lazy_area(vpn_range, AreaType::UserMmap, UniversalPTEFlag::user_rw(), None)
+            .expect("insert lazy area failed");
+
+        for i in 0..MIN_PRESENT {
+            let va = base_vpn.start_addr().as_usize() + i * PAGE_SIZE;
+            ms.handle_user_page_fault(va, UserAccessType::Read).expect("fault-in failed");
+        }
+
+        let (_ppn0, sz0, flags0) = ms.page_table.walk(base_vpn).expect("walk base failed");
+        assert_eq!(sz0, PageSize::Size2M);
+        assert!(flags0.contains(UniversalPTEFlag::WRITEABLE));
+
+        // Clear WRITE on the huge PTE to mimic fork write-protection.
+        ms.page_table
+            .update_flags(base_vpn, UniversalPTEFlag::user_read())
+            .expect("update_flags failed");
+
+        let target_vpn = Vpn::from_usize(base_vpn.as_usize() + 10);
+        let target_va = target_vpn.start_addr().as_usize();
+        ms.handle_user_page_fault(target_va, UserAccessType::Write)
+            .expect("write fault resolve failed");
+
+        let (_ppn_b, sz_b, flags_b) = ms.page_table.walk(base_vpn).expect("walk base after failed");
+        let (_ppn_t, sz_t, flags_t) = ms.page_table.walk(target_vpn).expect("walk target failed");
+        assert_eq!(sz_b, PageSize::Size4K);
+        assert_eq!(sz_t, PageSize::Size4K);
+        assert!(!flags_b.contains(UniversalPTEFlag::WRITEABLE));
+        assert!(flags_t.contains(UniversalPTEFlag::WRITEABLE));
+
+        println!("  THP split-before-COW test passed");
     }
 }
