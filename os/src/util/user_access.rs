@@ -17,6 +17,8 @@ use crate::arch::constant::{USER_BASE, USER_TOP};
 use crate::arch::mm::paddr_to_vaddr;
 use crate::config::PAGE_SIZE;
 use crate::kernel::current_memory_space;
+use mm::page_table::PageTableInner as _;
+use mm::address::{PageNum as _, UsizeConvert as _};
 
 #[inline]
 fn range_ok(user_addr: usize, len: usize) -> bool {
@@ -41,7 +43,8 @@ pub fn copy_from_user(dst: &mut [u8], src_user: usize) -> Result<(), isize> {
         return Err(-(EFAULT as isize));
     }
 
-    let mut space = current_memory_space().lock();
+    let ms = current_memory_space();
+    let mut space = ms.lock();
     let mut read = 0usize;
     while read < dst.len() {
         let cur_va = src_user.checked_add(read).ok_or(-(EFAULT as isize))?;
@@ -70,7 +73,8 @@ pub fn copy_to_user(dst_user: usize, src: &[u8]) -> Result<(), isize> {
         return Err(-(EFAULT as isize));
     }
 
-    let mut space = current_memory_space().lock();
+    let ms = current_memory_space();
+    let mut space = ms.lock();
     let mut written = 0usize;
     while written < src.len() {
         let cur_va = dst_user.checked_add(written).ok_or(-(EFAULT as isize))?;
@@ -128,17 +132,36 @@ fn translate_or_fault_in(
     vaddr: usize,
     access: crate::mm::UserAccessType,
 ) -> Result<mm::address::Paddr, isize> {
-    use mm::address::Vaddr;
-    if let Some(paddr) = space.page_table().translate(Vaddr::from_usize(vaddr)) {
-        return Ok(paddr);
+    use mm::address::{Vaddr, Vpn};
+
+    let va = Vaddr::from_usize(vaddr);
+    let vpn = Vpn::from_addr_floor(va);
+
+    // If the page is present but write-protected (COW), translate() would still succeed.
+    // Use walk() to check PTE flags and resolve COW on-demand.
+    if let Ok((_ppn, _size, flags)) = space.page_table().walk(vpn) {
+        if access == crate::mm::UserAccessType::Write
+            && !flags.contains(mm::page_table::UniversalPTEFlag::WRITEABLE)
+        {
+            #[cfg(feature = "cow")]
+            {
+                space.handle_user_page_fault(vaddr, access).map_err(|_| -(EFAULT as isize))?;
+            }
+            #[cfg(not(feature = "cow"))]
+            {
+                return Err(-(EFAULT as isize));
+            }
+        }
+        if let Some(paddr) = space.page_table().translate(va) {
+            return Ok(paddr);
+        }
     }
 
-    #[cfg(feature = "demand_paging")]
+    #[cfg(any(feature = "demand_paging", feature = "cow"))]
     {
-        if space.fault_in_user(vaddr, access).is_ok() {
-            if let Some(paddr) = space.page_table().translate(Vaddr::from_usize(vaddr)) {
-                return Ok(paddr);
-            }
+        space.handle_user_page_fault(vaddr, access).map_err(|_| -(EFAULT as isize))?;
+        if let Some(paddr) = space.page_table().translate(va) {
+            return Ok(paddr);
         }
     }
 
