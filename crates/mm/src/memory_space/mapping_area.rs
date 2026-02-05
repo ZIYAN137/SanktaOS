@@ -81,6 +81,31 @@ pub struct MappingArea {
 }
 
 impl MappingArea {
+    /// Find a contiguous tracked range covering `vpn`, if any.
+    ///
+    /// The returned base VPN is the key stored in `self.frames` (typically 2MiB-aligned for THP).
+    fn find_contiguous_covering(&self, vpn: Vpn) -> Option<(Vpn, &Arc<crate::frame_allocator::FrameRangeTracker>)> {
+        let (base, tracked) = self.frames.range(..=vpn).next_back()?;
+        match tracked {
+            TrackedFrames::Contiguous(range) => {
+                let base = *base;
+                let end = Vpn::from_usize(base.as_usize().saturating_add(range.len()));
+                if vpn >= base && vpn < end {
+                    Some((base, range))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether `vpn` has been materialized (tracked) either as a 4K page or as part of a
+    /// contiguous tracked range (e.g. a collapsed THP chunk).
+    fn is_materialized(&self, vpn: Vpn) -> bool {
+        self.frames.contains_key(&vpn) || self.find_contiguous_covering(vpn).is_some()
+    }
+
     /// 返回该区域覆盖的虚拟页号范围。
     pub fn vpn_range(&self) -> VpnRange {
         self.vpn_range
@@ -124,13 +149,18 @@ impl MappingArea {
 
     /// 获取虚拟页号（VPN）对应的物理页号（PPN）（如果已映射）
     pub fn get_ppn(&self, vpn: Vpn) -> Option<crate::address::Ppn> {
-        self.frames.get(&vpn).map(|tracked| match tracked {
-            TrackedFrames::Single(frame) => frame.ppn(),
-            TrackedFrames::Multiple(frames) => frames.first().map(|f| f.ppn()).unwrap(),
-            TrackedFrames::Contiguous(_) => {
-                panic!("当前实现不支持连续帧");
-            }
-        })
+        if let Some(tracked) = self.frames.get(&vpn) {
+            return Some(match tracked {
+                TrackedFrames::Single(frame) => frame.ppn(),
+                TrackedFrames::Multiple(frames) => frames.first().map(|f| f.ppn()).unwrap(),
+                TrackedFrames::Contiguous(range) => range.start_ppn(),
+            });
+        }
+
+        // Fallback: a collapsed huge chunk is tracked at its base VPN only.
+        let (base, range) = self.find_contiguous_covering(vpn)?;
+        let off = vpn.as_usize() - base.as_usize();
+        Some(Ppn::from_usize(range.start_ppn().as_usize() + off))
     }
 
     /// 创建一个新的映射区域描述符。
@@ -168,9 +198,7 @@ impl MappingArea {
         batch: Option<&mut TlbBatchContextWrapper>,
     ) -> Result<(), page_table::PagingError> {
         // For demand paging, mapping the same page twice should be a no-op.
-        if matches!(self.map_type, MapType::Framed | MapType::Lazy)
-            && self.frames.contains_key(&vpn)
-        {
+        if matches!(self.map_type, MapType::Framed | MapType::Lazy) && self.is_materialized(vpn) {
             return Ok(());
         }
 
@@ -233,6 +261,11 @@ impl MappingArea {
             return Ok(());
         }
         if self.map_type == MapType::Lazy && !self.frames.contains_key(&vpn) {
+            // A collapsed huge chunk is tracked at its base VPN only, and must be split before
+            // doing per-page unmap operations.
+            if self.find_contiguous_covering(vpn).is_some() {
+                return Err(page_table::PagingError::HugePageSplitNotImplemented);
+            }
             return Ok(());
         }
         page_table.unmap_with_batch(vpn, batch)?;
@@ -347,14 +380,19 @@ impl MappingArea {
         flags: UniversalPTEFlag,
     ) -> Result<(), page_table::PagingError> {
         for (vpn, tracked) in &self.frames {
-            let ppn = match tracked {
-                TrackedFrames::Single(frame) => frame.ppn(),
-                TrackedFrames::Multiple(frames) => frames.first().map(|f| f.ppn()).unwrap(),
-                TrackedFrames::Contiguous(_) => {
-                    return Err(page_table::PagingError::HugePageSplitNotImplemented);
+            match tracked {
+                TrackedFrames::Single(frame) => {
+                    page_table.map(*vpn, frame.ppn(), PageSize::Size4K, flags)?;
                 }
-            };
-            page_table.map(*vpn, ppn, PageSize::Size4K, flags)?;
+                TrackedFrames::Multiple(frames) => {
+                    let ppn = frames.first().map(|f| f.ppn()).unwrap();
+                    page_table.map(*vpn, ppn, PageSize::Size4K, flags)?;
+                }
+                TrackedFrames::Contiguous(range) => {
+                    // THP huge chunk: map as a 2MiB leaf at its base VPN.
+                    page_table.map(*vpn, range.start_ppn(), PageSize::Size2M, flags)?;
+                }
+            }
         }
         Ok(())
     }
@@ -443,14 +481,96 @@ impl MappingArea {
                             .frames
                             .insert(*vpn, TrackedFrames::Multiple(new_frames));
                     }
-                    TrackedFrames::Contiguous(_) => {
-                        return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                    TrackedFrames::Contiguous(range) => {
+                        // Deep-copy a huge chunk.
+                        //
+                        // NOTE: We currently use contiguous tracking only for 2MiB THP chunks.
+                        const THP_2M_PAGES: usize = 512;
+                        if range.len() != THP_2M_PAGES {
+                            return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                        }
+                        let base_ppn = range.start_ppn();
+
+                        let new_range = alloc_contig_frames_aligned(THP_2M_PAGES, THP_2M_PAGES)
+                            .ok_or(page_table::PagingError::FrameAllocFailed)?;
+                        let new_base_ppn = new_range.start_ppn();
+                        let new_range = Arc::new(new_range);
+
+                        for i in 0..THP_2M_PAGES {
+                            let src_ppn = Ppn::from_usize(base_ppn.as_usize() + i);
+                            let dst_ppn = Ppn::from_usize(new_base_ppn.as_usize() + i);
+                            unsafe {
+                                let src_va =
+                                    arch_ops().paddr_to_vaddr(src_ppn.start_addr().as_usize());
+                                let dst_va =
+                                    arch_ops().paddr_to_vaddr(dst_ppn.start_addr().as_usize());
+                                core::ptr::copy_nonoverlapping(
+                                    src_va as *const u8,
+                                    dst_va as *mut u8,
+                                    page_size,
+                                );
+                            }
+                        }
+
+                        page_table.map_with_batch(
+                            *vpn,
+                            new_base_ppn,
+                            PageSize::Size2M,
+                            self.permission.clone(),
+                            Some(batch),
+                        )?;
+                        new_area
+                            .frames
+                            .insert(*vpn, TrackedFrames::Contiguous(new_range));
                     }
                 }
             }
 
             Ok(new_area)
         })
+    }
+
+    /// Split a tracked 2MiB contiguous chunk at `base_vpn` into 512 4KiB trackers.
+    ///
+    /// This only updates `self.frames` ownership model; the caller is responsible for splitting
+    /// page table mappings beforehand (or afterwards) as needed.
+    pub fn split_contiguous_2m_at(&mut self, base_vpn: Vpn) -> Result<(), page_table::PagingError> {
+        const THP_2M_PAGES: usize = 512;
+
+        let Some(tracked) = self.frames.remove(&base_vpn) else {
+            return Ok(());
+        };
+        match tracked {
+            TrackedFrames::Contiguous(range) => {
+                if range.len() != THP_2M_PAGES {
+                    self.frames.insert(base_vpn, TrackedFrames::Contiguous(range));
+                    return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                }
+
+                let owned = match Arc::try_unwrap(range) {
+                    Ok(r) => r,
+                    Err(r) => {
+                        // Shared ownership: we can't transfer page ownership without a more
+                        // sophisticated allocator model.
+                        self.frames.insert(base_vpn, TrackedFrames::Contiguous(r));
+                        return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                    }
+                };
+
+                let frames: alloc::vec::Vec<FrameTracker> = owned.into_allocated_frames();
+                debug_assert!(frames.len() == THP_2M_PAGES);
+                for (i, frame) in frames.into_iter().enumerate() {
+                    let vpn = Vpn::from_usize(base_vpn.as_usize() + i);
+                    self.frames.insert(vpn, TrackedFrames::Single(Arc::new(frame)));
+                }
+                Ok(())
+            }
+            other => {
+                // Not a contiguous chunk; restore it.
+                self.frames.insert(base_vpn, other);
+                Ok(())
+            }
+        }
     }
 
     /// Resolve a COW write fault for a single 4K page.
@@ -1052,10 +1172,8 @@ impl MappingArea {
         // Allocate a 2MiB-aligned contiguous backing.
         let range = alloc_contig_frames_aligned(THP_2M_PAGES, THP_2M_PAGES)
             .ok_or(page_table::PagingError::FrameAllocFailed)?;
-        let frames_vec: alloc::vec::Vec<FrameTracker> = range.into_allocated_frames();
-        debug_assert!(frames_vec.len() == THP_2M_PAGES);
-        let base_ppn = frames_vec[0].ppn();
-        let new_frames: alloc::vec::Vec<Arc<FrameTracker>> = frames_vec.into_iter().map(Arc::new).collect();
+        let base_ppn = range.start_ppn();
+        let range = Arc::new(range);
 
         let page_size = mm_config().page_size();
 
@@ -1097,11 +1215,13 @@ impl MappingArea {
             Ok::<(), page_table::PagingError>(())
         })?;
 
-        // Install the new per-page trackers (fully materialize the chunk).
-        for (i, frame) in new_frames.into_iter().enumerate() {
+        // Replace per-page trackers with a single contiguous tracker.
+        for i in 0..THP_2M_PAGES {
             let v = Vpn::from_usize(base_vpn.as_usize() + i);
-            self.frames.insert(v, TrackedFrames::Single(frame));
+            let _ = self.frames.remove(&v);
         }
+        self.frames
+            .insert(base_vpn, TrackedFrames::Contiguous(range));
 
         Ok(true)
     }
