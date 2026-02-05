@@ -80,14 +80,28 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     use crate::test::assert::{FAILED_INDEX, FAILED_LIST, FAILED_LIST_CAPACITY};
     use core::sync::atomic::Ordering;
 
-    println!("\n\x1b[33m--- Running {} tests ---\x1b[0m", tests.len());
-
     // Compile-time filter for kernel tests.
     //
     // Usage (host side):
     //   OS_TEST_FILTER=memory_space_tests TEST=1 cargo test ... --no-run
     // The produced test ELF will only execute tests whose `type_name` contains the substring.
     let filter = option_env!("OS_TEST_FILTER");
+
+    let total = tests.len();
+    let selected = if let Some(f) = filter {
+        tests.iter().filter(|t| t.name().contains(f)).count()
+    } else {
+        total
+    };
+
+    if let Some(f) = filter {
+        println!(
+            "\n\x1b[33m--- Running {} tests (filter: {}, total: {}) ---\x1b[0m",
+            selected, f, total
+        );
+    } else {
+        println!("\n\x1b[33m--- Running {} tests ---\x1b[0m", total);
+    }
 
     // 重置失败计数器
     TEST_FAILED.store(0, Ordering::SeqCst);
@@ -103,6 +117,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     }
 
     // 遍历并执行所有测试
+    let mut ran_tests: usize = 0;
     let mut failed_tests: usize = 0;
     for test in tests {
         if let Some(f) = filter {
@@ -110,6 +125,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
                 continue;
             }
         }
+        ran_tests += 1;
         if !test.run() {
             failed_tests += 1;
         }
@@ -119,8 +135,8 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     println!("\x1b[33m\n--- Test Summary ---\x1b[0m");
     println!(
         "\x1b[33mTotal: {}\x1b[0m, \x1b[32mPassed: {}\x1b[0m, \x1b[91mFailed: {}\x1b[0m (assertions: {})",
-        tests.len(),
-        tests.len() - failed_tests,
+        ran_tests,
+        ran_tests - failed_tests,
         failed_tests,
         failed_assertions
     );
