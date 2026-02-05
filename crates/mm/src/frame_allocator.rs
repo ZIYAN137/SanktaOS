@@ -408,8 +408,13 @@ impl FrameAllocator {
         // 从对齐边界开始查找
         let mut frame_idx = 0;
         while frame_idx < self.total_frames {
-            // 对齐到下一个边界
-            let aligned_idx = (frame_idx + align_pages - 1) & !(align_pages - 1);
+            // Align to the next boundary in *absolute* PPN space, not relative indices.
+            //
+            // For huge pages we need `start_ppn % align_pages == 0`. If `self.start` is not
+            // aligned, simply aligning `frame_idx` is insufficient.
+            let abs = self.start.as_usize().saturating_add(frame_idx);
+            let abs_aligned = (abs + align_pages - 1) & !(align_pages - 1);
+            let aligned_idx = abs_aligned.saturating_sub(self.start.as_usize());
             if aligned_idx + num > self.total_frames {
                 break;
             }
