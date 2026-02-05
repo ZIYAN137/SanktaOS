@@ -16,6 +16,7 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use mm::memory_space::{AreaType, MapType, MappingArea, MmapFile};
 use mm::page_table::{PageTableInner, PagingError, UniversalPTEFlag};
+use uapi::mm::MapFlags;
 
 // 内核链接器符号
 unsafe extern "C" {
@@ -551,6 +552,20 @@ impl MemorySpace {
         fault_vaddr: usize,
         access: UserAccessType,
     ) -> Result<(), PagingError> {
+        self.handle_user_page_fault(fault_vaddr, access)
+    }
+
+    /// Handle a userspace page fault.
+    ///
+    /// This is a common entry point for:
+    /// - demand paging (materialize Lazy pages)
+    /// - COW (write faults on write-protected pages after fork)
+    #[cfg(any(feature = "demand_paging", feature = "cow"))]
+    pub fn handle_user_page_fault(
+        &mut self,
+        fault_vaddr: usize,
+        access: UserAccessType,
+    ) -> Result<(), PagingError> {
         let vpn = Vpn::from_addr_floor(Vaddr::from_usize(fault_vaddr));
         let idx = self
             .areas
@@ -558,9 +573,13 @@ impl MemorySpace {
             .position(|a| a.vpn_range().contains(vpn))
             .ok_or(PagingError::NotMapped)?;
 
-        let (map_type, perm) = {
+        let (map_type, perm, shared) = {
             let area = &self.areas[idx];
-            (area.map_type(), area.permission())
+            let shared = area
+                .mmap_file()
+                .map(|f| f.flags.contains(MapFlags::SHARED))
+                .unwrap_or(false);
+            (area.map_type(), area.permission(), shared)
         };
 
         // Permission check against VMA metadata.
@@ -573,16 +592,72 @@ impl MemorySpace {
             return Err(PagingError::InvalidAddress);
         }
 
-        match map_type {
-            MapType::Lazy => {
-                // Allocate and map a single 4K page on demand.
-                let area = &mut self.areas[idx];
-                area.map_one(&mut self.page_table, vpn)?;
-                Ok(())
+        // Fast path: already mapped and (likely) OK.
+        if access != UserAccessType::Write {
+            if self.page_table.translate(Vaddr::from_usize(fault_vaddr)).is_some() {
+                return Ok(());
             }
-            MapType::Reserved => Err(PagingError::InvalidAddress),
-            // Not a demand-paged region. This fault is likely a protection fault.
-            MapType::Framed | MapType::Direct => Err(PagingError::InvalidAddress),
+        }
+
+        match access {
+            UserAccessType::Read | UserAccessType::Exec => match map_type {
+                MapType::Lazy => {
+                    #[cfg(feature = "demand_paging")]
+                    {
+                        let area = &mut self.areas[idx];
+                        area.map_one(&mut self.page_table, vpn)?;
+                        Ok(())
+                    }
+                    #[cfg(not(feature = "demand_paging"))]
+                    {
+                        let _ = vpn;
+                        Err(PagingError::InvalidAddress)
+                    }
+                }
+                MapType::Reserved => Err(PagingError::InvalidAddress),
+                MapType::Framed | MapType::Direct => Err(PagingError::InvalidAddress),
+            },
+            UserAccessType::Write => {
+                // Distinguish "not mapped" vs "write-protected" using PTE flags.
+                let mapped = self.page_table.walk(vpn).is_ok();
+                if !mapped {
+                    // Missing mapping: demand paging may materialize it.
+                    match map_type {
+                        MapType::Lazy => {
+                            #[cfg(feature = "demand_paging")]
+                            {
+                                let area = &mut self.areas[idx];
+                                area.map_one(&mut self.page_table, vpn)?;
+                                return Ok(());
+                            }
+                            #[cfg(not(feature = "demand_paging"))]
+                            {
+                                return Err(PagingError::InvalidAddress);
+                            }
+                        }
+                        MapType::Reserved => return Err(PagingError::InvalidAddress),
+                        MapType::Framed | MapType::Direct => return Err(PagingError::InvalidAddress),
+                    }
+                }
+
+                let (_ppn, _size, pte_flags) = self.page_table.walk(vpn)?;
+                if pte_flags.contains(UniversalPTEFlag::WRITEABLE) {
+                    // Likely an A/D-bit fault or other transient; we currently don't emulate A/D.
+                    return Err(PagingError::InvalidAddress);
+                }
+
+                #[cfg(feature = "cow")]
+                {
+                    // Only apply COW to private mappings.
+                    if !shared && perm.contains(UniversalPTEFlag::WRITEABLE) {
+                        let area = &mut self.areas[idx];
+                        area.resolve_cow_write_fault(&mut self.page_table, vpn)?;
+                        return Ok(());
+                    }
+                }
+
+                Err(PagingError::InvalidAddress)
+            }
         }
     }
 
@@ -1448,6 +1523,7 @@ impl MemorySpace {
     /// # 注意
     /// - 直接映射是共享的（不复制）
     /// - 帧映射是深层复制的
+    #[cfg(not(feature = "cow"))]
     pub fn clone_for_fork(&self) -> Result<Self, PagingError> {
         let mut new_space = MemorySpace::new();
         new_space.heap_start = self.heap_start;
@@ -1472,6 +1548,77 @@ impl MemorySpace {
                 }
             }
         }
+
+        Ok(new_space)
+    }
+
+    /// 克隆内存空间（用于 fork 系统调用，COW 模式）
+    ///
+    /// 语义：
+    /// - Direct：重新映射（共享）
+    /// - Reserved：仅克隆元数据
+    /// - Framed/Lazy：共享已分配页，并对“私有可写”页做 write-protect（父子写入触发 COW）
+    #[cfg(feature = "cow")]
+    pub fn clone_for_fork(&mut self) -> Result<Self, PagingError> {
+        use mm::TlbBatchContextWrapper;
+
+        let mut new_space = MemorySpace::new();
+        new_space.heap_start = self.heap_start;
+
+        for area in self.areas.iter() {
+            match area.map_type() {
+                MapType::Direct => {
+                    let mut new_area = area.clone_metadata();
+                    new_area.map(&mut new_space.page_table)?;
+                    new_space.areas.push(new_area);
+                }
+                MapType::Reserved => {
+                    let new_area = area.clone_metadata();
+                    new_space.areas.push(new_area);
+                }
+                MapType::Framed | MapType::Lazy => {
+                    let shared = area
+                        .mmap_file()
+                        .map(|f| f.flags.contains(MapFlags::SHARED))
+                        .unwrap_or(false);
+
+                    let mut child_flags = area.permission();
+                    if !shared && child_flags.contains(UniversalPTEFlag::WRITEABLE) {
+                        child_flags.remove(UniversalPTEFlag::WRITEABLE);
+                    }
+
+                    let new_area = area.clone_shared_frames();
+                    // Map only already materialized pages (Lazy may be sparse).
+                    new_area.map_tracked_frames(&mut new_space.page_table, child_flags)?;
+                    new_space.areas.push(new_area);
+                }
+            }
+        }
+
+        // Write-protect parent pages in a single TLB batch (SMP correctness).
+        let (parent_pt, parent_areas) = (&mut self.page_table, &self.areas);
+        TlbBatchContextWrapper::execute(|batch| {
+            for area in parent_areas.iter() {
+                if !matches!(area.map_type(), MapType::Framed | MapType::Lazy) {
+                    continue;
+                }
+                let shared = area
+                    .mmap_file()
+                    .map(|f| f.flags.contains(MapFlags::SHARED))
+                    .unwrap_or(false);
+                let mut flags = area.permission();
+                if shared || !flags.contains(UniversalPTEFlag::WRITEABLE) {
+                    continue;
+                }
+                flags.remove(UniversalPTEFlag::WRITEABLE);
+
+                for vpn in area.mapped_vpns() {
+                    // Parent is active: use update_flags_with_batch so shootdown happens once.
+                    parent_pt.update_flags_with_batch(vpn, flags, Some(batch))?;
+                }
+            }
+            Ok::<(), PagingError>(())
+        })?;
 
         Ok(new_space)
     }

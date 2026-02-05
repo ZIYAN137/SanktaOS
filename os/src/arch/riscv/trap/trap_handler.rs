@@ -85,7 +85,7 @@ pub fn user_trap(
             let va = stval::read();
             if crate::kernel::current_memory_space()
                 .lock()
-                .fault_in_user(va, crate::mm::UserAccessType::Exec)
+                .handle_user_page_fault(va, crate::mm::UserAccessType::Exec)
                 .is_ok()
             {
                 return;
@@ -98,20 +98,20 @@ pub fn user_trap(
             let va = stval::read();
             if crate::kernel::current_memory_space()
                 .lock()
-                .fault_in_user(va, crate::mm::UserAccessType::Read)
+                .handle_user_page_fault(va, crate::mm::UserAccessType::Read)
                 .is_ok()
             {
                 return;
             }
             crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGSEGV);
         }
-        #[cfg(feature = "demand_paging")]
+        #[cfg(any(feature = "demand_paging", feature = "cow"))]
         Trap::Exception(15) => {
             // Store/AMO page fault
             let va = stval::read();
             if crate::kernel::current_memory_space()
                 .lock()
-                .fault_in_user(va, crate::mm::UserAccessType::Write)
+                .handle_user_page_fault(va, crate::mm::UserAccessType::Write)
                 .is_ok()
             {
                 return;
