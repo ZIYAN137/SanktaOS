@@ -66,6 +66,16 @@ impl FrameTracker {
     pub fn ppn(&self) -> Ppn {
         self.0
     }
+
+    /// Wrap an already-allocated physical frame without clearing it.
+    ///
+    /// # Safety/Contract
+    /// The caller must ensure `ppn` is currently allocated in the global frame allocator.
+    /// This is primarily used by THP collapse/split paths where the frame contents must be
+    /// preserved (already zeroed or copied) and ownership is transferred to RAII trackers.
+    pub fn from_allocated(ppn: Ppn) -> Self {
+        FrameTracker(ppn)
+    }
 }
 
 impl Drop for FrameTracker {
@@ -114,6 +124,16 @@ impl FrameRangeTracker {
     /// 获取连续帧范围的引用。
     pub fn range(&self) -> &PpnRange {
         &self.range
+    }
+
+    /// Convert a contiguous allocation into per-page `FrameTracker`s.
+    ///
+    /// This consumes the range tracker without freeing the underlying frames; each returned
+    /// `FrameTracker` becomes responsible for freeing its page on drop.
+    pub fn into_allocated_frames(self) -> Vec<FrameTracker> {
+        let this = core::mem::ManuallyDrop::new(self);
+        let range = this.range;
+        range.into_iter().map(FrameTracker::from_allocated).collect()
     }
 }
 

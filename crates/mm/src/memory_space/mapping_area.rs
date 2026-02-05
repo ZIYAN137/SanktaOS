@@ -4,7 +4,7 @@ use core::cmp::min;
 
 use crate::address::{Paddr, PageNum, Ppn, UsizeConvert, Vpn, VpnRange};
 use crate::arch_ops::{TlbBatchContextWrapper, arch_ops};
-use crate::frame_allocator::{TrackedFrames, alloc_frame};
+use crate::frame_allocator::{FrameTracker, TrackedFrames, alloc_contig_frames_aligned, alloc_frame};
 use crate::memory_space::MmapFile;
 use crate::mm_config;
 use crate::page_table::{self, PageSize, PageTableEntry, PageTableInner, UniversalPTEFlag};
@@ -985,6 +985,125 @@ impl MappingArea {
         } else {
             Ok(())
         }
+    }
+
+    /// Try to collapse a 2MiB-aligned chunk into a single 2MiB leaf mapping (THP).
+    ///
+    /// This is an opportunistic optimization and returns `Ok(false)` if the chunk is not
+    /// eligible or the threshold is not reached.
+    pub fn try_collapse_2m<PT: PageTableInner<E>, E: PageTableEntry>(
+        &mut self,
+        page_table: &mut PT,
+        base_vpn: Vpn,
+        min_present_pages: usize,
+        avoid_shared_pages: bool,
+    ) -> Result<bool, page_table::PagingError> {
+        const THP_2M_PAGES: usize = 512;
+
+        if self.map_type != MapType::Lazy {
+            return Ok(false);
+        }
+        if self.file.is_some() {
+            // No page cache yet; keep file mappings as 4K pages.
+            return Ok(false);
+        }
+        if (base_vpn.as_usize() & (THP_2M_PAGES - 1)) != 0 {
+            return Ok(false);
+        }
+        let chunk_end = Vpn::from_usize(base_vpn.as_usize() + THP_2M_PAGES);
+        if base_vpn < self.vpn_range.start() || chunk_end > self.vpn_range.end() {
+            return Ok(false);
+        }
+
+        // Skip if already a huge leaf.
+        if let Ok((_ppn, size, _flags)) = page_table.walk(base_vpn) {
+            if size == PageSize::Size2M {
+                return Ok(false);
+            }
+        }
+
+        let mut present = 0usize;
+        for i in 0..THP_2M_PAGES {
+            let v = Vpn::from_usize(base_vpn.as_usize() + i);
+            if self.frames.contains_key(&v) {
+                present += 1;
+            }
+        }
+        if present < min_present_pages {
+            return Ok(false);
+        }
+
+        if avoid_shared_pages {
+            for i in 0..THP_2M_PAGES {
+                let v = Vpn::from_usize(base_vpn.as_usize() + i);
+                let Some(tracked) = self.frames.get(&v) else { continue };
+                match tracked {
+                    TrackedFrames::Single(frame) => {
+                        if Arc::strong_count(frame) > 1 {
+                            return Ok(false);
+                        }
+                    }
+                    // Not expected in current code paths; be conservative.
+                    TrackedFrames::Multiple(_) | TrackedFrames::Contiguous(_) => return Ok(false),
+                }
+            }
+        }
+
+        // Allocate a 2MiB-aligned contiguous backing.
+        let range = alloc_contig_frames_aligned(THP_2M_PAGES, THP_2M_PAGES)
+            .ok_or(page_table::PagingError::FrameAllocFailed)?;
+        let frames_vec: alloc::vec::Vec<FrameTracker> = range.into_allocated_frames();
+        debug_assert!(frames_vec.len() == THP_2M_PAGES);
+        let base_ppn = frames_vec[0].ppn();
+        let new_frames: alloc::vec::Vec<Arc<FrameTracker>> = frames_vec.into_iter().map(Arc::new).collect();
+
+        let page_size = mm_config().page_size();
+
+        // Copy present 4K pages into the new backing. Missing pages stay zeroed.
+        for i in 0..THP_2M_PAGES {
+            let v = Vpn::from_usize(base_vpn.as_usize() + i);
+            let Some(tracked) = self.frames.get(&v) else { continue };
+            let src_ppn = match tracked {
+                TrackedFrames::Single(frame) => frame.ppn(),
+                TrackedFrames::Multiple(frames) => frames.first().map(|f| f.ppn()).unwrap(),
+                TrackedFrames::Contiguous(_) => {
+                    return Err(page_table::PagingError::HugePageSplitNotImplemented);
+                }
+            };
+
+            let dst_ppn = Ppn::from_usize(base_ppn.as_usize() + i);
+
+            unsafe {
+                let src_va = arch_ops().paddr_to_vaddr(src_ppn.start_addr().as_usize());
+                let dst_va = arch_ops().paddr_to_vaddr(dst_ppn.start_addr().as_usize());
+                core::ptr::copy_nonoverlapping(src_va as *const u8, dst_va as *mut u8, page_size);
+            }
+        }
+
+        // Switch page table mappings: unmap 4K leaves and install a 2MiB leaf.
+        let flags = self.permission.clone();
+        TlbBatchContextWrapper::execute(|batch| {
+            for i in 0..THP_2M_PAGES {
+                let v = Vpn::from_usize(base_vpn.as_usize() + i);
+                let _ = page_table.unmap_with_batch(v, Some(batch));
+            }
+            page_table.map_with_batch(
+                base_vpn,
+                base_ppn,
+                PageSize::Size2M,
+                flags,
+                Some(batch),
+            )?;
+            Ok::<(), page_table::PagingError>(())
+        })?;
+
+        // Install the new per-page trackers (fully materialize the chunk).
+        for (i, frame) in new_frames.into_iter().enumerate() {
+            let v = Vpn::from_usize(base_vpn.as_usize() + i);
+            self.frames.insert(v, TrackedFrames::Single(frame));
+        }
+
+        Ok(true)
     }
 }
 
