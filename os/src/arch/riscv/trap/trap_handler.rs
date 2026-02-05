@@ -79,6 +79,45 @@ pub fn user_trap(
             // 处理系统调用
             dispatch_syscall(trap_frame);
         }
+        #[cfg(feature = "demand_paging")]
+        Trap::Exception(12) => {
+            // Instruction page fault
+            let va = stval::read();
+            if crate::kernel::current_memory_space()
+                .lock()
+                .fault_in_user(va, crate::mm::UserAccessType::Exec)
+                .is_ok()
+            {
+                return;
+            }
+            crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGSEGV);
+        }
+        #[cfg(feature = "demand_paging")]
+        Trap::Exception(13) => {
+            // Load page fault
+            let va = stval::read();
+            if crate::kernel::current_memory_space()
+                .lock()
+                .fault_in_user(va, crate::mm::UserAccessType::Read)
+                .is_ok()
+            {
+                return;
+            }
+            crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGSEGV);
+        }
+        #[cfg(feature = "demand_paging")]
+        Trap::Exception(15) => {
+            // Store/AMO page fault
+            let va = stval::read();
+            if crate::kernel::current_memory_space()
+                .lock()
+                .fault_in_user(va, crate::mm::UserAccessType::Write)
+                .is_ok()
+            {
+                return;
+            }
+            crate::kernel::terminate_task(128 + uapi::signal::NUM_SIGSEGV);
+        }
         Trap::Exception(3) => {
             // Breakpoint (EBREAK / C.EBREAK) in U-mode.
             // Many libc implementations use this for abort/trap paths; do not panic the kernel.
