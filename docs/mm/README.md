@@ -11,6 +11,21 @@ MM（Memory Management，内存管理）子系统是 SanktaOS 内核的核心组
 - **内核堆分配**：支持动态内存分配的全局分配器
 - **架构抽象**：统一的接口支持多种硬件架构
 
+### 可选特性（feature flags，默认关闭）
+
+SanktaOS 的部分内存管理能力通过 feature flag 控制（默认关闭，避免引入额外复杂度/回归风险）：
+
+- `demand_paging`：对 `MapType::Lazy` 区域启用按需分配（首次访问触发缺页分配/建立映射）
+- `cow`：fork 采用 Copy-on-Write，共享已物化页面并对“私有可写”页做写保护，写缺页时复制
+- `thp`：透明大页（THP），目前支持 RISC-V SV39 的 2MiB（512*4KiB）leaf mapping，以及 split/collapse
+
+启用方式示例（RISC-V）：
+
+```bash
+cd os
+cargo build --target riscv64gc-unknown-none-elf --features demand_paging,cow,thp
+```
+
 ## 模块结构（代码位置）
 
 ```
@@ -223,4 +238,36 @@ let vaddr_back = paddr.to_vaddr();
 
 - **Rust 版本**：nightly-2025-01-13
 - **支持架构**：RISC-V (SV39), LoongArch (TODO)
-- **页面大小**：4KB（大页支持已暂时禁用）
+- **页面大小**：4KB（基础页）；可选支持 2MiB（`--features thp`，RISC-V SV39）
+
+## Demand Paging / COW / THP 速览
+
+本节给出三个特性的关键语义约定（详细流程见 [整体架构](architecture.md)）。
+
+### Demand Paging（`demand_paging`）
+
+- Lazy VMA：`MapType::Lazy` 仅占位虚拟地址范围，不预先建立 PTE；首次访问触发缺页后分配物理页并映射。
+- 权限：缺页处理会基于 VMA 元数据（READ/WRITE/EXEC）判定访问是否合法；非法访问返回 `SIGSEGV`。
+
+### Copy-on-Write（`cow`）
+
+- fork：父子共享已物化页帧；对“私有可写”（非 `MAP_SHARED` 且 VMA permission 包含 WRITE）页清除 PTE 的 WRITE 位。
+- 写缺页：若共享计数>1，则分配新页、复制旧页内容并重映射；否则仅恢复 WRITE 权限（无需复制）。
+- 内核写用户内存：`copy_to_user` 路径也会触发 COW（通过“翻译失败/不可写 → 缺页处理 → 重试”实现）。
+
+### THP（`thp`，RISC-V SV39 2MiB）
+
+- 页大小：2MiB = 512 * 4KiB，使用 SV39 level-1 leaf PTE 表示。
+- collapse（策略 A，机会式）：对 **Lazy 匿名映射**（无文件映射）在 fault-in 后尝试 collapse：
+  - 阈值：当一个 2MiB chunk 内 materialize 的 4KiB 页数达到 **400/512** 时触发尝试；
+  - 物理内存：需要分配 **2MiB 对齐的连续页帧**（512 页）作为新 backing，复制已存在的 4KiB 页内容；
+  - 跟踪：collapse 后使用 `TrackedFrames::Contiguous` 跟踪整个 2MiB chunk。
+- split：在需要对大页做“部分操作”（如 munmap/mprotect/写缺页）前先 split 为 512 个 4KiB leaf。
+- 与 COW 的交互：写缺页策略为 **split -> COW**（先拆大页，再按 4KiB 粒度处理 COW）。
+
+### SMP / TLB shootdown 约束
+
+页表批量修改（map/unmap/update_flags/split/collapse）需要与多核 TLB 一致性协同：
+
+- 批处理：通过 `TlbBatchContextWrapper` 聚合刷新，减少 IPI 次数；
+- 同步：在可能释放/回收页帧的路径上使用“同步 shootdown”（等待其他 CPU ack）以避免远端 CPU 使用旧 TLB 访问已释放物理页。

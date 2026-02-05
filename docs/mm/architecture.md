@@ -357,6 +357,72 @@ pub const fn paddr_to_vaddr(paddr: usize) -> usize {
 }
 ```
 
+## 可选特性（Demand Paging / COW / THP）
+
+本节描述三项可选内存管理特性在 SanktaOS 中的落点、关键路径与交互约束。
+
+> 这些能力默认关闭，通过 `os/Cargo.toml` 的 feature flags 启用：`demand_paging` / `cow` / `thp`。
+
+### 1) Demand Paging（`demand_paging`）
+
+**目标**：对 Lazy 区域按需分配，降低进程创建成本与内存占用峰值。
+
+**关键点**：
+- VMA：使用 `MapType::Lazy` 仅占位虚拟地址范围，不预先建立页表映射；
+- 缺页入口（RISC-V）：`os/src/arch/riscv/trap/trap_handler.rs` 捕获 instruction/load/store page fault，
+  调用 `MemorySpace::handle_user_page_fault()`；
+- 缺页处理：`os/src/mm/memory_space.rs` 根据访问类型（R/W/X）做权限判定，并在 `MapType::Lazy` 下
+  为 faulting VPN 分配物理页并建立 4KiB 映射；
+- 内核访问用户内存：`os/src/util/user_access.rs` 在 `translate_or_fault_in` 中对不可翻译/不可写的用户地址
+  尝试触发缺页处理后重试，从而使 `copy_from_user/copy_to_user` 也能在 Lazy/COW 下工作。
+
+### 2) Copy-on-Write（`cow`）
+
+**目标**：fork 不再深拷贝用户态匿名页，改为共享 + 写时复制。
+
+**fork 语义**（`os/src/mm/memory_space.rs`）：
+- 子进程：共享已物化页帧（Lazy 仍可能稀疏），并对“私有可写”（非 `MAP_SHARED` 且 VMA permission 含 WRITE）的映射清除 PTE WRITE；
+- 父进程：对同类页统一 write-protect（批处理更新 flags），保证父子任意一方写入都会触发写缺页。
+
+**写缺页语义**（`crates/mm/src/memory_space/mapping_area.rs`）：
+- 若底层页帧引用计数 > 1：分配新页、复制旧页内容、重映射 faulting VPN，并更新跟踪器；
+- 若引用计数 == 1：无需复制，仅恢复 WRITE 权限（等价于“写保护已不再必要”）。
+
+### 3) THP（`thp`，RISC-V SV39 2MiB）
+
+**目标**：减少页表层级与 TLB 压力；在匿名 Lazy 场景下通过 collapse 获得收益。
+
+**页表支持**：
+- `os/src/arch/riscv/mm/page_table.rs` 在 `--features thp` 下支持 2MiB leaf mapping（level-1 叶子项）；
+- collapse 需要从“4KiB 子页表”切换到“2MiB leaf”，因此页表提供 `map_overwrite_with_batch()`：
+  覆盖安装 level-1 leaf，并释放被替换的 level-0 页表页。
+
+**collapse（策略 A，机会式）**：
+- 触发点：Lazy fault-in 后（`MemorySpace::handle_user_page_fault`），对 fault 所在 2MiB chunk 尝试 collapse；
+- 阈值：当 chunk 内物化页数达到 **400/512** 时尝试；
+- 物理内存：分配 **2MiB 对齐的连续页帧**（512 页），复制已有 4KiB 页内容；
+- 跟踪：以 `TrackedFrames::Contiguous` 在 chunk base VPN 处记录整段 2MiB backing。
+
+**split**：
+- 任何可能对大页做“部分操作”的路径（munmap/mprotect/写缺页等）都应先 split；
+- split 会把 2MiB leaf 拆回 512 个 4KiB leaf，并将 `TrackedFrames::Contiguous` 转回逐页 `TrackedFrames::Single`，
+  从而让后续逻辑（按页 unmap / 单页 COW）保持简单。
+
+### 4) 交互约束：THP × COW
+
+为避免在 huge leaf 上实现“4KiB 粒度的 COW 重映射”，SanktaOS 固定采用：
+
+- **写缺页策略：split -> COW**
+- **fork 策略：fork 前先 split 所有用户态 huge leaf**（避免父子共享同一个 `TrackedFrames::Contiguous` 的所有权模型）
+
+### 5) SMP / TLB shootdown
+
+页表更新在 SMP 下必须保证远端 CPU 不会继续使用旧 TLB：
+
+- 批处理：使用 `TlbBatchContextWrapper` 合并多次 map/unmap/update_flags 的刷新；
+- 同步：在可能导致页帧回收/复用的路径（如 unmap/split/collapse 切换）使用同步 shootdown（等待 ACK），
+  防止远端 hart 使用旧映射访问已释放的物理页。
+
 ## 关键设计决策
 
 ### 1. 为什么使用直接映射？
@@ -409,22 +475,23 @@ impl Drop for FrameTracker {
 **优势**：
 - 自动释放，防止内存泄漏
 - 配合 Rust 所有权系统，编译期检查
-- 支持通过 `clone()` 显式拷贝，避免意外共享
+- 支持显式共享/深拷贝语义：通过 `Arc` 共享页帧所有权；需要深拷贝时走专门的复制路径（如 fork 非 COW 或 COW 写缺页）
 
-### 4. 为什么暂时禁用大页？
+### 4. 为什么用 feature gate 的方式支持大页（THP）？
 
-**当前限制**：
-- `PageSize::Size2M` 和 `PageSize::Size1G` 枚举存在但未启用
-- 映射区域的 extend/shrink 仅支持 4K 页
+SanktaOS 目前以 feature gate 的方式提供 **透明大页（THP）**：默认关闭，按需开启以控制复杂度与回归风险。
 
-**原因**：
-- 大页扩展/收缩逻辑复杂，需要拆分/合并页表项
-- 帧分配器需要支持对齐的大块分配
-- 需要更多测试验证正确性
+**当前状态（RISC-V SV39，`--features thp`）**：
+- 支持 **2MiB** 大页（512*4KiB），使用 SV39 level-1 leaf PTE 表示
+- 支持 split/collapse：
+  - split：在 munmap/mprotect/写缺页等“部分操作”前拆分为 512 个 4KiB leaf
+  - collapse：对 Lazy 匿名映射（无文件映射）在 fault-in 后机会式尝试合并
 
-**未来计划**：
-- 代码中已预留大页相关逻辑（已注释）
-- 完善后可启用，优化 TLB 性能
+**为什么需要 feature gate**：
+- 需要连续且对齐的物理帧分配（2MiB 对齐，512 页连续）
+- 需要额外的页表语义：collapse 需要“覆盖安装”2MiB leaf（从原有 4KiB 子页表切换到 2MiB leaf）
+- 与 COW 交互复杂：写缺页策略固定为 **split -> COW**，避免在 huge leaf 上做 4KiB 粒度的复制/重映射
+- SMP 下必须严格处理 TLB shootdown，同步等待其他 CPU 刷新以避免使用旧映射访问已回收页帧
 
 ### 5. 为什么使用左闭右开区间？
 
