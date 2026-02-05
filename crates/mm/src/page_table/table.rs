@@ -113,4 +113,23 @@ where
         flags: UniversalPTEFlag,
         batch: Option<&mut TlbBatchContextWrapper>,
     ) -> PagingResult<()>;
+
+    /// Install a leaf mapping, overwriting an existing non-leaf subtree if needed.
+    ///
+    /// This is primarily used by THP "collapse" paths: a range that was previously mapped as
+    /// 4KiB pages has a non-leaf PTE at the huge-page level; to install a 2MiB leaf, the page
+    /// table implementation must be able to replace that subtree root safely.
+    ///
+    /// Default behavior falls back to `map_with_batch`, which may return `AlreadyMapped` if the
+    /// huge-page PTE is currently occupied by a non-leaf entry.
+    fn map_overwrite_with_batch(
+        &mut self,
+        vpn: Vpn,
+        ppn: Ppn,
+        page_size: PageSize,
+        flags: UniversalPTEFlag,
+        batch: Option<&mut TlbBatchContextWrapper>,
+    ) -> PagingResult<()> {
+        self.map_with_batch(vpn, ppn, page_size, flags, batch)
+    }
 }

@@ -464,6 +464,116 @@ impl PageTableInnerTrait<PageTableEntry> for PageTableInner {
         Ok(())
     }
 
+    fn map_overwrite_with_batch(
+        &mut self,
+        vpn: Vpn,
+        ppn: Ppn,
+        page_size: PageSize,
+        flags: UniversalPTEFlag,
+        batch: Option<&mut TlbBatchContextWrapper>,
+    ) -> PagingResult<()> {
+        if page_size == PageSize::Size4K {
+            return self.map_with_batch(vpn, ppn, page_size, flags, batch);
+        }
+
+        #[cfg(not(feature = "thp"))]
+        {
+            // Huge-page overwrite is only supported when `thp` is enabled.
+            return self.map_with_batch(vpn, ppn, page_size, flags, batch);
+        }
+
+        #[cfg(feature = "thp")]
+        {
+            // Currently only needed for 2MiB THP collapse.
+            if page_size != PageSize::Size2M {
+                return Err(PagingError::HugePageConflict);
+            }
+
+            // Verify flags: leaf must have at least one of R/W/X.
+            if !flags.intersects(
+                UniversalPTEFlag::READABLE
+                    | UniversalPTEFlag::WRITEABLE
+                    | UniversalPTEFlag::EXECUTABLE,
+            ) {
+                return Err(PagingError::InvalidFlags);
+            }
+
+            // Alignment requirements for 2MiB pages (512 * 4KiB).
+            const THP_2M_PAGES: usize = 512;
+            if (vpn.as_usize() & (THP_2M_PAGES - 1)) != 0 || (ppn.as_usize() & (THP_2M_PAGES - 1)) != 0 {
+                return Err(PagingError::InvalidAddress);
+            }
+
+            let mut current_ppn = self.root;
+            let vpn_value = vpn.as_usize();
+            let target_level = 1usize;
+
+            // Walk down to the level-1 page table.
+            for level in (target_level + 1..Self::LEVELS).rev() {
+                let idx = (vpn_value >> (9 * level)) & 0x1ff;
+                let pte_array = unsafe {
+                    core::slice::from_raw_parts_mut(
+                        current_ppn.start_addr().to_vaddr().as_usize() as *mut PageTableEntry,
+                        512,
+                    )
+                };
+                let pte = &mut pte_array[idx];
+
+                if !pte.is_valid() {
+                    // Allocate intermediate page table if missing.
+                    let new_frame = alloc_frame().ok_or(PagingError::FrameAllocFailed)?;
+                    let new_ppn = new_frame.ppn();
+                    self.frames.push(new_frame);
+                    *pte = PageTableEntry::new_table(new_ppn);
+                } else if pte.is_huge() {
+                    // Upper-level leaf conflicts with a lower-level mapping.
+                    return Err(PagingError::HugePageConflict);
+                }
+
+                current_ppn = pte.ppn();
+            }
+
+            // Overwrite the level-1 PTE.
+            let idx = (vpn_value >> (9 * target_level)) & 0x1ff;
+            let pte_array = unsafe {
+                core::slice::from_raw_parts_mut(
+                    current_ppn.start_addr().to_vaddr().as_usize() as *mut PageTableEntry,
+                    512,
+                )
+            };
+            let pte = &mut pte_array[idx];
+
+            if pte.is_valid() && pte.is_huge() {
+                return Err(PagingError::AlreadyMapped);
+            }
+
+            // If this is a non-leaf, free the next-level page table frame (now becoming unreachable).
+            if pte.is_valid() && !pte.is_huge() {
+                let child_ppn = pte.ppn();
+                // Install the huge leaf first so we never leave a dangling pointer on error paths.
+                *pte = PageTableEntry::new_leaf(ppn, flags | UniversalPTEFlag::VALID);
+
+                if let Some(pos) = self.frames.iter().position(|f| f.ppn() == child_ppn) {
+                    // Dropping the tracker deallocates the page table page.
+                    self.frames.remove(pos);
+                }
+            } else {
+                *pte = PageTableEntry::new_leaf(ppn, flags | UniversalPTEFlag::VALID);
+            }
+
+            // Flush local TLB for the base VPN; shootdown is handled by the batch context.
+            Self::tlb_flush(vpn);
+            if batch.is_none() {
+                let num_cpu = unsafe { crate::kernel::NUM_CPU };
+                if num_cpu > 1 {
+                    send_tlb_flush_ipi_all_sync();
+                }
+            }
+
+            Ok(())
+        }
+    }
+
     // 解除映射（支持 TLB 批处理）
     fn unmap_with_batch(
         &mut self,

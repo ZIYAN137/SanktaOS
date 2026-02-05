@@ -1198,14 +1198,14 @@ impl MappingArea {
             }
         }
 
-        // Switch page table mappings: unmap 4K leaves and install a 2MiB leaf.
+        // Switch page table mappings: install a 2MiB leaf at `base_vpn`, replacing any existing
+        // 4KiB subtree root at the huge-page level.
+        //
+        // This must NOT use `map_with_batch` directly, because the level-1 PTE is typically a
+        // non-leaf pointing to a level-0 page table after faulting in 4KiB pages.
         let flags = self.permission.clone();
         TlbBatchContextWrapper::execute(|batch| {
-            for i in 0..THP_2M_PAGES {
-                let v = Vpn::from_usize(base_vpn.as_usize() + i);
-                let _ = page_table.unmap_with_batch(v, Some(batch));
-            }
-            page_table.map_with_batch(
+            page_table.map_overwrite_with_batch(
                 base_vpn,
                 base_ppn,
                 PageSize::Size2M,
